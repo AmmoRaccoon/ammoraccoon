@@ -101,12 +101,12 @@ def scrape():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.set_extra_http_headers({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
 
         print(f"Loading: {BASE_URL}")
-        page.goto(BASE_URL, wait_until='networkidle', timeout=60000)
-        time.sleep(5)
+        page.goto(BASE_URL, wait_until='domcontentloaded', timeout=90000)
+        time.sleep(8)
 
         products = page.query_selector_all('.product-item')
         print(f"Found {len(products)} products")
