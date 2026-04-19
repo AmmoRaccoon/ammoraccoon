@@ -8,8 +8,12 @@ from supabase import create_client
 
 load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.getenv("SUPABASE_KEY")
+
+print(f"URL present: {bool(SUPABASE_URL)}")
+print(f"KEY present: {bool(SUPABASE_KEY)}")
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 RETAILER_SLUG = "ammunition-depot"
@@ -62,13 +66,22 @@ def parse_bullet_type(text):
 def parse_country(text):
     text_lower = text.lower()
     mapping = {
-        'federal': 'USA', 'winchester': 'USA', 'remington': 'USA',
-        'cci': 'USA', 'speer': 'USA', 'hornady': 'USA',
-        'blazer': 'USA', 'fiocchi': 'USA', 'american eagle': 'USA',
-        'magtech': 'Brazil', 'cbc': 'Brazil',
-        'ppu': 'Serbia', 'prvi partizan': 'Serbia',
+        'federal': 'USA',
+        'winchester': 'USA',
+        'remington': 'USA',
+        'cci': 'USA',
+        'speer': 'USA',
+        'hornady': 'USA',
+        'blazer': 'USA',
+        'fiocchi': 'USA',
+        'american eagle': 'USA',
+        'magtech': 'Brazil',
+        'cbc': 'Brazil',
+        'ppu': 'Serbia',
+        'prvi partizan': 'Serbia',
         'sellier': 'Czech Republic',
-        'tula': 'Russia', 'wolf': 'Russia',
+        'tula': 'Russia',
+        'wolf': 'Russia',
         'aguila': 'Mexico',
     }
     for keyword, country in mapping.items():
@@ -100,7 +113,6 @@ def scrape():
 
         for product in products:
             try:
-                # Get name
                 name_el = product.query_selector('a.product-item-link')
                 if not name_el:
                     listings_skipped += 1
@@ -108,37 +120,29 @@ def scrape():
                 name = name_el.inner_text().strip()
                 product_url = name_el.get_attribute('href')
 
-                # Get per-round price range (e.g. "$0.23 - $0.28")
                 price_el = product.query_selector('span.rounds-price')
                 if not price_el:
                     listings_skipped += 1
                     continue
 
                 price_text = price_el.inner_text().strip()
-                # Extract all dollar amounts - take the LOWEST (best deal shown first)
                 price_matches = re.findall(r'\$(\d+\.\d+)', price_text)
                 if not price_matches:
                     listings_skipped += 1
                     continue
 
-                # Use lowest per-round price
                 cpr = float(price_matches[0])
-
-                # Parse rounds from name
                 total_rounds = parse_rounds(name)
                 if not total_rounds or total_rounds <= 0:
                     listings_skipped += 1
                     continue
 
-                # Calculate total price from CPR
                 base_price = round(cpr * total_rounds, 2)
                 price_per_round = cpr
-
                 grain = parse_grain(name)
                 case_material = parse_case_material(name)
                 bullet_type = parse_bullet_type(name)
                 country = parse_country(name)
-
                 product_id = product_url.split('/')[-1].replace('.html', '') if product_url else name[:50]
 
                 listing = {
