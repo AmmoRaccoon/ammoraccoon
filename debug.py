@@ -1,7 +1,7 @@
 import time
 from playwright.sync_api import sync_playwright
 
-URL = "https://palmettostatearmory.com/9mm-ammo.html?product_list_limit=100"
+URL = "https://www.targetsportsusa.com/9mm-luger-ammo-c-51.aspx?pp=240&SortOrder=PriceAscending"
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
@@ -11,19 +11,20 @@ with sync_playwright() as p:
     })
 
     page.goto(URL, wait_until='domcontentloaded', timeout=90000)
-    time.sleep(8)
+    time.sleep(20)
 
-    products = page.query_selector_all('.product-item')
-    print(f"Found {len(products)} products")
-
-    # Find first in-stock product
-    for i, product in enumerate(products[:10]):
-        text = product.inner_text()
-        if 'Out of Stock' not in text:
-            print(f"\n--- IN STOCK PRODUCT {i} TEXT ---")
-            print(text)
-            print(f"\n--- IN STOCK PRODUCT {i} HTML ---")
-            print(product.inner_html()[:2000])
-            break
+    html = page.content()
+    
+    idx = html.find('Wolf Performance')
+    if idx > 0:
+        print("Found products!")
+        print(html[idx:idx+2000])
+    else:
+        print("Products not found")
+        print(f"Page length: {len(html)}")
+        # Print last part of body text to see what loaded
+        print("\n--- BODY TEXT (last 2000 chars) ---")
+        body = page.inner_text('body')
+        print(body[-2000:])
 
     browser.close()
