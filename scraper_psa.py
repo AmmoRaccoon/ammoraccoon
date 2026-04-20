@@ -1,0 +1,204 @@
+import os
+import re
+import time
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
+from supabase import create_client
+
+load_dotenv()
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+RETAILER_SLUG = "psa"
+BASE_URL = "https://palmettostatearmory.com/9mm-ammo.html?product_list_limit=100"
+
+def get_retailer_id():
+    result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
+    if not result.data:
+        print(f"ERROR: Retailer '{RETAILER_SLUG}' not found in database")
+        return None
+    return result.data[0]["id"]
+
+def parse_grain(text):
+    match = re.search(r'(\d+)\s*gr(?:ain)?', text, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+def parse_rounds(text):
+    patterns = [
+        r'(\d[\d,]*)\s*rounds?',
+        r'(\d[\d,]*)\s*rds',
+        r'(\d[\d,]*)/box',
+        r'(\d[\d,]*)\s*rd\b',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return int(match.group(1).replace(',', ''))
+    return None
+
+def parse_case_material(text):
+    text_lower = text.lower()
+    if 'steel' in text_lower or 'forged' in text_lower:
+        return 'Steel'
+    elif 'brass' in text_lower:
+        return 'Brass'
+    elif 'aluminum' in text_lower:
+        return 'Aluminum'
+    elif 'nickel' in text_lower:
+        return 'Nickel'
+    return 'Brass'
+
+def parse_bullet_type(text):
+    text_upper = text.upper()
+    for bt in ['FMJ', 'JHP', 'HP', 'OTM', 'TMJ', 'SP', 'FP']:
+        if bt in text_upper:
+            return bt
+    if 'HOLLOW POINT' in text_upper:
+        return 'JHP'
+    if 'FULL METAL' in text_upper:
+        return 'FMJ'
+    return None
+
+def parse_country(text):
+    text_lower = text.lower()
+    mapping = {
+        'federal': 'USA', 'winchester': 'USA', 'remington': 'USA',
+        'cci': 'USA', 'speer': 'USA', 'hornady': 'USA',
+        'blazer': 'USA', 'fiocchi': 'USA', 'american eagle': 'USA',
+        'hyperion': 'USA', 'browning': 'USA', 'pmc': 'South Korea',
+        'magtech': 'Brazil', 'cbc': 'Brazil',
+        'ppu': 'Serbia', 'prvi partizan': 'Serbia', 'belom': 'Serbia',
+        'sellier': 'Czech Republic', 'tula': 'Russia',
+        'wolf': 'Russia', 'aguila': 'Mexico', 'sterling': 'Turkey',
+    }
+    for keyword, country in mapping.items():
+        if keyword in text_lower:
+            return country
+    return None
+
+def scrape():
+    print(f"[{datetime.now()}] Starting PSA scraper...")
+    retailer_id = get_retailer_id()
+    if not retailer_id:
+        return
+
+    print(f"Retailer ID: {retailer_id}")
+    listings_saved = 0
+    listings_skipped = 0
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.set_extra_http_headers({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        })
+
+        print(f"Loading: {BASE_URL}")
+        page.goto(BASE_URL, wait_until='domcontentloaded', timeout=90000)
+        time.sleep(8)
+
+        products = page.query_selector_all('.product-item')
+        print(f"Found {len(products)} products")
+
+        for product in products:
+            try:
+                text = product.inner_text().strip()
+
+                # Skip out of stock
+                if 'Out of Stock' in text:
+                    listings_skipped += 1
+                    continue
+
+                # Name
+                name_el = product.query_selector('.product-item-link')
+                if not name_el:
+                    listings_skipped += 1
+                    continue
+
+                name = name_el.inner_text().strip()
+                product_url = name_el.get_attribute('href')
+
+                # Find all dollar amounts
+                all_prices = re.findall(r'\$(\d+\.?\d*)', text)
+                if not all_prices:
+                    listings_skipped += 1
+                    continue
+
+                prices = [float(p) for p in all_prices]
+
+                # Per round price is always < $1
+                cpr_prices = [p for p in prices if p < 1]
+                # Total price is always > $1
+                total_prices = [p for p in prices if p > 1]
+
+                if not cpr_prices or not total_prices:
+                    listings_skipped += 1
+                    continue
+
+                price_per_round = cpr_prices[0]
+                base_price = min(total_prices)  # lowest = sale price
+
+                total_rounds = parse_rounds(name)
+                if not total_rounds or total_rounds <= 0:
+                    if price_per_round > 0:
+                        total_rounds = round(base_price / price_per_round)
+                    else:
+                        listings_skipped += 1
+                        continue
+
+                grain = parse_grain(name)
+                case_material = parse_case_material(name)
+                bullet_type = parse_bullet_type(name)
+                country = parse_country(name)
+                product_id = product_url.split('/')[-1].replace('.html', '') if product_url else name[:50]
+
+                listing = {
+                    'retailer_id': retailer_id,
+                    'retailer_product_id': product_id,
+                    'product_url': product_url,
+                    'caliber': '9mm Luger',
+                    'caliber_normalized': '9mm',
+                    'grain': grain,
+                    'bullet_type': bullet_type,
+                    'case_material': case_material,
+                    'condition_type': 'New',
+                    'country_of_origin': country,
+                    'rounds_per_box': total_rounds,
+                    'boxes_per_case': 1,
+                    'total_rounds': total_rounds,
+                    'base_price': base_price,
+                    'price_per_round': price_per_round,
+                    'in_stock': True,
+                    'stock_level': 'In Stock',
+                    'last_updated': datetime.now(timezone.utc).isoformat(),
+                }
+
+                result = supabase.table('listings').upsert(
+                    listing,
+                    on_conflict='retailer_id,retailer_product_id'
+                ).execute()
+
+                supabase.table('price_history').insert({
+                    'listing_id': result.data[0]['id'],
+                    'price': base_price,
+                    'price_per_round': price_per_round,
+                    'in_stock': True,
+                }).execute()
+
+                listings_saved += 1
+                print(f"  Saved: {name[:60]} | ${base_price} | {price_per_round}c/rd | {total_rounds}rds | {case_material}")
+
+            except Exception as e:
+                listings_skipped += 1
+                print(f"  Skipped: {e}")
+                continue
+
+        browser.close()
+
+    print(f"\nDone! Saved: {listings_saved} | Skipped: {listings_skipped}")
+
+if __name__ == '__main__':
+    scrape()

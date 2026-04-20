@@ -1,7 +1,7 @@
 import time
 from playwright.sync_api import sync_playwright
 
-URL = "https://www.luckygunner.com/handgun/9mm-ammo"
+URL = "https://palmettostatearmory.com/9mm-ammo.html?product_list_limit=100"
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
@@ -13,19 +13,17 @@ with sync_playwright() as p:
     page.goto(URL, wait_until='domcontentloaded', timeout=90000)
     time.sleep(8)
 
-    print(f"Title: {page.title()}")
+    products = page.query_selector_all('.product-item')
+    print(f"Found {len(products)} products")
 
-    html = page.content()
-    idx = html.find('per round')
-    if idx < 0:
-        idx = html.find('Per Round')
-    if idx > 0:
-        print("Found price data")
-        print(html[max(0, idx-500):idx+500])
-    else:
-        print("No price data found")
-
-    print("\n--- BODY SAMPLE ---")
-    print(page.inner_text('body')[:2000])
+    # Find first in-stock product
+    for i, product in enumerate(products[:10]):
+        text = product.inner_text()
+        if 'Out of Stock' not in text:
+            print(f"\n--- IN STOCK PRODUCT {i} TEXT ---")
+            print(text)
+            print(f"\n--- IN STOCK PRODUCT {i} HTML ---")
+            print(product.inner_html()[:2000])
+            break
 
     browser.close()
