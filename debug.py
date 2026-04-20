@@ -1,7 +1,7 @@
 import time
 from playwright.sync_api import sync_playwright
 
-URL = "https://www.sgammo.com/catalog/pistol-ammo-sale/9mm-luger-ammo"
+URL = "https://www.luckygunner.com/handgun/9mm-ammo"
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
@@ -11,23 +11,21 @@ with sync_playwright() as p:
     })
 
     page.goto(URL, wait_until='domcontentloaded', timeout=90000)
-    time.sleep(10)
+    time.sleep(8)
+
+    print(f"Title: {page.title()}")
 
     html = page.content()
-
-    idx = html.find('Per Round')
+    idx = html.find('per round')
+    if idx < 0:
+        idx = html.find('Per Round')
     if idx > 0:
-        print("Found 'Per Round'")
-        print(html[max(0, idx-1000):idx+500])
+        print("Found price data")
+        print(html[max(0, idx-500):idx+500])
     else:
-        print("'Per Round' not found")
+        print("No price data found")
 
-    # Check table rows
-    rows = page.query_selector_all('tr')
-    print(f"\nFound {len(rows)} table rows")
-    
-    if rows:
-        for i, row in enumerate(rows[:5]):
-            print(f"\nRow {i}: {row.inner_text()[:200]}")
+    print("\n--- BODY SAMPLE ---")
+    print(page.inner_text('body')[:2000])
 
     browser.close()
