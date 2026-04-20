@@ -40,8 +40,13 @@ def parse_rounds(text):
 
 def parse_case_material(text):
     text_lower = text.lower()
+    steel_brands = ['wolf', 'tula', 'tulammo', 'brown bear', 'silver bear', 'golden bear']
+    if any(brand in text_lower for brand in steel_brands):
+        return 'Steel'
     if 'steel' in text_lower:
         return 'Steel'
+
+
     elif 'brass' in text_lower:
         return 'Brass'
     elif 'aluminum' in text_lower:
