@@ -7,28 +7,37 @@ from supabase import create_client
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
-RETAILER_ID = 11
-BASE_URL = "https://aeammo.com/Ammo/Handgun-Ammo/9mm-Ammo"
+RETAILER_ID = 12
+BASE_URL = "https://rivertownmunitions.com/product-category/handgun/9mm/"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def parse_rounds(title):
-    multi = re.search(r'(\d+)/box\s*\[(\d+)\s*boxes?\]', title, re.IGNORECASE)
+    # Prefer the case total when both box and case are mentioned.
+    case = re.search(r'(\d+)\s*(?:rd|rds|rounds?)\s*case', title, re.IGNORECASE)
+    if case:
+        return int(case.group(1))
+
+    # "500 rd box x 2", "250 rd loose x 4"
+    multi = re.search(r'(\d+)\s*(?:rd|rds|rounds?)\s*(?:box|loose)?\s*x\s*(\d+)', title, re.IGNORECASE)
     if multi:
         return int(multi.group(1)) * int(multi.group(2))
-    single_box = re.search(r'(\d+)/box', title, re.IGNORECASE)
-    if single_box:
-        return int(single_box.group(1))
-    rounds = re.search(r'(\d+)\s*rounds?', title, re.IGNORECASE)
+
+    box = re.search(r'(\d+)\s*(?:rd|rds)\s*box', title, re.IGNORECASE)
+    if box:
+        return int(box.group(1))
+
+    rounds = re.search(r'(\d+)\s*rounds?\b', title, re.IGNORECASE)
     if rounds:
         return int(rounds.group(1))
+
     rd = re.search(r'(\d+)\s*rd\b', title, re.IGNORECASE)
     if rd:
         return int(rd.group(1))
     return None
 
 def parse_grain(title):
-    m = re.search(r'(\d+)\s*gr', title, re.IGNORECASE)
+    m = re.search(r'(\d+)\s*(?:grain|gr)\b', title, re.IGNORECASE)
     return int(m.group(1)) if m else None
 
 def parse_case_material(title):
@@ -42,6 +51,8 @@ def parse_case_material(title):
         return 'Aluminum'
     if 'brass' in title_lower:
         return 'Brass'
+    if 'nickel' in title_lower:
+        return 'Nickel'
     if 'polymer' in title_lower:
         return 'Polymer'
     return 'Brass'
@@ -52,7 +63,7 @@ def parse_bullet_type(title):
         return 'JHP'
     if 'TMJ' in title_upper:
         return 'TMJ'
-    if 'FMJ' in title_upper:
+    if 'FMJ' in title_upper or 'FULL METAL JACKET' in title_upper:
         return 'FMJ'
     if 'LRN' in title_upper or 'LEAD ROUND' in title_upper:
         return 'LRN'
@@ -60,20 +71,38 @@ def parse_bullet_type(title):
         return 'JSP'
     if 'FRANGIBLE' in title_upper:
         return 'Frangible'
+    if 'FTX' in title_upper or 'FLEXLOCK' in title_upper:
+        return 'JHP'
+    if 'INCENDIARY' in title_upper:
+        return 'Incendiary'
+    if 'BLANK' in title_upper:
+        return 'Blank'
     if 'HP' in title_upper:
         return 'JHP'
     return 'FMJ'
 
 def parse_brand(title):
     brands = [
-        'Federal', 'Winchester', 'Remington', 'Hornady', 'CCI', 'Speer',
+        'Federal American Eagle', 'American Eagle', 'Federal Champion', 'Federal',
+        'Winchester', 'Remington', 'Hornady', 'CCI Blazer', 'CCI', 'Speer',
         'Magtech', 'PMC', 'Fiocchi', 'Blazer', 'Wolf', 'Tula', 'TulAmmo',
         'Aguila', 'Browning', 'Sig Sauer', 'SIG Sauer', 'Prvi Partizan',
-        'Sellier & Bellot', 'American Eagle', 'Norma', 'Lapua',
+        'Sellier and Bellot', 'Sellier & Bellot', 'Norma', 'Lapua',
         'Black Hills', 'Underwood', 'Liberty', 'Maxxtech', 'Igman', 'Sterling',
+        'Barnes', 'Precision One', 'New Republic', 'Paraklese',
     ]
+    title_lower = title.lower()
     for brand in brands:
-        if brand.lower() in title.lower():
+        if brand.lower() in title_lower:
+            # Normalize known duplicates.
+            if brand == 'Sellier & Bellot':
+                return 'Sellier and Bellot'
+            if brand == 'Federal American Eagle' or brand == 'American Eagle':
+                return 'Federal'
+            if brand == 'Federal Champion':
+                return 'Federal'
+            if brand == 'CCI Blazer':
+                return 'CCI'
             return brand
     return None
 
@@ -97,10 +126,13 @@ async def scrape():
         page_num = 1
 
         while True:
-            url = BASE_URL if page_num == 1 else f"{BASE_URL}?page={page_num}"
+            url = BASE_URL if page_num == 1 else f"{BASE_URL}page/{page_num}/"
             print(f"Scraping page {page_num}: {url}")
-            await page.goto(url, wait_until='domcontentloaded', timeout=30000)
-            await page.wait_for_timeout(4000)
+            resp = await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            if resp and resp.status == 404:
+                print(f"Page {page_num} returned 404, stopping.")
+                break
+            await page.wait_for_timeout(3000)
 
             cards = await page.query_selector_all('li.product')
 
@@ -110,15 +142,28 @@ async def scrape():
 
             for card in cards:
                 try:
-                    title_el = await card.query_selector('h4.card-title a')
+                    title_el = await card.query_selector('h2 a, .woocommerce-loop-product__title, a.woocommerce-loop-product__link')
+                    link_el = await card.query_selector('a.woocommerce-loop-product__link, h2 a')
                     if not title_el:
                         continue
                     title = (await title_el.inner_text()).strip()
-                    link = await title_el.get_attribute('href')
+                    # Prefer the dedicated product link for the URL.
+                    href_src = link_el or title_el
+                    link = await href_src.get_attribute('href')
                     if link and not link.startswith('http'):
-                        link = 'https://aeammo.com' + link
+                        link = 'https://rivertownmunitions.com' + link
 
-                    price_el = await card.query_selector('.price--withoutTax')
+                    # Combine title + slug so round count detection works even
+                    # when the displayed title is trimmed.
+                    slug_text = link.rsplit('/', 2)[-2].replace('-', ' ') if link else ''
+                    parse_text = f"{title} {slug_text}"
+
+                    # Current price: prefer <ins> (sale), else the lone amount.
+                    price_el = await card.query_selector('.price ins .woocommerce-Price-amount')
+                    if not price_el:
+                        price_el = await card.query_selector('.price > .woocommerce-Price-amount')
+                    if not price_el:
+                        price_el = await card.query_selector('.price .woocommerce-Price-amount')
                     if not price_el:
                         continue
                     price_text = (await price_el.inner_text()).strip()
@@ -127,15 +172,15 @@ async def scrape():
                         continue
                     price = float(price_match.group(1))
 
-                    rounds = parse_rounds(title)
+                    rounds = parse_rounds(parse_text)
                     if not rounds or rounds < 1:
                         continue
 
-                    grain = parse_grain(title)
-                    case_material = parse_case_material(title)
-                    bullet_type = parse_bullet_type(title)
-                    brand = parse_brand(title)
-                    condition = parse_condition(title)
+                    grain = parse_grain(parse_text)
+                    case_material = parse_case_material(parse_text)
+                    bullet_type = parse_bullet_type(parse_text)
+                    brand = parse_brand(parse_text)
+                    condition = parse_condition(parse_text)
                     ppr = round(price / rounds * 100, 4)
                     product_id = extract_product_id(link)
 
@@ -164,7 +209,7 @@ async def scrape():
                     print(f"  Error on card: {e}")
                     continue
 
-            next_btn = await page.query_selector('a[rel="next"], .pagination-item--next a')
+            next_btn = await page.query_selector('a.next.page-numbers')
             if not next_btn:
                 break
             page_num += 1
