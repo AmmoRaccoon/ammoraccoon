@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:rivertownmunitions.com)",
+      "Bash(python scraper_rivertown.py)",
+      "Bash(git *)",
+      "WebFetch(domain:ammo.com)",
+      "WebFetch(domain:www.ammo.com)",
+      "Bash(python _probe_ammocom.py)",
+      "WebFetch(domain:www.bulkammo.com)",
+      "Bash(python _probe_bulkammo.py)",
+      "Bash(python -c ' *)",
+      "WebFetch(domain:www.trueshotammo.com)",
+      "Bash(python _probe_trueshot.py)",
+      "WebFetch(domain:www.grabagun.com)",
+      "Bash(python _probe_grabagun.py)",
+      "Bash(pip show *)",
+      "Bash(pip install *)",
+      "WebFetch(domain:www.midwayusa.com)",
+      "Bash(python _probe_midway.py)",
+      "Bash(python _probe_midway_parse.py)",
+      "WebFetch(domain:www.natchezss.com)",
+      "Bash(python _probe_natchez.py)",
+      "WebFetch(domain:www.wideners.com)",
+      "Bash(python _probe_wideners.py)",
+      "Bash(python _probe_sportsmans.py)",
+      "WebFetch(domain:www.freedommunitions.com)",
+      "WebFetch(domain:www.berelionline.com)",
+      "WebFetch(domain:berelionline.com)",
+      "WebFetch(domain:bereli.com)",
+      "Bash(python _probe_bereli.py)",
+      "WebFetch(domain:www.opticsplanet.com)",
+      "Bash(python _probe_opticsplanet.py)"
+    ]
+  }
+}

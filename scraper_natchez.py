@@ -205,7 +205,7 @@ async def scrape():
                     bullet_type = parse_bullet_type(title)
                     brand = parse_brand(title)
                     condition = parse_condition(title)
-                    ppr = round(price / rounds * 100, 4)
+                    ppr = round(price / rounds, 4)
 
                     product_id = sku[:100]
                     if product_id in seen_ids:

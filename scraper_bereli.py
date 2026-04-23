@@ -188,7 +188,7 @@ async def scrape():
                     case_material = parse_case_material(name)
                     bullet_type = parse_bullet_type(name)
                     condition = parse_condition(name)
-                    ppr = round(price / rounds * 100, 4)
+                    ppr = round(price / rounds, 4)
                     product_id = entity_id[:100]
                     if product_id in seen_ids:
                         continue

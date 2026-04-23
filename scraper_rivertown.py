@@ -181,7 +181,7 @@ async def scrape():
                     bullet_type = parse_bullet_type(parse_text)
                     brand = parse_brand(parse_text)
                     condition = parse_condition(parse_text)
-                    ppr = round(price / rounds * 100, 4)
+                    ppr = round(price / rounds, 4)
                     product_id = extract_product_id(link)
 
                     product = {

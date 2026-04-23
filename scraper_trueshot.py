@@ -144,7 +144,7 @@ def scrape():
                     if product_id in seen_ids:
                         continue
                     seen_ids.add(product_id)
-                    ppr = round(price / rounds * 100, 4)
+                    ppr = round(price / rounds, 4)
 
                     row = {
                         'retailer_id': RETAILER_ID,
