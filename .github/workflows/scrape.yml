@@ -108,3 +108,11 @@ jobs:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       #   run: python scraper_bereli.py
+
+      - name: Scraper health check
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python scripts/health_check.py
