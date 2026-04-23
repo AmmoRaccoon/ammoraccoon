@@ -101,8 +101,10 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_freedommunitions.py
 
-      - name: Run Bereli scraper
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python scraper_bereli.py
+      # Disabled: per-variant pricing on product pages causes low prices to be paired
+      # with high round counts, producing phantom ~3¢/rd listings. Rewrite pending.
+      # - name: Run Bereli scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_bereli.py
