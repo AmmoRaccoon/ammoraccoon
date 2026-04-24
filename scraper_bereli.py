@@ -155,7 +155,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 brand_raw = await article.get_attribute('data-product-brand')
                 # Run BigCommerce's brand attribute through the canonical
                 # normalizer; fall back to the raw value if unrecognized.
-                brand = parse_brand(name or '') or parse_brand(brand_raw or '') or brand_raw
+                brand = parse_brand(name or '') or parse_brand(brand_raw or '') or brand_raw or 'Unknown'
                 data_price = await article.get_attribute('data-product-price')
                 if not entity_id or not name:
                     continue

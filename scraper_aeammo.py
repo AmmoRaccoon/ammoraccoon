@@ -163,7 +163,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 grain = parse_grain(title)
                 case_material = parse_case_material(title)
                 bullet_type = parse_bullet_type(title)
-                brand = parse_brand(title)
+                brand = parse_brand(title) or "Unknown"
                 condition = parse_condition(title)
                 ppr = round(price / rounds, 4)
                 if not sanity_check_ppr(ppr, price, rounds, context=title[:60]):

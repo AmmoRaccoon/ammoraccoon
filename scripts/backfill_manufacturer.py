@@ -53,8 +53,9 @@ def main():
     rows = fetch_null_rows()
     print(f"Found {len(rows)} listings with NULL manufacturer")
 
-    updated = 0
-    still_null = 0
+    updated_real = 0
+    updated_unknown = 0
+    failures = 0
     for row in rows:
         # Scraped URLs typically include the brand in the slug; title copy
         # sometimes leaks into the caliber field for older rows, so we
@@ -62,18 +63,24 @@ def main():
         text = f"{row.get('product_url') or ''} {row.get('caliber') or ''}"
         brand = parse_brand(text)
         if not brand:
-            still_null += 1
-            continue
+            # Final fallback — null breaks frontend filters, so we
+            # always write something. 'Unknown' is a real bucket users
+            # can opt in or out of.
+            brand = 'Unknown'
         try:
             supabase.table('listings').update({'manufacturer': brand}).eq('id', row['id']).execute()
-            updated += 1
-            if updated % 25 == 0:
-                print(f"  ...updated {updated}")
+            if brand == 'Unknown':
+                updated_unknown += 1
+            else:
+                updated_real += 1
+            total = updated_real + updated_unknown
+            if total % 25 == 0:
+                print(f"  ...updated {total}")
         except Exception as e:
             print(f"  failed to update id={row['id']}: {e}")
-            still_null += 1
+            failures += 1
 
-    print(f"\nDone. Updated: {updated} | still null (no brand detected): {still_null}")
+    print(f"\nDone. Real brand: {updated_real} | Unknown fallback: {updated_unknown} | failed: {failures}")
 
 
 if __name__ == '__main__':

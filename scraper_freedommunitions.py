@@ -127,7 +127,7 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
             vendor_raw = (p.get("vendor") or "").strip() or None
             # Prefer a canonical brand from the title; fall back to the raw
             # vendor only if the title doesn't surface a known brand.
-            vendor = parse_brand(title) or parse_brand(vendor_raw or '') or vendor_raw
+            vendor = parse_brand(title) or parse_brand(vendor_raw or '') or vendor_raw or 'Unknown'
             if not handle_p:
                 continue
 

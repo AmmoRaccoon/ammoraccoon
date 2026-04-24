@@ -157,7 +157,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             case_material = parse_case_material(name)
             bullet_type = parse_bullet_type(name)
             country = parse_country(name)
-            manufacturer = parse_brand(name)
+            manufacturer = parse_brand(name) or "Unknown"
             product_id = product_url.split('/')[-1].replace('.html', '') if product_url else name[:50]
             if product_id in seen_ids:
                 continue

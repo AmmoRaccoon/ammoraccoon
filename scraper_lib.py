@@ -175,6 +175,26 @@ _BRAND_ALIASES = [
     ('geco', 'Geco'),
     ('monarch', 'Monarch'),
     ('sgammo', 'SGAmmo'),
+    # Long-tail brands surfaced by the null-manufacturer audit.
+    ('nosler asp', 'Nosler'),
+    ('nosler', 'Nosler'),
+    ('g2 research', 'G2 Research'),
+    ('g2 telos', 'G2 Research'),
+    ('winusa', 'Winchester'),
+    ('american quality ammunition', 'American Quality'),
+    ('us cartridge', 'US Cartridge'),
+    ('sinterfire', 'Sinterfire'),
+    ('patriot sports', 'Patriot Sports'),
+    ('rangemaster', 'Prvi Partizan'),
+    ('privi', 'Prvi Partizan'),  # spelling variant in slugs
+    ('seller bellot', 'Sellier & Bellot'),  # frequent typo
+    ('sellier bellot', 'Sellier & Bellot'),  # hyphen-stripped form
+    ('v crown', 'Sig Sauer'),  # V-Crown is the Sig Sauer JHP line
+    ('sig sauer ep', 'Sig Sauer'),
+    ('sig sauer match elite', 'Sig Sauer'),
+    ('elite v crown', 'Sig Sauer'),
+    ('xie9mm', 'Sig Sauer'),  # SKU prefix used in some URLs
+    ('xi51', 'Sig Sauer'),  # SKU prefix
 ]
 
 
@@ -182,17 +202,30 @@ def parse_brand(text):
     """Return a canonical manufacturer name from product text, or None.
 
     Matches the longest alias first so "Federal American Eagle"
-    resolves before the bare "Federal" prefix.
+    resolves before the bare "Federal" prefix. URL-style and slug-style
+    separators are normalized to spaces so aliases written with spaces
+    (e.g. "sellier and bellot", "prvi partizan") match URL slugs
+    (e.g. "sellier-bellot", "prvi-partizan") too.
     """
     if not text:
         return None
-    t = text.lower()
+    t = text.lower().replace('-', ' ').replace('_', ' ').replace('/', ' ')
     # Sort by descending pattern length for every call so new aliases
     # inserted anywhere in the list still yield longest-match behavior.
     for needle, canonical in sorted(_BRAND_ALIASES, key=lambda kv: -len(kv[0])):
         if needle in t:
             return canonical
     return None
+
+
+def parse_brand_or_unknown(text):
+    """Same as parse_brand but returns 'Unknown' instead of None.
+
+    Use this when assigning the manufacturer column on a listing —
+    null breaks frontend filtering, while 'Unknown' is a real first-
+    class brand bucket users can choose to include or exclude.
+    """
+    return parse_brand(text) or 'Unknown'
 
 
 PPR_FLOOR = 0.01   # Below this, something is off by 100x the other way.

@@ -123,7 +123,7 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
             title = p.get("title", "")
             handle_p = p.get("handle", "")
             vendor_raw = (p.get("vendor") or "").strip() or None
-            vendor = parse_brand(title) or parse_brand(vendor_raw or '') or vendor_raw
+            vendor = parse_brand(title) or parse_brand(vendor_raw or '') or vendor_raw or 'Unknown'
             if not handle_p:
                 continue
 
