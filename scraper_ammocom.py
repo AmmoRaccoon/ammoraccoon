@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -178,6 +178,8 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
 
                 in_stock_el = await card.query_selector('.b-availability__in-stock')
                 in_stock = in_stock_el is not None
+                card_text = await card.inner_text()
+                purchase_limit = parse_purchase_limit(card_text)
 
                 rounds = parse_rounds(title)
                 if not rounds or rounds < 1:
@@ -209,6 +211,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     'bullet_type': bullet_type,
                     'case_material': case_material,
                     'condition_type': condition,
+                    'purchase_limit': purchase_limit,
                     'last_updated': now_iso(),
                 }
                 with_stock_fields(product, in_stock)

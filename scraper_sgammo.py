@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit
 
 load_dotenv()
 
@@ -161,6 +161,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             seen_ids.add(product_id)
 
             in_stock = '+' in text or 'in stock' in text.lower()
+            purchase_limit = parse_purchase_limit(text)
 
             listing = {
                 'retailer_id': retailer_id,
@@ -178,6 +179,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 'total_rounds': total_rounds,
                 'base_price': base_price,
                 'price_per_round': price_per_round,
+                'purchase_limit': purchase_limit,
                 'last_updated': now_iso(),
             }
             with_stock_fields(listing, in_stock)

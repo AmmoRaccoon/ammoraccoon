@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit
 
 load_dotenv()
 
@@ -132,6 +132,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             card_text = product.inner_text()
             oos_el = product.query_selector('.stock.unavailable, .out-of-stock')
             in_stock = oos_el is None and 'out of stock' not in card_text.lower()
+            purchase_limit = parse_purchase_limit(card_text)
 
             price_el = product.query_selector('span.rounds-price')
             if not price_el:
@@ -177,6 +178,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 'total_rounds': total_rounds,
                 'base_price': base_price,
                 'price_per_round': price_per_round,
+                'purchase_limit': purchase_limit,
                 'last_updated': now_iso(),
             }
             with_stock_fields(listing, in_stock)

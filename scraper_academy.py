@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit
 
 load_dotenv()
 
@@ -127,10 +127,12 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
             # Academy hides Add-to-Cart and shows "Out of Stock" /
             # "Currently Unavailable" copy on OOS tiles.
-            card_text = product.inner_text().lower()
-            in_stock = 'out of stock' not in card_text and \
-                       'currently unavailable' not in card_text and \
-                       'sold out' not in card_text
+            card_text = product.inner_text()
+            card_lower = card_text.lower()
+            in_stock = 'out of stock' not in card_lower and \
+                       'currently unavailable' not in card_lower and \
+                       'sold out' not in card_lower
+            purchase_limit = parse_purchase_limit(card_text)
 
             price_el = product.query_selector('[data-auid="product-price"], [class*="price"], [class*="Price"]')
             if not price_el:
@@ -179,6 +181,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 'total_rounds': total_rounds,
                 'base_price': base_price,
                 'price_per_round': price_per_round,
+                'purchase_limit': purchase_limit,
                 'last_updated': now_iso(),
             }
             with_stock_fields(listing, in_stock)

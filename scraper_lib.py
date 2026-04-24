@@ -63,6 +63,34 @@ def normalize_caliber(text):
     return (None, None)
 
 
+_LIMIT_PATTERNS = [
+    re.compile(r'limit\s*(?:of\s*)?(\d+)', re.IGNORECASE),
+    re.compile(r'max(?:imum)?\s*(?:qty|quantity)\s*[:=]?\s*(\d+)', re.IGNORECASE),
+    re.compile(r'(\d+)\s*per\s*(?:customer|order|household)', re.IGNORECASE),
+    re.compile(r'qty\s*limit\s*[:=]?\s*(\d+)', re.IGNORECASE),
+]
+
+
+def parse_purchase_limit(text):
+    """Return an int purchase limit if found in the text, else None.
+
+    Matches common retailer copy like "Limit 2", "Max qty: 5",
+    "5 per customer", "Qty Limit: 3".
+    """
+    if not text:
+        return None
+    for pat in _LIMIT_PATTERNS:
+        m = pat.search(text)
+        if m:
+            try:
+                n = int(m.group(1))
+                if 1 <= n <= 999:
+                    return n
+            except ValueError:
+                pass
+    return None
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
