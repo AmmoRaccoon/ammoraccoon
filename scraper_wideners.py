@@ -5,19 +5,33 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
+from scraper_lib import CALIBERS, now_iso
+
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 RETAILER_ID = 17
-BASE_URL = "https://www.wideners.com/handgun/9mm-ammo"
+SITE_BASE = "https://www.wideners.com"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
 
+CALIBER_PATHS = {
+    '9mm':     '/handgun/9mm-ammo',
+    '380acp':  '/handgun/380-auto-ammo',
+    '40sw':    '/handgun/40-sw-ammo',
+    '38spl':   '/handgun/38-special-ammo',
+    '357mag':  '/handgun/357-magnum-ammo',
+    '22lr':    '/rimfire/22-lr-ammo',
+    '223-556': '/rifle/223-rem-5-56-nato-ammo',
+    '308win':  '/rifle/308-win-7-62x51-ammo',
+    '762x39':  '/rifle/7-62x39-ammo',
+    '300blk':  '/rifle/300-aac-blackout-ammo',
+}
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def parse_rounds(title):
-    # Wideners titles typically end with "- 1000 Rounds" / "- 50 Rounds"
     m = re.search(r'(\d[\d,]*)\s*rounds?\b', title, re.IGNORECASE)
     if m:
         return int(m.group(1).replace(',', ''))
@@ -123,6 +137,112 @@ def parse_condition(title):
         return 'Remanufactured'
     return 'New'
 
+async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
+    base = SITE_BASE + CALIBER_PATHS[caliber_norm]
+    products = []
+    page_num = 1
+
+    while True:
+        url = base if page_num == 1 else f"{base}?p={page_num}"
+        print(f"\n[{caliber_norm}] page {page_num}: {url}")
+        try:
+            resp = await page.goto(url, wait_until='domcontentloaded', timeout=60000)
+        except Exception as e:
+            print(f"  goto failed: {e}")
+            break
+        if resp and resp.status >= 400:
+            print(f"  HTTP {resp.status} - skipping caliber.")
+            break
+        try:
+            await page.wait_for_selector('#products-list li.item', timeout=30000)
+        except Exception:
+            print(f"  no main product list on page {page_num}, stopping caliber.")
+            break
+        await page.wait_for_timeout(2500)
+
+        cards = await page.query_selector_all('#products-list > li.item')
+        if not cards:
+            break
+
+        new_on_page = 0
+        for card in cards:
+            try:
+                slug = await card.get_attribute('id')
+                title_el = await card.query_selector('h2.product-name')
+                if not slug or not title_el:
+                    continue
+                title = (await title_el.inner_text()).strip()
+
+                price_el = await card.query_selector('.price-box .special-price .price')
+                if not price_el:
+                    price_el = await card.query_selector('.price-box .regular-price .price')
+                if not price_el:
+                    price_el = await card.query_selector('.price-box .price')
+                if not price_el:
+                    continue
+                price_text = (await price_el.inner_text()).strip()
+                pm = re.search(r'\$?([\d,]+\.\d{2})', price_text.replace(',', ''))
+                if not pm:
+                    continue
+                price = float(pm.group(1))
+
+                in_stock_el = await card.query_selector('.availability.in-stock')
+                in_stock = in_stock_el is not None
+
+                rounds = parse_rounds(title)
+                if not rounds or rounds < 1:
+                    continue
+
+                grain = parse_grain(title)
+                case_material = parse_case_material(title)
+                bullet_type = parse_bullet_type(title)
+                brand = parse_brand(title)
+                condition = parse_condition(title)
+                ppr = round(price / rounds, 4)
+
+                product_id = slug[:100]
+                if product_id in seen_ids:
+                    continue
+                seen_ids.add(product_id)
+
+                link = f"{base}#{slug}"
+
+                products.append({
+                    'retailer_id': RETAILER_ID,
+                    'retailer_product_id': product_id,
+                    'caliber': caliber_display,
+                    'caliber_normalized': caliber_norm,
+                    'product_url': link,
+                    'base_price': round(price, 2),
+                    'price_per_round': ppr,
+                    'rounds_per_box': rounds,
+                    'total_rounds': rounds,
+                    'manufacturer': brand,
+                    'grain': grain,
+                    'bullet_type': bullet_type,
+                    'case_material': case_material,
+                    'condition_type': condition,
+                    'in_stock': in_stock,
+                    'last_updated': now_iso(),
+                })
+                new_on_page += 1
+                print(f"  [ok] {title[:55]} | ${price} | {rounds}rd | {ppr:.2f}/rd | {'in' if in_stock else 'OUT'}")
+            except Exception as e:
+                print(f"  Error on card: {e}")
+                continue
+
+        if new_on_page == 0:
+            break
+
+        next_link = await page.query_selector('a.next[title="Next"]')
+        if not next_link:
+            break
+        page_num += 1
+        if page_num > 30:
+            break
+    return products
+
+
 async def scrape():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -135,111 +255,11 @@ async def scrape():
 
         all_products = []
         seen_ids = set()
-        page_num = 1
 
-        while True:
-            url = BASE_URL if page_num == 1 else f"{BASE_URL}?p={page_num}"
-            print(f"Scraping page {page_num}: {url}")
-            try:
-                resp = await page.goto(url, wait_until='domcontentloaded', timeout=60000)
-            except Exception as e:
-                print(f"  goto failed: {e}")
-                break
-            if resp and resp.status >= 400:
-                print(f"  status {resp.status}, stopping.")
-                break
-            try:
-                await page.wait_for_selector('#products-list li.item', timeout=30000)
-            except Exception:
-                print(f"  no main product list on page {page_num}, stopping.")
-                break
-            await page.wait_for_timeout(2500)
-
-            cards = await page.query_selector_all('#products-list > li.item')
-            if not cards:
-                print(f"  no cards, stopping.")
-                break
-
-            new_on_page = 0
-            for card in cards:
-                try:
-                    slug = await card.get_attribute('id')
-                    title_el = await card.query_selector('h2.product-name')
-                    if not slug or not title_el:
-                        continue
-                    title = (await title_el.inner_text()).strip()
-
-                    # Prefer special (sale) price, else regular.
-                    price_el = await card.query_selector('.price-box .special-price .price')
-                    if not price_el:
-                        price_el = await card.query_selector('.price-box .regular-price .price')
-                    if not price_el:
-                        price_el = await card.query_selector('.price-box .price')
-                    if not price_el:
-                        continue
-                    price_text = (await price_el.inner_text()).strip()
-                    pm = re.search(r'\$?([\d,]+\.\d{2})', price_text.replace(',', ''))
-                    if not pm:
-                        continue
-                    price = float(pm.group(1))
-
-                    in_stock_el = await card.query_selector('.availability.in-stock')
-                    in_stock = in_stock_el is not None
-
-                    rounds = parse_rounds(title)
-                    if not rounds or rounds < 1:
-                        continue
-
-                    grain = parse_grain(title)
-                    case_material = parse_case_material(title)
-                    bullet_type = parse_bullet_type(title)
-                    brand = parse_brand(title)
-                    condition = parse_condition(title)
-                    ppr = round(price / rounds, 4)
-
-                    product_id = slug[:100]
-                    if product_id in seen_ids:
-                        continue
-                    seen_ids.add(product_id)
-
-                    link = f"{BASE_URL}#{slug}"
-
-                    product = {
-                        'retailer_id': RETAILER_ID,
-                        'retailer_product_id': product_id,
-                        'caliber': '9mm',
-                        'caliber_normalized': '9mm',
-                        'product_url': link,
-                        'base_price': round(price, 2),
-                        'price_per_round': ppr,
-                        'rounds_per_box': rounds,
-                        'total_rounds': rounds,
-                        'manufacturer': brand,
-                        'grain': grain,
-                        'bullet_type': bullet_type,
-                        'case_material': case_material,
-                        'condition_type': condition,
-                        'in_stock': in_stock,
-                        'last_updated': datetime.now(timezone.utc).isoformat(),
-                    }
-                    all_products.append(product)
-                    new_on_page += 1
-                    print(f"  [ok] {title[:55]} | ${price} | {rounds}rd | {ppr:.2f}c/rd | {'in' if in_stock else 'OUT'}")
-                except Exception as e:
-                    print(f"  Error on card: {e}")
-                    continue
-
-            if new_on_page == 0:
-                print(f"  no new products on page {page_num}, stopping.")
-                break
-
-            next_link = await page.query_selector('a.next[title="Next"]')
-            if not next_link:
-                break
-            page_num += 1
-            if page_num > 30:
-                print("  hit page cap 30, stopping.")
-                break
+        for caliber_norm in CALIBER_PATHS:
+            caliber_display = CALIBERS[caliber_norm]
+            products = await scrape_caliber(page, caliber_norm, caliber_display, seen_ids)
+            all_products.extend(products)
 
         await browser.close()
 
@@ -249,7 +269,7 @@ async def scrape():
             print("Nothing to upsert.")
             return
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = now_iso()
         for product in all_products:
             try:
                 result = supabase.table('listings').upsert(

@@ -1,3 +1,10 @@
+"""Bereli scraper — currently disabled.
+
+Variant pricing requires per-product Playwright drilldown that we haven't
+finished. Multi-caliber loop scaffolding is in place so re-enabling is a
+matter of fixing the rounds/price extraction.
+"""
+
 import asyncio
 import os
 import re
@@ -6,21 +13,33 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
+from scraper_lib import CALIBERS, now_iso
+
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 RETAILER_ID = 19
-BASE_URL = "https://www.bereli.com/ammunition/handgun-ammo/9mm-ammo/"
+SITE_BASE = "https://www.bereli.com"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
 
+CALIBER_PATHS = {
+    '9mm':     '/ammunition/handgun-ammo/9mm-ammo/',
+    '380acp':  '/ammunition/handgun-ammo/380-auto-ammo/',
+    '40sw':    '/ammunition/handgun-ammo/40-sw-ammo/',
+    '38spl':   '/ammunition/handgun-ammo/38-special-ammo/',
+    '357mag':  '/ammunition/handgun-ammo/357-magnum-ammo/',
+    '22lr':    '/ammunition/rimfire-ammo/22-lr-ammo/',
+    '223-556': '/ammunition/rifle-ammo/223-556-ammo/',
+    '308win':  '/ammunition/rifle-ammo/308-762x51-ammo/',
+    '762x39':  '/ammunition/rifle-ammo/7-62x39-ammo/',
+    '300blk':  '/ammunition/rifle-ammo/300-blackout-ammo/',
+}
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def parse_rounds(title):
-    # Bereli titles vary: explicit "N Rounds" / hyphenated "50-ROUNDS" / trailing "500 Bulk Pack".
-    # Try explicit forms first, then common trailing-quantity patterns. Products with
-    # no quantity in the title get skipped; they'd require fetching the product page.
     primary = re.search(r'(\d[\d,]*)[\s-]*rounds?\b', title, re.IGNORECASE)
     if primary:
         return int(primary.group(1).replace(',', ''))
@@ -91,16 +110,7 @@ def parse_condition(title):
         return 'Remanufactured'
     return 'New'
 
-def extract_product_id(url):
-    if not url:
-        return None
-    slug = url.rstrip('/').split('/')[-1]
-    return slug[:100]
-
 def fetch_rounds_from_product_page(link):
-    # Bereli product pages (BigCommerce) have the spec as an <li> in the
-    # description: "<li>Quantity: N Rounds per box</li>". Matching only that
-    # exact form avoids grabbing marketing copy or related-product blurbs.
     try:
         req = urllib.request.Request(link, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=20) as resp:
@@ -111,6 +121,109 @@ def fetch_rounds_from_product_page(link):
     if m:
         return int(m.group(1).replace(',', ''))
     return None
+
+async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
+    base = SITE_BASE + CALIBER_PATHS[caliber_norm]
+    products = []
+    page_num = 1
+
+    while True:
+        url = base if page_num == 1 else f"{base}?page={page_num}"
+        print(f"\n[{caliber_norm}] page {page_num}: {url}")
+        try:
+            resp = await page.goto(url, wait_until='domcontentloaded', timeout=60000)
+        except Exception as e:
+            print(f"  goto failed: {e}")
+            break
+        if resp and resp.status >= 400:
+            print(f"  HTTP {resp.status} - skipping caliber.")
+            break
+        await page.wait_for_timeout(4000)
+
+        cards = await page.query_selector_all('li.product')
+        if not cards:
+            break
+
+        new_on_page = 0
+        for card in cards:
+            try:
+                article = await card.query_selector('article.card')
+                if not article:
+                    continue
+                entity_id = await article.get_attribute('data-entity-id')
+                name = await article.get_attribute('data-name')
+                brand = await article.get_attribute('data-product-brand')
+                data_price = await article.get_attribute('data-product-price')
+                if not entity_id or not name:
+                    continue
+
+                link_el = await card.query_selector('.card-title a, .card-figure__link')
+                link = await link_el.get_attribute('href') if link_el else None
+                if link and not link.startswith('http'):
+                    link = SITE_BASE + link
+
+                price_el = await card.query_selector('.price.price--main')
+                price = None
+                if price_el:
+                    price_text = (await price_el.inner_text()).strip()
+                    pm = re.search(r'\$?([\d,]+\.\d{2})', price_text.replace(',', ''))
+                    if pm:
+                        price = float(pm.group(1))
+                if price is None and data_price:
+                    try:
+                        price = float(data_price)
+                    except ValueError:
+                        pass
+                if price is None or price <= 0:
+                    continue
+
+                rounds = parse_rounds(name)
+                if (not rounds or rounds < 1) and link:
+                    rounds = fetch_rounds_from_product_page(link)
+                if not rounds or rounds < 1:
+                    continue
+
+                grain = parse_grain(name)
+                case_material = parse_case_material(name)
+                bullet_type = parse_bullet_type(name)
+                condition = parse_condition(name)
+                ppr = round(price / rounds, 4)
+                product_id = entity_id[:100]
+                if product_id in seen_ids:
+                    continue
+                seen_ids.add(product_id)
+
+                products.append({
+                    'retailer_id': RETAILER_ID,
+                    'retailer_product_id': product_id,
+                    'caliber': caliber_display,
+                    'caliber_normalized': caliber_norm,
+                    'product_url': link,
+                    'base_price': round(price, 2),
+                    'price_per_round': ppr,
+                    'rounds_per_box': rounds,
+                    'total_rounds': rounds,
+                    'manufacturer': brand or None,
+                    'grain': grain,
+                    'bullet_type': bullet_type,
+                    'case_material': case_material,
+                    'condition_type': condition,
+                    'in_stock': True,
+                    'last_updated': now_iso(),
+                })
+                new_on_page += 1
+                print(f"  [ok] {name[:55]} | ${price} | {rounds}rd | {ppr:.2f}/rd")
+            except Exception as e:
+                print(f"  Error on card: {e}")
+                continue
+
+        if new_on_page == 0:
+            break
+        page_num += 1
+        if page_num > 30:
+            break
+    return products
+
 
 async def scrape():
     async with async_playwright() as p:
@@ -124,108 +237,11 @@ async def scrape():
 
         all_products = []
         seen_ids = set()
-        page_num = 1
 
-        while True:
-            url = BASE_URL if page_num == 1 else f"{BASE_URL}?page={page_num}"
-            print(f"Scraping page {page_num}: {url}")
-            try:
-                resp = await page.goto(url, wait_until='domcontentloaded', timeout=60000)
-            except Exception as e:
-                print(f"  goto failed: {e}")
-                break
-            if resp and resp.status >= 400:
-                print(f"  status {resp.status}, stopping.")
-                break
-            await page.wait_for_timeout(4000)
-
-            cards = await page.query_selector_all('li.product')
-            if not cards:
-                print(f"  no cards on page {page_num}, stopping.")
-                break
-
-            new_on_page = 0
-            for card in cards:
-                try:
-                    article = await card.query_selector('article.card')
-                    if not article:
-                        continue
-                    entity_id = await article.get_attribute('data-entity-id')
-                    name = await article.get_attribute('data-name')
-                    brand = await article.get_attribute('data-product-brand')
-                    data_price = await article.get_attribute('data-product-price')
-                    if not entity_id or not name:
-                        continue
-
-                    link_el = await card.query_selector('.card-title a, .card-figure__link')
-                    link = await link_el.get_attribute('href') if link_el else None
-                    if link and not link.startswith('http'):
-                        link = 'https://www.bereli.com' + link
-
-                    # Prefer the visible "main" price element; fall back to data-product-price.
-                    price_el = await card.query_selector('.price.price--main')
-                    price = None
-                    if price_el:
-                        price_text = (await price_el.inner_text()).strip()
-                        pm = re.search(r'\$?([\d,]+\.\d{2})', price_text.replace(',', ''))
-                        if pm:
-                            price = float(pm.group(1))
-                    if price is None and data_price:
-                        try:
-                            price = float(data_price)
-                        except ValueError:
-                            pass
-                    if price is None or price <= 0:
-                        continue
-
-                    rounds = parse_rounds(name)
-                    if (not rounds or rounds < 1) and link:
-                        rounds = fetch_rounds_from_product_page(link)
-                    if not rounds or rounds < 1:
-                        continue
-
-                    grain = parse_grain(name)
-                    case_material = parse_case_material(name)
-                    bullet_type = parse_bullet_type(name)
-                    condition = parse_condition(name)
-                    ppr = round(price / rounds, 4)
-                    product_id = entity_id[:100]
-                    if product_id in seen_ids:
-                        continue
-                    seen_ids.add(product_id)
-
-                    product = {
-                        'retailer_id': RETAILER_ID,
-                        'retailer_product_id': product_id,
-                        'caliber': '9mm',
-                        'caliber_normalized': '9mm',
-                        'product_url': link,
-                        'base_price': round(price, 2),
-                        'price_per_round': ppr,
-                        'rounds_per_box': rounds,
-                        'total_rounds': rounds,
-                        'manufacturer': brand or None,
-                        'grain': grain,
-                        'bullet_type': bullet_type,
-                        'case_material': case_material,
-                        'condition_type': condition,
-                        'in_stock': True,
-                        'last_updated': datetime.now(timezone.utc).isoformat(),
-                    }
-                    all_products.append(product)
-                    new_on_page += 1
-                    print(f"  [ok] {name[:55]} | ${price} | {rounds}rd | {ppr:.2f}c/rd")
-                except Exception as e:
-                    print(f"  Error on card: {e}")
-                    continue
-
-            if new_on_page == 0:
-                print(f"  no new products on page {page_num}, stopping.")
-                break
-            page_num += 1
-            if page_num > 30:
-                print("  hit page cap 30, stopping.")
-                break
+        for caliber_norm in CALIBER_PATHS:
+            caliber_display = CALIBERS[caliber_norm]
+            products = await scrape_caliber(page, caliber_norm, caliber_display, seen_ids)
+            all_products.extend(products)
 
         await browser.close()
 
@@ -235,7 +251,7 @@ async def scrape():
             print("Nothing to upsert.")
             return
 
-        now = datetime.now(timezone.utc).isoformat()
+        now = now_iso()
         for product in all_products:
             try:
                 result = supabase.table('listings').upsert(

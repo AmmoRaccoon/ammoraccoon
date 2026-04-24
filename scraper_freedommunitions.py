@@ -5,15 +5,30 @@ import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
 
+from scraper_lib import CALIBERS, normalize_caliber, now_iso
+
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 RETAILER_ID = 18
-BASE_URL = "https://www.freedommunitions.com"
-COLLECTION_HANDLE = "pistol-9mm"
+SITE_BASE = "https://www.freedommunitions.com"
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
+
+# Freedom Munitions Shopify collection handles per caliber.
+COLLECTION_HANDLES = {
+    '9mm':     'pistol-9mm',
+    '380acp':  'pistol-380-acp',
+    '40sw':    'pistol-40-s-w',
+    '38spl':   'pistol-38-special',
+    '357mag':  'pistol-357-magnum',
+    '22lr':    'rimfire-22-lr',
+    '223-556': 'rifle-223-556',
+    '308win':  'rifle-308-7-62x51',
+    '762x39':  'rifle-7-62x39',
+    '300blk':  'rifle-300-blackout',
+}
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -23,11 +38,9 @@ def fetch_json(url):
         return json.loads(resp.read())
 
 def parse_rounds(text, variant_title=""):
-    # Freedom Munitions titles: "... 50 rounds, ..." / "... 50 Rounds ..."
     primary = re.search(r'(\d[\d,]*)\s*rounds?\b', text, re.IGNORECASE)
     if primary:
         return int(primary.group(1).replace(',', ''))
-    # Fallback: numeric variant title
     if variant_title and variant_title.lower() != 'default title':
         m = re.search(r'(\d+)', variant_title)
         if m:
@@ -66,7 +79,7 @@ def parse_bullet_type(text):
     if 'FMJ' in u or 'FULL METAL JACKET' in u:
         return 'FMJ'
     if 'ROUND NOSE' in u or ' RN' in u or u.endswith('RN') or '(RN)' in u:
-        return 'FMJ'  # Round Nose is typically FMJ-RN
+        return 'FMJ'
     if 'LRN' in u or 'LEAD ROUND' in u:
         return 'LRN'
     if 'JSP' in u:
@@ -89,17 +102,14 @@ def parse_condition(text):
         return 'Remanufactured'
     return 'New'
 
-def is_nine_mm(text):
-    t = text.lower()
-    return '9mm' in t or '9 mm' in t or '9x19' in t or 'luger' in t
 
-def scrape():
-    all_rows = []
-    seen_ids = set()
+def scrape_caliber(caliber_norm, caliber_display, seen_ids):
+    handle = COLLECTION_HANDLES[caliber_norm]
+    rows = []
     page_num = 1
     while True:
-        url = f"{BASE_URL}/collections/{COLLECTION_HANDLE}/products.json?page={page_num}&limit=250"
-        print(f"Fetching page {page_num}: {url}")
+        url = f"{SITE_BASE}/collections/{handle}/products.json?page={page_num}&limit=250"
+        print(f"\n[{caliber_norm}] page {page_num}: {url}")
         try:
             data = fetch_json(url)
         except Exception as e:
@@ -108,14 +118,19 @@ def scrape():
 
         products = data.get("products", [])
         if not products:
-            print(f"  No products on page {page_num}, stopping.")
+            print(f"  No products on page {page_num}, stopping caliber.")
             break
 
         for p in products:
             title = p.get("title", "")
-            handle = p.get("handle", "")
+            handle_p = p.get("handle", "")
             vendor = (p.get("vendor") or "").strip() or None
-            if not handle or not is_nine_mm(title):
+            if not handle_p:
+                continue
+
+            # Defensive: confirm caliber matches title - skip cross-listed items.
+            _, detected = normalize_caliber(title)
+            if detected and detected != caliber_norm:
                 continue
 
             grain = parse_grain(title)
@@ -139,18 +154,18 @@ def scrape():
 
                     available = bool(v.get("available", False))
                     variant_id = v.get("id")
-                    link = f"{BASE_URL}/products/{handle}"
-                    product_id = (f"{handle}-{variant_id}" if variant_id else handle)[:100]
+                    link = f"{SITE_BASE}/products/{handle_p}"
+                    product_id = (f"{handle_p}-{variant_id}" if variant_id else handle_p)[:100]
                     if product_id in seen_ids:
                         continue
                     seen_ids.add(product_id)
                     ppr = round(price / rounds, 4)
 
-                    row = {
+                    rows.append({
                         'retailer_id': RETAILER_ID,
                         'retailer_product_id': product_id,
-                        'caliber': '9mm',
-                        'caliber_normalized': '9mm',
+                        'caliber': caliber_display,
+                        'caliber_normalized': caliber_norm,
                         'product_url': link,
                         'base_price': round(price, 2),
                         'price_per_round': ppr,
@@ -162,15 +177,26 @@ def scrape():
                         'case_material': case_material,
                         'condition_type': condition,
                         'in_stock': available,
-                        'last_updated': datetime.now(timezone.utc).isoformat(),
-                    }
-                    all_rows.append(row)
-                    print(f"  [ok] {title[:55]} | {rounds}rd | ${price} | {ppr:.2f}c/rd | {'in' if available else 'OUT'}")
+                        'last_updated': now_iso(),
+                    })
+                    print(f"  [ok] {title[:55]} | {rounds}rd | ${price} | {ppr:.2f}/rd | {'in' if available else 'OUT'}")
                 except Exception as e:
                     print(f"  Error on variant: {e}")
                     continue
 
         page_num += 1
+        if page_num > 10:
+            break
+    return rows
+
+
+def scrape():
+    all_rows = []
+    seen_ids = set()
+    for caliber_norm in COLLECTION_HANDLES:
+        caliber_display = CALIBERS[caliber_norm]
+        rows = scrape_caliber(caliber_norm, caliber_display, seen_ids)
+        all_rows.extend(rows)
 
     print(f"\nTotal scraped: {len(all_rows)}")
 
@@ -178,7 +204,7 @@ def scrape():
         print("Nothing to upsert.")
         return
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_iso()
     for row in all_rows:
         try:
             result = supabase.table('listings').upsert(
