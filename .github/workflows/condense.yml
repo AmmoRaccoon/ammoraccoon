@@ -1,0 +1,30 @@
+name: Condense price_history
+
+# Rolls up price_history rows older than 30 days to one row per
+# (listing_id, UTC day). Runs separately from the 2-hour scrape
+# because it only needs to touch the DB — no scraping.
+on:
+  schedule:
+    - cron: '0 0 * * 0'   # Sunday 00:00 UTC
+  workflow_dispatch:
+
+jobs:
+  condense:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install python-dotenv "supabase==2.15.0"
+
+      - name: Condense history
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scripts/condense_history.py
