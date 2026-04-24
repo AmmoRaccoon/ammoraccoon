@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -194,6 +194,8 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 brand = parse_brand(parse_text)
                 condition = parse_condition(parse_text)
                 ppr = round(price / rounds, 4)
+                if not sanity_check_ppr(ppr, price, rounds, context=parse_text[:60]):
+                    continue
                 product_id = extract_product_id(link)
                 if product_id in seen_ids:
                     continue

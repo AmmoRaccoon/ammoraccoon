@@ -199,6 +199,10 @@ PPR_FLOOR = 0.01   # Below this, something is off by 100x the other way.
 PPR_CEILING = 5.00 # $5/rd is premium-defensive territory; above it is almost
                    # certainly a unit-conversion bug. Belt-and-suspenders
                    # guard against the April 22 cents-to-dollars regression.
+                   # TODO: when .50 BMG (real-world ~$6-10/rd), .338 Lapua,
+                   # or similar premium-rifle calibers are added, raise the
+                   # ceiling OR scope it per caliber_normalized — a blanket
+                   # $5 ceiling will silently drop legitimate listings.
 
 
 def sanity_check_ppr(ppr, price, rounds, context=''):

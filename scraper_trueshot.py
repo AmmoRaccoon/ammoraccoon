@@ -5,7 +5,7 @@ import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -165,6 +165,8 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
                         continue
                     seen_ids.add(product_id)
                     ppr = round(price / rounds, 4)
+                    if not sanity_check_ppr(ppr, price, rounds, context=title[:60]):
+                        continue
 
                     row = {
                         'retailer_id': RETAILER_ID,
