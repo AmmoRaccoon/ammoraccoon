@@ -195,6 +195,35 @@ def parse_brand(text):
     return None
 
 
+PPR_FLOOR = 0.01   # Below this, something is off by 100x the other way.
+PPR_CEILING = 5.00 # $5/rd is premium-defensive territory; above it is almost
+                   # certainly a unit-conversion bug. Belt-and-suspenders
+                   # guard against the April 22 cents-to-dollars regression.
+
+
+def sanity_check_ppr(ppr, price, rounds, context=''):
+    """Return True if a computed price_per_round looks physically plausible.
+
+    Falsifies when the scraper's arithmetic is obviously wrong — stops a
+    misparsed row from leaking into the DB regardless of which scraper
+    produced it. Scrapers should call this after computing ppr and
+    `continue` on False.
+    """
+    if ppr is None:
+        return False
+    try:
+        p = float(ppr)
+    except (TypeError, ValueError):
+        return False
+    if p < PPR_FLOOR or p > PPR_CEILING:
+        print(
+            f"  [sanity] ppr ${p:.4f} outside [{PPR_FLOOR}, {PPR_CEILING}] "
+            f"(price=${price}, rounds={rounds}) {context}"
+        )
+        return False
+    return True
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
