@@ -5,7 +5,7 @@ import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -124,7 +124,10 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
         for p in products:
             title = p.get("title", "")
             handle_p = p.get("handle", "")
-            vendor = (p.get("vendor") or "").strip() or None
+            vendor_raw = (p.get("vendor") or "").strip() or None
+            # Prefer a canonical brand from the title; fall back to the raw
+            # vendor only if the title doesn't surface a known brand.
+            vendor = parse_brand(title) or parse_brand(vendor_raw or '') or vendor_raw
             if not handle_p:
                 continue
 

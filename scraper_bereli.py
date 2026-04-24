@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -152,7 +152,10 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     continue
                 entity_id = await article.get_attribute('data-entity-id')
                 name = await article.get_attribute('data-name')
-                brand = await article.get_attribute('data-product-brand')
+                brand_raw = await article.get_attribute('data-product-brand')
+                # Run BigCommerce's brand attribute through the canonical
+                # normalizer; fall back to the raw value if unrecognized.
+                brand = parse_brand(name or '') or parse_brand(brand_raw or '') or brand_raw
                 data_price = await article.get_attribute('data-product-price')
                 if not entity_id or not name:
                     continue

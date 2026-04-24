@@ -91,6 +91,110 @@ def parse_purchase_limit(text):
     return None
 
 
+# Canonical brand names. Multi-word entries must come before any
+# single-word prefix/suffix to let the longest match win ("American
+# Eagle" before "Federal" so Federal American Eagle titles don't
+# collapse to the base brand on the first pass).
+_BRAND_ALIASES = [
+    # (match_lowercase, canonical_display)
+    ('federal american eagle', 'Federal'),
+    ('american eagle', 'Federal'),
+    ('federal champion', 'Federal'),
+    ('federal personal defense', 'Federal'),
+    ('federal premium', 'Federal'),
+    ('federal hst', 'Federal'),
+    ('federal', 'Federal'),
+    ('winchester usa forged', 'Winchester'),
+    ('winchester supreme elite', 'Winchester'),
+    ('winchester white box', 'Winchester'),
+    ('winchester', 'Winchester'),
+    ('remington golden saber', 'Remington'),
+    ('remington htp', 'Remington'),
+    ('remington umc', 'Remington'),
+    ('remington', 'Remington'),
+    ('hornady critical duty', 'Hornady'),
+    ('hornady critical defense', 'Hornady'),
+    ('hornady', 'Hornady'),
+    ('cci blazer', 'CCI'),
+    ('cci', 'CCI'),
+    ('speer gold dot', 'Speer'),
+    ('speer lawman', 'Speer'),
+    ('speer', 'Speer'),
+    ('blazer brass', 'Blazer'),
+    ('blazer', 'Blazer'),
+    ('magtech', 'Magtech'),
+    ('pmc bronze', 'PMC'),
+    ('pmc', 'PMC'),
+    ('fiocchi', 'Fiocchi'),
+    ('sellier and bellot', 'Sellier & Bellot'),
+    ('sellier & bellot', 'Sellier & Bellot'),
+    ('seller & bellot', 'Sellier & Bellot'),
+    ('s&b', 'Sellier & Bellot'),
+    ('tulammo', 'Tula'),
+    ('tula', 'Tula'),
+    ('wolf', 'Wolf'),
+    ('prvi partizan (ppu)', 'Prvi Partizan'),
+    ('prvi partizan', 'Prvi Partizan'),
+    ('ppu ', 'Prvi Partizan'),
+    ('norma', 'Norma'),
+    ('lapua', 'Lapua'),
+    ('black hills', 'Black Hills'),
+    ('underwood', 'Underwood'),
+    ('sig sauer', 'Sig Sauer'),
+    ('liberty ammunition', 'Liberty'),
+    ('liberty', 'Liberty'),
+    ('maxxtech', 'Maxxtech'),
+    ('igman', 'Igman'),
+    ('armscor', 'Armscor'),
+    ('aguila', 'Aguila'),
+    ('browning', 'Browning'),
+    ('barnes', 'Barnes'),
+    ('sierra', 'Sierra'),
+    ('atomic', 'Atomic'),
+    ('sterling steel', 'Sterling'),
+    ('sterling', 'Sterling'),
+    ('belom', 'Belom'),
+    ('bvac', 'BVAC'),
+    ('veteran', 'Veteran'),
+    ('hyperion', 'Hyperion'),
+    ('staccato', 'Staccato'),
+    ('corbon', 'Corbon'),
+    ('precision one', 'Precision One'),
+    ('freedom munitions', 'Freedom Munitions'),
+    ('turan', 'Turan'),
+    ('stv', 'STV'),
+    ('silver bear', 'Silver Bear'),
+    ('brown bear', 'Brown Bear'),
+    ('barnaul', 'Barnaul'),
+    ('red army', 'Red Army'),
+    ('new republic', 'New Republic'),
+    ('paraklese', 'Paraklese'),
+    ('excalibur', 'Excalibur'),
+    ('colt', 'Colt'),
+    ('cbc', 'Magtech'),  # CBC is Magtech's international brand.
+    ('geco', 'Geco'),
+    ('monarch', 'Monarch'),
+    ('sgammo', 'SGAmmo'),
+]
+
+
+def parse_brand(text):
+    """Return a canonical manufacturer name from product text, or None.
+
+    Matches the longest alias first so "Federal American Eagle"
+    resolves before the bare "Federal" prefix.
+    """
+    if not text:
+        return None
+    t = text.lower()
+    # Sort by descending pattern length for every call so new aliases
+    # inserted anywhere in the list still yield longest-match behavior.
+    for needle, canonical in sorted(_BRAND_ALIASES, key=lambda kv: -len(kv[0])):
+        if needle in t:
+            return canonical
+    return None
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
