@@ -65,3 +65,16 @@ def normalize_caliber(text):
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+def with_stock_fields(listing, in_stock, now=None):
+    """Add in_stock / stock_level / last_seen_in_stock to a listing dict.
+
+    last_seen_in_stock is only set when in_stock is True so that
+    out-of-stock cycles don't overwrite the previous good timestamp.
+    """
+    listing['in_stock'] = bool(in_stock)
+    listing['stock_level'] = 'In Stock' if in_stock else 'Out of Stock'
+    if in_stock:
+        listing['last_seen_in_stock'] = now or now_iso()
+    return listing

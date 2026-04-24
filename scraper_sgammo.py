@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso
+from scraper_lib import CALIBERS, now_iso, with_stock_fields
 
 load_dotenv()
 
@@ -178,10 +178,9 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 'total_rounds': total_rounds,
                 'base_price': base_price,
                 'price_per_round': price_per_round,
-                'in_stock': in_stock,
-                'stock_level': 'In Stock' if in_stock else 'Out of Stock',
                 'last_updated': now_iso(),
             }
+            with_stock_fields(listing, in_stock)
 
             result = supabase.table('listings').upsert(
                 listing,

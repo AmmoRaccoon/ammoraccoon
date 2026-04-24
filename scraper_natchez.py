@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -219,7 +219,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
 
                 link = href if href.startswith('http') else SITE_BASE + href
 
-                products.append({
+                product = {
                     'retailer_id': RETAILER_ID,
                     'retailer_product_id': product_id,
                     'caliber': caliber_display,
@@ -234,9 +234,10 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     'bullet_type': bullet_type,
                     'case_material': case_material,
                     'condition_type': condition,
-                    'in_stock': in_stock,
                     'last_updated': now_iso(),
-                })
+                }
+                with_stock_fields(product, in_stock)
+                products.append(product)
                 new_on_page += 1
                 print(f"  [ok] {title[:55]} | ${price} | {rounds}rd | {ppr:.2f}/rd | {'in' if in_stock else 'OUT'}")
             except Exception as e:

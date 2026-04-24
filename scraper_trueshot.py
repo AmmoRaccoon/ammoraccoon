@@ -5,7 +5,7 @@ import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -159,7 +159,7 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
                     seen_ids.add(product_id)
                     ppr = round(price / rounds, 4)
 
-                    rows.append({
+                    row = {
                         'retailer_id': RETAILER_ID,
                         'retailer_product_id': product_id,
                         'caliber': caliber_display,
@@ -174,9 +174,10 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
                         'bullet_type': bullet_type,
                         'case_material': case_material,
                         'condition_type': condition,
-                        'in_stock': available,
                         'last_updated': now_iso(),
-                    })
+                    }
+                    with_stock_fields(row, available)
+                    rows.append(row)
                     print(f"  [ok] {title[:50]} | {rounds}rd | ${price} | {ppr:.2f}/rd | {'in' if available else 'OUT'}")
                 except Exception as e:
                     print(f"  Error on variant: {e}")

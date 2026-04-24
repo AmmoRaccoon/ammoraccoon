@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso
+from scraper_lib import CALIBERS, now_iso, with_stock_fields
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -177,6 +177,12 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 if price is None or price <= 0:
                     continue
 
+                oos_el = await card.query_selector('.out-of-stock, [data-event-type="sold_out"]')
+                card_text = (await card.inner_text()).lower()
+                in_stock = oos_el is None and \
+                           'out of stock' not in card_text and \
+                           'sold out' not in card_text
+
                 rounds = parse_rounds(name)
                 if (not rounds or rounds < 1) and link:
                     rounds = fetch_rounds_from_product_page(link)
@@ -193,7 +199,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     continue
                 seen_ids.add(product_id)
 
-                products.append({
+                product = {
                     'retailer_id': RETAILER_ID,
                     'retailer_product_id': product_id,
                     'caliber': caliber_display,
@@ -208,9 +214,10 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     'bullet_type': bullet_type,
                     'case_material': case_material,
                     'condition_type': condition,
-                    'in_stock': True,
                     'last_updated': now_iso(),
-                })
+                }
+                with_stock_fields(product, in_stock)
+                products.append(product)
                 new_on_page += 1
                 print(f"  [ok] {name[:55]} | ${price} | {rounds}rd | {ppr:.2f}/rd")
             except Exception as e:
@@ -268,6 +275,7 @@ async def scrape():
                         'in_stock': product['in_stock'],
                         'recorded_at': now,
                     }).execute()
+
 
             except Exception as e:
                 print(f"  DB error for {product.get('manufacturer','?')}: {e}")

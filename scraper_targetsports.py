@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso
+from scraper_lib import CALIBERS, now_iso, with_stock_fields
 
 load_dotenv()
 
@@ -137,6 +137,11 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             name = name_el.inner_text().strip()
 
+            text_lower = text.lower()
+            in_stock = 'out of stock' not in text_lower and \
+                       'sold out' not in text_lower and \
+                       'backordered' not in text_lower
+
             cpr_match = re.search(r'\$(\d+\.\d+)\s*Per\s*Round', text, re.IGNORECASE)
             if not cpr_match:
                 skipped += 1
@@ -182,10 +187,9 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 'total_rounds': total_rounds,
                 'base_price': base_price,
                 'price_per_round': price_per_round,
-                'in_stock': True,
-                'stock_level': 'In Stock',
                 'last_updated': now_iso(),
             }
+            with_stock_fields(listing, in_stock)
 
             result = supabase.table('listings').upsert(
                 listing,
@@ -196,7 +200,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 'listing_id': result.data[0]['id'],
                 'price': base_price,
                 'price_per_round': price_per_round,
-                'in_stock': True,
+                'in_stock': in_stock,
             }).execute()
 
             saved += 1

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso
+from scraper_lib import CALIBERS, now_iso, with_stock_fields
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -146,6 +146,14 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     continue
                 price = float(price_match.group(1))
 
+                # AE Ammo (BigCommerce) marks OOS variants with a
+                # "Sold Out" label or .out-of-stock class on the card.
+                oos_el = await card.query_selector('.out-of-stock, .soldout, .sold-out')
+                card_text = (await card.inner_text()).lower()
+                in_stock = oos_el is None and \
+                           'out of stock' not in card_text and \
+                           'sold out' not in card_text
+
                 rounds = parse_rounds(title)
                 if not rounds or rounds < 1:
                     continue
@@ -161,7 +169,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     continue
                 seen_ids.add(product_id)
 
-                products.append({
+                product = {
                     'retailer_id': RETAILER_ID,
                     'retailer_product_id': product_id,
                     'caliber': caliber_display,
@@ -176,9 +184,10 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     'bullet_type': bullet_type,
                     'case_material': case_material,
                     'condition_type': condition,
-                    'in_stock': True,
                     'last_updated': now_iso(),
-                })
+                }
+                with_stock_fields(product, in_stock)
+                products.append(product)
                 new_on_page += 1
                 print(f"  [ok] {title[:55]} | ${price} | {rounds}rd | {ppr:.2f}/rd")
             except Exception as e:
@@ -233,7 +242,7 @@ async def scrape():
                         'listing_id': listing_id,
                         'price': product['base_price'],
                         'price_per_round': product['price_per_round'],
-                        'in_stock': True,
+                        'in_stock': product['in_stock'],
                         'recorded_at': now,
                     }).execute()
 
