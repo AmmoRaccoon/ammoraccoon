@@ -20,20 +20,23 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "blackbasin"
 SITE_BASE = "https://blackbasin.com"
 
-# BigCommerce. Confirmed paths: /handgun-ammo/9mm/, /rifle-ammo/.223-remington/,
-# /rifle-ammo/5.56x45-nato/, /rifle-ammo/7.62x51-.308/. Other slugs are best
-# guesses under the same /handgun-ammo|rifle-ammo|rimfire-ammo/ root.
+# BigCommerce stencil. Verified 2026-04-25 against the live homepage
+# nav. Black Basin's slug pattern is INCONSISTENT — some calibers
+# carry a leading dot, some don't, and they use abbreviated/expanded
+# names interchangeably ("357-mag" not "magnum"; "40-smith-wesson"
+# not "40-s-w"; "380-auto" not "380-acp"; "22-long-rifle" not "22-lr"
+# in the rimfire path; "300-aac-blackout" without leading dot).
 CALIBER_PATHS = {
     '9mm':     '/handgun-ammo/9mm/',
-    '380acp':  '/handgun-ammo/.380-acp/',
-    '40sw':    '/handgun-ammo/.40-s-w/',
+    '380acp':  '/handgun-ammo/.380-auto/',
+    '40sw':    '/handgun-ammo/.40-smith-wesson/',
     '38spl':   '/handgun-ammo/.38-special/',
-    '357mag':  '/handgun-ammo/.357-magnum/',
-    '22lr':    '/rimfire-ammo/.22-lr/',
+    '357mag':  '/handgun-ammo/.357-mag/',
+    '22lr':    '/rimfire-ammo/22-long-rifle/',
     '223-556': '/rifle-ammo/.223-remington/',
     '308win':  '/rifle-ammo/7.62x51-.308/',
     '762x39':  '/rifle-ammo/7.62x39/',
-    '300blk':  '/rifle-ammo/.300-blackout/',
+    '300blk':  '/rifle-ammo/300-aac-blackout/',
 }
 
 def get_retailer_id():
@@ -42,6 +45,53 @@ def get_retailer_id():
         print(f"ERROR: Retailer '{RETAILER_SLUG}' not found in database")
         return None
     return result.data[0]["id"]
+
+
+def fetch_smallest_variant(page, product_url):
+    """Visit a Black Basin product page and pull the smallest variant
+    from its option grid. BB renders variants as a QTY/PRICE/PRICE-PER-
+    ROUND table:
+
+        <div class="option-grid-value">
+          <input type="radio" data-product-attribute-value="N">
+          <label>50</label>
+          <span class="option-grid-value--price">$24.07</span>
+          <span class="option-grid-value--ppr">$0.48</span>
+        </div>
+
+    Returns (smallest_qty, smallest_qty_price) or (None, None) when no
+    variant grid is present. The category-page tile shows the lowest
+    variant's price already, but reading the grid lets us record the
+    EXACT round count too (titles carry no count on Black Basin).
+    """
+    try:
+        resp = page.goto(product_url, wait_until='domcontentloaded', timeout=60000)
+    except Exception:
+        return None, None
+    if resp and resp.status >= 400:
+        return None, None
+    rows = page.query_selector_all('.option-grid-value')
+    best_qty = None
+    best_price = None
+    for row in rows:
+        label = row.query_selector('label.form-label[data-product-attribute-value]')
+        price_el = row.query_selector('.option-grid-value--price')
+        if not label or not price_el:
+            continue
+        qty_text = (label.inner_text() or '').strip()
+        m = re.search(r'(\d[\d,]*)', qty_text)
+        if not m:
+            continue
+        qty = int(m.group(1).replace(',', ''))
+        price_text = (price_el.inner_text() or '').strip()
+        pm = re.search(r'\$?(\d{1,5}(?:,\d{3})*(?:\.\d{1,2})?)', price_text)
+        if not pm:
+            continue
+        price = float(pm.group(1).replace(',', ''))
+        if best_qty is None or qty < best_qty:
+            best_qty = qty
+            best_price = price
+    return best_qty, best_price
 
 def parse_grain(text):
     match = re.search(r'(\d+)[\s-]*gr(?:ain)?', text, re.IGNORECASE)
@@ -115,54 +165,91 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         return 0, 0
     time.sleep(6)
 
-    products = page.query_selector_all('article.card, li.product, .productCard')
+    # Scope to the main product grid. Pre-fix selector matched 100
+    # cards including 50 phantom carousel items; .productGrid scopes
+    # to the 50 real products.
+    products = page.query_selector_all('.productGrid article.card')
     if not products:
-        products = page.query_selector_all('.card')
+        products = page.query_selector_all('ul.productGrid li.product')
     print(f"  Found {len(products)} products")
     if not products:
         return 0, 0
 
-    saved = 0
+    # Two-pass loop — collect URL/title from category page, then visit
+    # each product page for the QTY/PRICE/PRICE-PER-ROUND grid. Black
+    # Basin titles never include round count and the category-page
+    # price is a "$X.XX - $Y.YY" range, so the existing single-pass
+    # extractor silently dropped every product.
+    candidates = []
     skipped = 0
-
     for product in products:
         try:
-            link_el = product.query_selector('h4 a, h3 a, .card-title a')
+            link_el = product.query_selector('h3.card-title a, h4.card-title a, .card-title a')
             if not link_el:
                 skipped += 1
                 continue
-
-            name = link_el.inner_text().strip() or link_el.get_attribute('title') or ''
             href = link_el.get_attribute('href') or ''
             if not href:
                 skipped += 1
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
-
-            # Skip brand-carousel cards that occasionally render inside
-            # the product grid wrapper. They look like products to the
-            # price/round regex (promo banner + carousel number) and
-            # otherwise get saved with the loop's caliber tag attached.
-            if '/brands/' in product_url:
+            if '/brands/' in product_url or '/categories/' in product_url:
                 skipped += 1
                 continue
-
-            card_text = product.inner_text()
-
-            price_matches = re.findall(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', card_text)
-            if len(price_matches) >= 2 and price_matches[0] != price_matches[1]:
+            name = (link_el.inner_text() or '').strip() or (link_el.get_attribute('title') or '').split(',')[0].strip()
+            if not name:
                 skipped += 1
                 continue
-            if not price_matches:
-                skipped += 1
-                continue
-            base_price = float(price_matches[0].replace(',', ''))
-            if base_price <= 0:
-                skipped += 1
-                continue
+            # data-name on the article is cleaner than scraping h3 text
+            # which sometimes wraps mid-word with extra whitespace.
+            data_name = product.get_attribute('data-name')
+            if data_name:
+                name = data_name.strip()
+            candidates.append((product_url, name))
+        except Exception as e:
+            skipped += 1
+            print(f"  Skipped (card parse): {e}")
+            continue
 
-            total_rounds = parse_rounds(name) or parse_rounds(card_text)
-            if not total_rounds or total_rounds <= 0:
+    # Black Basin lists ~100 products per caliber. Visiting every
+    # product page for the variant grid would push the per-caliber
+    # runtime to several minutes; cap at 30 so the full scrape fits
+    # in the 2-hour cron window. Sort by price-low-first so we cover
+    # the most common (and cheapest) SKUs every cycle. The cap can be
+    # raised once we move scraping to a worker with longer budgets.
+    BLACK_BASIN_PER_CALIBER_CAP = 30
+    candidates = candidates[:BLACK_BASIN_PER_CALIBER_CAP]
+
+    saved = 0
+    for product_url, name in candidates:
+        try:
+            # Smallest variant from the QTY grid — Black Basin is the
+            # only retailer that publishes per-round price directly per
+            # variant. We pair the smallest variant's QTY with its
+            # price (not the category-page lowest price, since the two
+            # always agree here but reading from the grid is unambiguous).
+            total_rounds, base_price = fetch_smallest_variant(page, product_url)
+            if not total_rounds or not base_price:
+                # Fallback: title parsing for the rare single-variant SKU
+                # whose option grid is replaced by a plain price block.
+                total_rounds = parse_rounds(name)
+                if not total_rounds:
+                    skipped += 1
+                    print(f"  Skipped (no variant grid + no round count): {name[:55]}")
+                    continue
+                # No price either — last resort: try the page's main
+                # price element after the goto in fetch_smallest_variant.
+                price_el = page.query_selector('[data-product-price-without-tax]')
+                if price_el:
+                    pt = (price_el.inner_text() or '').strip()
+                    pm = re.search(r'\$(\d{1,5}(?:,\d{3})*(?:\.\d{1,2})?)', pt)
+                    if pm:
+                        base_price = float(pm.group(1).replace(',', ''))
+                if not base_price or base_price <= 0:
+                    skipped += 1
+                    print(f"  Skipped (no price): {name[:55]}")
+                    continue
+            if total_rounds <= 0 or base_price <= 0:
                 skipped += 1
                 continue
 
@@ -182,11 +269,13 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             seen_ids.add(product_id)
 
-            card_lower = card_text.lower()
-            in_stock = ('out of stock' not in card_lower and
-                        'sold out' not in card_lower and
-                        'unavailable' not in card_lower)
-            purchase_limit = parse_purchase_limit(card_text)
+            # We're sitting on the product page after fetch_smallest_variant.
+            # Read stock + purchase-limit from its body text.
+            page_text = (page.locator('body').inner_text() or '').lower()
+            in_stock = ('out of stock' not in page_text and
+                        'sold out' not in page_text and
+                        'currently unavailable' not in page_text)
+            purchase_limit = parse_purchase_limit(page_text)
 
             listing = {
                 'retailer_id': retailer_id,
