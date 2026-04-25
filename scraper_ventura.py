@@ -20,19 +20,22 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "ventura"
 SITE_BASE = "https://www.venturamunitions.com"
 
-# BigCommerce. Caliber slugs are guesses under the /handgun/, /rifle/,
-# /rimfire/ roots — runtime 404s are skipped gracefully.
+# BigCommerce stencil — verified 2026-04-25 against the live category
+# nav. Most calibers live under /categories/handgun/ or
+# /categories/rifle/ with the *-ammo-for-sale.html suffix; .300 BLK
+# sits at the top level (no group), .22 LR has a custom legacy URL,
+# and .223 Rem has a stray "-1-" suffix from a category re-import.
 CALIBER_PATHS = {
-    '9mm':     '/handgun/9mm-luger/',
-    '380acp':  '/handgun/380-acp/',
-    '40sw':    '/handgun/40-s-w/',
-    '38spl':   '/handgun/38-special/',
-    '357mag':  '/handgun/357-magnum/',
-    '22lr':    '/rimfire/22-lr/',
-    '223-556': '/rifle/223-remington/',
-    '308win':  '/rifle/308-winchester/',
-    '762x39':  '/rifle/762x39/',
-    '300blk':  '/rifle/300-blackout/',
+    '9mm':     '/categories/handgun/9mm-ammo-for-sale.html',
+    '380acp':  '/categories/handgun/380-acp-ammo-for-sale.html',
+    '40sw':    '/categories/handgun/40-s-w-ammo-for-sale.html',
+    '38spl':   '/categories/handgun/38-special-ammo-for-sale.html',
+    '357mag':  '/categories/handgun/357-magnum-ammo-for-sale.html',
+    '22lr':    '/22lr-long-rifle/',
+    '223-556': '/categories/rifle/223-rem-1-ammo-for-sale.html',
+    '308win':  '/categories/rifle/308-win-ammo-for-sale.html',
+    '762x39':  '/categories/rifle/7-62-x-39-ammo-for-sale.html',
+    '300blk':  '/categories/300-aac-blackout-ammo-for-sale.html',
 }
 
 def get_retailer_id():
@@ -114,9 +117,13 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         return 0, 0
     time.sleep(6)
 
-    products = page.query_selector_all('article.card, li.product, .productCard')
+    # Scope to the main product grid wrapper. Pre-fix selectors were
+    # too broad — `article.card, li.product, .productCard` matched
+    # carousel cards from "Customers Also Viewed" / "Recently Viewed"
+    # / brand sidebars, and the .card fallback grabbed every nav tile.
+    products = page.query_selector_all('.productGrid article.card')
     if not products:
-        products = page.query_selector_all('.card')
+        products = page.query_selector_all('ul.productGrid li.product')
     print(f"  Found {len(products)} products")
     if not products:
         return 0, 0
@@ -126,28 +133,42 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
     for product in products:
         try:
-            link_el = product.query_selector('h4 a, h3 a, .card-title a')
+            link_el = product.query_selector('h4.card-title a, .card-title a, h3 a')
             if not link_el:
                 skipped += 1
                 continue
 
-            name = link_el.inner_text().strip() or link_el.get_attribute('title') or ''
+            name = (link_el.inner_text() or '').strip() or (link_el.get_attribute('title') or '')
             href = link_el.get_attribute('href') or ''
             if not href:
                 skipped += 1
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
 
+            # Skip nav-tile links to other categories that occasionally
+            # bleed through the .productGrid scope.
+            if '/categories/' in product_url or '/brands/' in product_url:
+                skipped += 1
+                continue
+
             card_text = product.inner_text()
 
-            price_matches = re.findall(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', card_text)
-            if len(price_matches) >= 2 and price_matches[0] != price_matches[1]:
+            # Real price — BigCommerce stencil renders the listing price
+            # in <span data-product-price-without-tax>. The pre-fix
+            # regex on inner_text was vulnerable to MSRP banners and
+            # any "Save $X" overlays.
+            price_el = product.query_selector('[data-product-price-without-tax]')
+            if not price_el:
+                price_el = product.query_selector('.price.price--withoutTax')
+            if not price_el:
                 skipped += 1
                 continue
-            if not price_matches:
+            price_text = (price_el.inner_text() or '').strip()
+            price_match = re.search(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', price_text)
+            if not price_match:
                 skipped += 1
                 continue
-            base_price = float(price_matches[0].replace(',', ''))
+            base_price = float(price_match.group(1).replace(',', ''))
             if base_price <= 0:
                 skipped += 1
                 continue
