@@ -155,11 +155,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_velocity.py
-      # - name: Run Gritr Sports scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_gritr.py
+      # Enabled 2026-04-25 — manual run confirmed 148 listings across
+      # all 10 calibers. 46 skips: 29 are title-filter rejections on
+      # mixed-caliber pages (.357 Mag in /other-handgun-calibers/,
+      # .22 LR in /rimfire-ammo/), 17 missing round count in title.
+      # Prices verified against retail.
+      - name: Run Gritr Sports scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_gritr.py
       # - name: Run Ventura Munitions scraper
       #   env:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
