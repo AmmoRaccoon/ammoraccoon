@@ -165,11 +165,15 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_gritr.py
-      # - name: Run Ventura Munitions scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_ventura.py
+      # Enabled 2026-04-25 — manual run confirmed 105 listings across
+      # all 10 calibers with 0 skips. BigCommerce stencil same as
+      # Buckinghorse; URL fixes per the scraper commit. Prices
+      # verified against retail.
+      - name: Run Ventura Munitions scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_ventura.py
       # - name: Run Bulk Munitions scraper
       #   env:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
