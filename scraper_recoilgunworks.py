@@ -20,20 +20,21 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "recoilgunworks"
 SITE_BASE = "https://recoilgunworks.com"
 
-# BigCommerce store. Verified path: /ammo/handgun-ammo/9mm,
-# /ammo/rifle-ammo/223-5-56. Other calibers follow the same hierarchy
-# but slugs are educated guesses — 404s are skipped at runtime.
+# BigCommerce store. Verified 2026-04-25 by following each redirect
+# from the live "Shop by Caliber" nav and probing slug variants. RGW
+# does NOT carry .308 Win or .300 BLK as dedicated category pages
+# (every plausible slug 404'd) so they're omitted — re-add later if
+# RGW expands inventory. Most categories use an "-ammo" suffix; .357
+# Magnum and .40 S&W are the inconsistent exceptions.
 CALIBER_PATHS = {
-    '9mm':     '/ammo/handgun-ammo/9mm',
-    '380acp':  '/ammo/handgun-ammo/380-acp',
-    '40sw':    '/ammo/handgun-ammo/40-sw',
-    '38spl':   '/ammo/handgun-ammo/38-special',
-    '357mag':  '/ammo/handgun-ammo/357-magnum',
-    '22lr':    '/ammo/rimfire-ammo/22-lr',
-    '223-556': '/ammo/rifle-ammo/223-5-56',
-    '308win':  '/ammo/rifle-ammo/308-win',
-    '762x39':  '/ammo/rifle-ammo/7-62x39',
-    '300blk':  '/ammo/rifle-ammo/300-blackout',
+    '9mm':     '/ammo/handgun-ammo/9mm/',
+    '380acp':  '/ammo/handgun-ammo/380-auto-ammo/',
+    '40sw':    '/ammo/handgun-ammo/40-s-w/',
+    '38spl':   '/ammo/handgun-ammo/38-special-ammo/',
+    '357mag':  '/ammo/handgun-ammo/357-magnum/',
+    '22lr':    '/ammo/rimfire-ammo/22lr/',
+    '223-556': '/ammo/rifle-ammo/223-5-56/',
+    '762x39':  '/ammo/rifle-ammo/7-62x39mm-ammo/',
 }
 
 def get_retailer_id():
@@ -48,12 +49,15 @@ def parse_grain(text):
     return int(match.group(1)) if match else None
 
 def parse_rounds(text):
-    # Recoil Gun Works titles use parens like "(5200)" for round counts
-    # in addition to the usual "1000 rounds" / "50 rd" patterns.
+    # Round-count parsing. RGW titles often include manufacturer SKUs
+    # in parens like "(5200)" or "(P9HST2)" — those are NOT round
+    # counts and the previous regex matched them, divided $13.99 by
+    # 5200, then ate the listing on the [0.01, 5.0]/rd sanity gate.
+    # Only match patterns that explicitly say rounds/rd/count/box.
     patterns = [
-        r'\((\d[\d,]{2,})\)',
         r'(\d[\d,]*)\s*rounds?',
         r'(\d[\d,]*)\s*rds?\b',
+        r'(\d[\d,]*)\s*rd\s*(?:box|case|pack)',
         r'(\d[\d,]*)\s*count',
         r'(\d[\d,]*)\s*per\s*box',
     ]
@@ -61,6 +65,70 @@ def parse_rounds(text):
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             return int(match.group(1).replace(',', ''))
+    return None
+
+
+def fetch_product_round_count(page, product_url):
+    """Navigate to a product page and recover the smallest credible
+    round count from three signals, in priority order:
+
+      1. Variant radios — RGW's BigCommerce stencil renders these as
+         <span class="form-option-variant">50rd Box</span> etc.
+         When present, the smallest variant pairs cleanly with the
+         lowest price on the category-page range.
+      2. Product title <h1> — single-variant products sometimes bake
+         the round count into the title (e.g. "Tula Ammo 7.62x39
+         122gr FMJ - 40RD").
+      3. SKU trailing suffix — many manufacturer SKUs encode count
+         as a "-NN" or "-NNN" tail (Sig V-Crown E380A1-365-20 is
+         20rd, etc.). Bounded to [5, 5000] to avoid grabbing random
+         SKU digits.
+
+    Returns None when no signal yields a credible count; caller
+    should then skip the listing rather than guess.
+    """
+    try:
+        resp = page.goto(product_url, wait_until='domcontentloaded', timeout=60000)
+    except Exception:
+        return None
+    if resp and resp.status >= 400:
+        return None
+
+    # 1. Variant grid
+    labels = page.query_selector_all('.form-option-variant')
+    rounds_seen = []
+    for label in labels:
+        text = (label.inner_text() or '').strip()
+        m = re.search(r'(\d[\d,]*)\s*rd', text, re.IGNORECASE)
+        if m:
+            rounds_seen.append(int(m.group(1).replace(',', '')))
+    if rounds_seen:
+        return min(rounds_seen)
+
+    # 2. Product title
+    h1 = page.query_selector('h1.productView-title, h1')
+    if h1:
+        n = parse_rounds((h1.inner_text() or ''))
+        if n:
+            return n
+
+    # 3. SKU tail
+    sku_el = page.query_selector('[data-product-sku], .productView-info dd[data-test*="sku" i]')
+    sku_text = ''
+    if sku_el:
+        sku_text = (sku_el.inner_text() or '').strip()
+    else:
+        # Fall back to grepping the page body for "SKU: …".
+        body = (page.locator('body').inner_text() or '')
+        m = re.search(r'SKU:\s*([A-Z0-9\-]+)', body, re.IGNORECASE)
+        if m:
+            sku_text = m.group(1)
+    if sku_text:
+        m = re.search(r'-(\d{2,4})\s*$', sku_text)
+        if m:
+            n = int(m.group(1))
+            if 5 <= n <= 5000:
+                return n
     return None
 
 def parse_case_material(text):
@@ -118,49 +186,93 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         return 0, 0
     time.sleep(6)
 
-    products = page.query_selector_all('article.card, li.product, .productCard')
+    # Scope to the main product grid — RGW's BigCommerce stencil theme
+    # wraps each product in <li class="product"> directly under
+    # <ul class="productGrid">. The previous broad selector
+    # ('article.card, li.product, .productCard') matched 24 phantom
+    # cards from sidebar carousels and the "you might also like" rail.
+    products = page.query_selector_all('.productGrid li.product')
     if not products:
-        products = page.query_selector_all('.card')
+        products = page.query_selector_all('ul.productGrid li.product')
     print(f"  Found {len(products)} products")
     if not products:
         return 0, 0
 
-    saved = 0
+    # Collect the cheap parts (URL, title, lowest-of-range price) from
+    # the category page first; visit each product page in a second
+    # pass to read the variant grid. Two passes keeps the loop simple
+    # and lets us bail early on cards that fail basic shape checks.
+    candidates = []
     skipped = 0
-
     for product in products:
         try:
-            link_el = product.query_selector('h4 a, h3 a, .card-title a')
+            # Title + product URL — RGW renders both an h3.card-title
+            # anchor and a card-figure__link anchor. The h3 anchor's
+            # innerText is the cleanest title; both share the same
+            # href.
+            link_el = (product.query_selector('h3.card-title a')
+                       or product.query_selector('.card-figure__link'))
             if not link_el:
                 skipped += 1
                 continue
-
-            name = link_el.inner_text().strip() or link_el.get_attribute('title') or ''
             href = link_el.get_attribute('href') or ''
             if not href:
                 skipped += 1
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
+            name = (link_el.inner_text() or '').strip()
+            if not name:
+                # card-figure__link's text is empty; the visible title
+                # only lives on the aria-label / on the h3 anchor.
+                name = (link_el.get_attribute('aria-label') or '').split(',')[0].strip()
 
-            card_text = product.inner_text()
-
-            # Skip variant-priced ranges — they pair the wrong price with
-            # the wrong round count. Same failure mode as Bereli.
-            price_matches = re.findall(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', card_text)
-            if len(price_matches) >= 2 and price_matches[0] != price_matches[1]:
+            # Real prices live in a single span for a single-variant
+            # product, OR a hyphenated range like "$13.99 - $274.99"
+            # for multi-variant products. Take the LOWEST of the
+            # range — that's the smallest pack size, which we'll
+            # pair with the smallest variant's round count below.
+            price_el = (product.query_selector('[data-product-price-without-tax]')
+                        or product.query_selector('.price.price--withoutTax'))
+            if not price_el:
                 skipped += 1
                 continue
+            price_text = (price_el.inner_text() or '').strip()
+            price_matches = re.findall(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', price_text)
             if not price_matches:
                 skipped += 1
                 continue
-            base_price = float(price_matches[0].replace(',', ''))
+            base_price = min(float(p.replace(',', '')) for p in price_matches)
             if base_price <= 0:
                 skipped += 1
                 continue
 
-            total_rounds = parse_rounds(name) or parse_rounds(card_text)
+            product_id = product_url.rstrip('/').split('/')[-1]
+            if not product_id or product_id in seen_ids:
+                continue
+            seen_ids.add(product_id)
+            candidates.append((product_id, product_url, name, base_price))
+        except Exception as e:
+            skipped += 1
+            print(f"  Skipped (card parse): {e}")
+            continue
+
+    saved = 0
+    for product_id, product_url, name, base_price in candidates:
+        try:
+            # Round count: RGW doesn't put it in the title, so we have
+            # to visit the product page and read the variant radio
+            # labels (e.g. "50rd Box", "1000rd Case"). We pair the
+            # SMALLEST variant with the LOWEST price from the
+            # category-page range — together that's the per-box deal
+            # we want to record.
+            total_rounds = fetch_product_round_count(page, product_url)
+            if not total_rounds:
+                # Last-ditch fallback: maybe the round count was in the
+                # category-page title. Rare on RGW but cheap to try.
+                total_rounds = parse_rounds(name)
             if not total_rounds or total_rounds <= 0:
                 skipped += 1
+                print(f"  Skipped (no round count): {name[:55]}")
                 continue
 
             price_per_round = round(base_price / total_rounds, 4)
@@ -174,16 +286,16 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             bullet_type = parse_bullet_type(name)
             country = parse_country(name)
             manufacturer = parse_brand(name) or "Unknown"
-            product_id = product_url.rstrip('/').split('/')[-1]
-            if not product_id or product_id in seen_ids:
-                continue
-            seen_ids.add(product_id)
 
-            card_lower = card_text.lower()
-            in_stock = ('out of stock' not in card_lower and
-                        'sold out' not in card_lower and
-                        'unavailable' not in card_lower)
-            purchase_limit = parse_purchase_limit(card_text)
+            # We're sitting on the product page after the variant
+            # fetch, so read stock + purchase-limit hints directly
+            # from its body. Category-page card text isn't reliable
+            # here because RGW shows price ranges, not stock badges.
+            page_text = (page.locator('body').inner_text() or '').lower()
+            in_stock = ('out of stock' not in page_text and
+                        'sold out' not in page_text and
+                        'currently unavailable' not in page_text)
+            purchase_limit = parse_purchase_limit(page_text)
 
             listing = {
                 'retailer_id': retailer_id,
