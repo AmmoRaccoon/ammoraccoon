@@ -20,19 +20,21 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "buckinghorse"
 SITE_BASE = "https://buckinghorseoutpost.com"
 
-# BigCommerce category URLs are caliber-named at the root. Verified via
-# homepage "Shop by Caliber" nav.
+# BigCommerce category URLs — verified 2026-04-25 against the live
+# "Shop by Caliber" nav. Buckinghorse normalizes everything *without*
+# leading dots (so `/40-s-w/` rather than `/.40-s-w/`); the previous
+# guessed slugs 404'd for 6 of 10 calibers.
 CALIBER_PATHS = {
     '9mm':     '/9mm/',
-    '380acp':  '/.380-auto/',
-    '40sw':    '/.40-s-w/',
-    '38spl':   '/.38-special/',
-    '357mag':  '/.357-magnum/',
+    '380acp':  '/380-auto/',
+    '40sw':    '/40-s-w/',
+    '38spl':   '/38-special/',
+    '357mag':  '/357-magnum/',
     '22lr':    '/22-lr/',
-    '223-556': '/.223-remington/',
-    '308win':  '/.308-winchester/',
+    '223-556': '/223-remington/',
+    '308win':  '/308-winchester/',
     '762x39':  '/7-62x39mm/',
-    '300blk':  '/.300-aac-blackout/',
+    '300blk':  '/300-aac-blackout/',
 }
 
 def get_retailer_id():
@@ -115,12 +117,15 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         return 0, 0
     time.sleep(6)
 
-    # BigCommerce: product cards live in article.card or li.product within a list/grid.
-    products = page.query_selector_all('article.card, li.product, .productCard')
+    # Scope to the main product grid wrapper so we don't double-count
+    # cards rendered in carousels, "recently viewed" sidebars, or
+    # quick-view overlays — pre-fix the broader query was matching
+    # `article.card` AND its outer `li.product`, hugely inflating the
+    # "Found 36 products" count and burning through dedup checks.
+    products = page.query_selector_all('.productGrid article.card')
     if not products:
-        # Some BigCommerce themes wrap cards differently — fall back to
-        # any block that contains both a product link and a price.
-        products = page.query_selector_all('.card')
+        # Theme fallback — some BigCommerce installs flatten the wrapper.
+        products = page.query_selector_all('ul.productGrid li.product')
     print(f"  Found {len(products)} products")
     if not products:
         return 0, 0
@@ -130,12 +135,16 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
     for product in products:
         try:
-            link_el = product.query_selector('h4 a, .card-title a, a.card-figure__link, h3 a')
+            link_el = product.query_selector('h4.card-title a, .card-title a, h3 a')
             if not link_el:
                 skipped += 1
                 continue
 
-            name = link_el.inner_text().strip() or link_el.get_attribute('title') or ''
+            raw_name = link_el.inner_text().strip() or link_el.get_attribute('title') or ''
+            # Trim the "- FREE SHIPPING ON ORDERS OVER $200" promo suffix
+            # Buckinghorse jams into every product title — keeps the saved
+            # display name clean and avoids confusing future regex passes.
+            name = re.sub(r'\s*-?\s*FREE SHIPPING.*$', '', raw_name, flags=re.IGNORECASE).strip()
             href = link_el.get_attribute('href') or ''
             if not href:
                 skipped += 1
@@ -144,7 +153,21 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
             card_text = product.inner_text()
 
-            price_match = re.search(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', card_text)
+            # Real price lives in <span data-product-price-without-tax>.
+            # The previous regex on inner_text grabbed the first $ amount
+            # in the card, which was always the "$200" from the
+            # "FREE SHIPPING ON ORDERS OVER $200" promo banner glued
+            # into every title — every listing came back as $200.
+            price_el = product.query_selector('[data-product-price-without-tax]')
+            if not price_el:
+                # Newer BigCommerce themes sometimes drop the data attr;
+                # fall back to the price--withoutTax class.
+                price_el = product.query_selector('.price.price--withoutTax')
+            if not price_el:
+                skipped += 1
+                continue
+            price_text = (price_el.inner_text() or '').strip()
+            price_match = re.search(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', price_text)
             if not price_match:
                 skipped += 1
                 continue
