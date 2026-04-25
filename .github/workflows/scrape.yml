@@ -109,6 +109,66 @@ jobs:
       #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       #   run: python scraper_bereli.py
 
+      # New retailers — ids 20-36. Disabled by default until each scraper
+      # has been verified against live DOM. Selectors are best-effort
+      # guesses from static HTML recon; uncomment after a manual run
+      # confirms it parses real listings.
+      # - name: Run Bucking Horse Outpost scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_buckinghorse.py
+      # - name: Run RecoilGunWorks scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_recoilgunworks.py
+      # - name: Run Outdoor Limited scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_outdoorlimited.py
+      # - name: Run Shadowsmith Ammo scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_shadowsmith.py
+      # - name: Run Velocity Ammo Sales scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_velocity.py
+      # - name: Run Gritr Sports scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_gritr.py
+      # - name: Run Ventura Munitions scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_ventura.py
+      # - name: Run Bulk Munitions scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_bulkmunitions.py
+      # - name: Run Gorilla Ammunition scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_gorilla.py
+      # - name: Run Georgia Arms scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_georgiaarms.py
+      # - name: Run Black Basin scraper
+      #   env:
+      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      #   run: python scraper_blackbasin.py
+
       - name: Scraper health check
         if: always()
         env:

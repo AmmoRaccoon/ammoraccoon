@@ -30,7 +30,28 @@
       "WebFetch(domain:bereli.com)",
       "Bash(python _probe_bereli.py)",
       "WebFetch(domain:www.opticsplanet.com)",
-      "Bash(python _probe_opticsplanet.py)"
+      "Bash(python _probe_opticsplanet.py)",
+      "WebFetch(domain:buckinghorseoutpost.com)",
+      "WebFetch(domain:southgeorgiaoutdoors.com)",
+      "WebFetch(domain:www.southgeorgiaoutdoors.com)",
+      "WebFetch(domain:recoilgunworks.com)",
+      "WebFetch(domain:www.outdoorlimited.com)",
+      "WebFetch(domain:www.americanreloading.com)",
+      "WebFetch(domain:www.marylandmunitions.com)",
+      "WebFetch(domain:marylandmunitions.com)",
+      "WebFetch(domain:shadowsmithammo.com)",
+      "WebFetch(domain:www.shadowsmith.net)",
+      "WebFetch(domain:www.velocityammosales.com)",
+      "WebFetch(domain:www.gritrsports.com)",
+      "WebFetch(domain:gritrsports.com)",
+      "WebFetch(domain:www.sportsmansguide.com)",
+      "WebFetch(domain:www.venturamunitions.com)",
+      "WebFetch(domain:www.bulkmunitions.com)",
+      "WebFetch(domain:www.gorillaammo.com)",
+      "WebFetch(domain:www.ammosquared.com)",
+      "WebFetch(domain:www.georgia-arms.com)",
+      "WebFetch(domain:blackbasin.com)",
+      "Bash(python scripts/seed_new_retailers.py)"
     ]
   }
 }
