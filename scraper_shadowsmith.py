@@ -21,18 +21,20 @@ RETAILER_SLUG = "shadowsmith"
 # shadowsmithammo.com 301-redirects to www.shadowsmith.net.
 SITE_BASE = "https://www.shadowsmith.net"
 
-# WooCommerce store using a faceted taxonomy URL pattern.
+# WooCommerce store. URL prefix is /product-category/ammunition/...
+# (the previous map was missing the /product-category/ root, so every
+# request 404'd). Verified 2026-04-25 against the live homepage nav.
 CALIBER_PATHS = {
-    '9mm':     '/ammunition/filters/caliber-gauge/9mm/',
-    '380acp':  '/ammunition/filters/caliber-gauge/380-acp/',
-    '40sw':    '/ammunition/filters/caliber-gauge/40-sw/',
-    '38spl':   '/ammunition/filters/caliber-gauge/38-special/',
-    '357mag':  '/ammunition/filters/caliber-gauge/357-magnum/',
-    '22lr':    '/ammunition/filters/caliber-gauge/22-lr/',
-    '223-556': '/ammunition/filters/caliber-gauge/223-rem-5-56-nato/',
-    '308win':  '/ammunition/filters/caliber-gauge/308-7-62-nato/',
-    '762x39':  '/ammunition/filters/caliber-gauge/7-62-x-39mm/',
-    '300blk':  '/ammunition/filters/caliber-gauge/300-aac-blackout/',
+    '9mm':     '/product-category/ammunition/filters/caliber-gauge/9mm/',
+    '380acp':  '/product-category/ammunition/filters/caliber-gauge/380-acp/',
+    '40sw':    '/product-category/ammunition/filters/caliber-gauge/40-sw/',
+    '38spl':   '/product-category/ammunition/filters/caliber-gauge/38-special/',
+    '357mag':  '/product-category/ammunition/filters/caliber-gauge/357-magnum/',
+    '22lr':    '/product-category/ammunition/filters/caliber-gauge/22-lr/',
+    '223-556': '/product-category/ammunition/filters/caliber-gauge/223-rem-5-56-nato/',
+    '308win':  '/product-category/ammunition/filters/caliber-gauge/308-7-62-nato/',
+    '762x39':  '/product-category/ammunition/filters/caliber-gauge/7-62-x-39mm/',
+    '300blk':  '/product-category/ammunition/filters/caliber-gauge/300-aac-blackout/',
 }
 
 def get_retailer_id():
@@ -46,10 +48,40 @@ def parse_grain(text):
     match = re.search(r'(\d+)[\s-]*gr(?:ain)?', text, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
+def is_non_ammo(title):
+    """Reject snap caps, dummy rounds, and other non-ammo trainers
+    that show up in ammunition categories. These have no real round
+    count and aren't products users are price-comparing."""
+    t = title.lower()
+    return any(k in t for k in [
+        'snap cap', 'snap caps', 'dummy round', 'dummy rounds',
+        'a-zoom', 'azoom',
+    ])
+
+
 def parse_rounds(text):
+    # Shadowsmith titles use a wider variety of round-count formats
+    # than other retailers — explicit "20 rounds", compact "1400RD",
+    # slash-separated "250/ct", "20/Box", and prose like "Box of 20".
+    # The earlier patterns only caught the first two; everything else
+    # was falling through to "no round count" and getting skipped.
     patterns = [
         r'(\d[\d,]*)\s*rounds?',
-        r'(\d[\d,]*)\s*rds?\b',
+        r'(\d[\d,]*)\s*rd[s]?\b',
+        r'(\d[\d,]*)\s*rnd[s]?\b',
+        r'(\d[\d,]*)\s*/\s*ct\b',
+        r'(\d[\d,]*)\s*ct\b',
+        r'(\d[\d,]*)\s*/\s*box\b',
+        r'(\d[\d,]*)\s*/\s*bx\b',
+        r'(\d[\d,]*)\s*per\s*box',
+        r'\bbox\s+of\s+(\d[\d,]*)\b',
+        r'(\d[\d,]*)\s*-\s*count\b',
+        # Manufacturer SKU notation "50/10" = 50 rounds per box ×
+        # 10 boxes per case. The displayed price is per-box, so we
+        # take the first number as the listing's round count.
+        # Bound the first number to 1–5000 so we don't grab dates
+        # or UPC fragments.
+        r'\b(\d{2,4})/\d{1,4}\b',
         r'(\d[\d,]*)\s*count',
         r'(\d[\d,]*)\s*/\s*bx',     # "50/bx" pattern seen on shadowsmith
         r'(\d[\d,]*)\s*per\s*box',
@@ -113,12 +145,22 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
         return 0, 0
-    time.sleep(6)
+    # Shadowsmith renders behind an age-verification overlay but the
+    # product DOM mounts regardless. Wait for the title selector
+    # explicitly so we don't race the JS that paints products into the
+    # grid.
+    try:
+        page.wait_for_selector('.woocommerce-loop-product__title', timeout=20000)
+    except Exception:
+        print(f"  no product titles rendered after 20s - skipping caliber.")
+        return 0, 0
+    time.sleep(2)
 
-    # WooCommerce: products are <li class="product"> inside a <ul.products>.
-    products = page.query_selector_all('li.product, ul.products li')
-    if not products:
-        products = page.query_selector_all('[class*="product"]')
+    # WooCommerce: products are <li class="...product..."> inside a
+    # <ul class="products">. Class string starts with "entry content-bg
+    # loop-entry product type-product post-NNNN ..." — Playwright's CSS
+    # selector handles unordered class matching so li.product works.
+    products = page.query_selector_all('ul.products li.product, li.product')
     print(f"  Found {len(products)} products")
     if not products:
         return 0, 0
@@ -128,38 +170,66 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
     for product in products:
         try:
-            link_el = product.query_selector('a.woocommerce-LoopProduct-link, h2.woocommerce-loop-product__title, h3 a, a[href*="/product/"]')
+            # Title link — Shadowsmith uses /product/ (singular) URLs.
+            link_el = (product.query_selector('h2.woocommerce-loop-product__title a')
+                       or product.query_selector('a.woocommerce-LoopProduct-link-title')
+                       or product.query_selector('a[href*="/product/"]'))
             if not link_el:
                 skipped += 1
                 continue
-
             href = link_el.get_attribute('href') or ''
-            title_el = product.query_selector('.woocommerce-loop-product__title, h2, h3')
-            name = (title_el.inner_text().strip() if title_el else '') or link_el.inner_text().strip()
-            if not name or not href:
+            if not href:
                 skipped += 1
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
 
-            card_text = product.inner_text()
+            title_el = product.query_selector('h2.woocommerce-loop-product__title, .woocommerce-loop-product__title')
+            raw_name = (title_el.inner_text().strip() if title_el
+                        else link_el.inner_text().strip())
+            # Drop common typographic glyphs so the listings table stays
+            # ASCII-clean across terminals/locales.
+            TYPOGRAPHIC = str.maketrans({
+                '–': '-', '—': '-',
+                '‘': "'", '’': "'", '“': '"', '”': '"',
+                '®': '', '™': '',
+                '·': '*', '•': '*', '×': 'x',
+            })
+            name = raw_name.translate(TYPOGRAPHIC).strip()
+            if not name:
+                skipped += 1
+                continue
+            # Snap caps / dummy rounds get listed in ammo categories on
+            # Shadowsmith. Drop them before they pollute the skipped
+            # count or end up as junk listings with imputed defaults.
+            if is_non_ammo(name):
+                skipped += 1
+                print(f"  Skipped (not real ammo): {name[:55]}")
+                continue
 
-            # WooCommerce price: <span class="woocommerce-Price-amount">
-            price_matches = re.findall(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', card_text)
-            if len(price_matches) >= 2 and price_matches[0] != price_matches[1]:
-                # variable product price range — skip, can't trust pairing
+            # Listing price — same .price .woocommerce-Price-amount pair
+            # as Velocity. The pre-fix regex on the whole card text was
+            # vulnerable to "Sale!" badges and "$X off" promo overlays.
+            price_el = product.query_selector('.price .woocommerce-Price-amount, span.price .amount')
+            base_price = None
+            if price_el:
+                price_text = (price_el.inner_text() or '').strip()
+                m = re.search(r'\$?(\d{1,5}(?:,\d{3})*(?:\.\d{1,2})?)', price_text)
+                if m:
+                    try:
+                        base_price = float(m.group(1).replace(',', ''))
+                    except ValueError:
+                        base_price = None
+            if not base_price or base_price <= 0:
                 skipped += 1
-                continue
-            if not price_matches:
-                skipped += 1
-                continue
-            base_price = float(price_matches[0].replace(',', ''))
-            if base_price <= 0:
-                skipped += 1
+                print(f"  Skipped (no price): {name[:55]}")
                 continue
 
-            total_rounds = parse_rounds(name) or parse_rounds(card_text)
+            # Round count must come from the title — Shadowsmith doesn't
+            # display CPR or surface variant grids on the category page.
+            total_rounds = parse_rounds(name)
             if not total_rounds or total_rounds <= 0:
                 skipped += 1
+                print(f"  Skipped (no round count): {name[:55]}")
                 continue
 
             price_per_round = round(base_price / total_rounds, 4)
@@ -178,10 +248,13 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             seen_ids.add(product_id)
 
-            card_lower = card_text.lower()
-            in_stock = ('out of stock' not in card_lower and
-                        'sold out' not in card_lower and
-                        'unavailable' not in card_lower)
+            # Stock status: Shadowsmith adds an "outofstock" class to
+            # the <li> wrapper for sold-out products (price still
+            # renders, unlike Velocity). Read the wrapper's class list
+            # directly instead of grepping inner_text.
+            wrapper_class = product.get_attribute('class') or ''
+            in_stock = ('outofstock' not in wrapper_class)
+            card_text = product.inner_text() or ''
             purchase_limit = parse_purchase_limit(card_text)
 
             listing = {
