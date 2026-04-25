@@ -20,8 +20,9 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "velocity"
 SITE_BASE = "https://www.velocityammosales.com"
 
-# Shopify store (despite its WordPress-style domain) — uses /collections/ slugs.
-# 5.56 has its own collection separate from .223 — fetch both under the same caliber slug.
+# WooCommerce store (the /collections/ paths threw the original
+# implementation — they map to WC product_cat archives, not Shopify
+# collections). Verified 2026-04-25 against the live nav.
 CALIBER_PATHS = {
     '9mm':     '/collections/9-mm/',
     '380acp':  '/collections/380-acp/',
@@ -114,12 +115,12 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         return 0, 0
     time.sleep(6)
 
-    # Shopify default product card patterns.
-    products = page.query_selector_all('.product-card, .grid__item .card, [class*="product-item"], [class*="ProductItem"]')
-    if not products:
-        products = page.query_selector_all('a[href*="/products/"]')
-        # When falling back to anchor-only, dedupe by href and re-resolve
-        # the parent card on each iteration via .closest().
+    # WooCommerce product cards live in <li class="product">. The
+    # previous Shopify-flavored selectors matched nothing on this site
+    # and the anchor fallback was grabbing every /products/ link in the
+    # page (header nav, footer, related-products carousel) which is
+    # why "found 246 candidates" but only 50 saved.
+    products = page.query_selector_all('ul.products li.product, li.product')
     print(f"  Found {len(products)} product candidates")
     if not products:
         return 0, 0
@@ -129,43 +130,90 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
     for product in products:
         try:
-            link_el = product.query_selector('a[href*="/products/"]')
+            link_el = product.query_selector('a.woocommerce-LoopProduct-link, a.woocommerce-loop-product__link')
             if not link_el:
-                # the product itself might already be the anchor (fallback path)
-                if product.evaluate('el => el.tagName') == 'A':
-                    link_el = product
-                else:
-                    skipped += 1
-                    continue
+                link_el = product.query_selector('a[href*="/products/"]')
+            if not link_el:
+                skipped += 1
+                continue
 
             href = link_el.get_attribute('href') or ''
-            if not href:
+            if not href or '?add-to-cart' in href:
                 skipped += 1
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
 
-            title_el = product.query_selector('.product-card__title, .card__heading, h3, h2')
-            name = (title_el.inner_text().strip() if title_el else
-                    (link_el.get_attribute('aria-label') or link_el.inner_text().strip()))
+            title_el = product.query_selector('.woocommerce-loop-product__title, h2, h3')
+            raw_name = (title_el.inner_text().strip() if title_el
+                        else (link_el.get_attribute('aria-label') or link_el.inner_text().strip()))
+            # Velocity titles use HTML en-dashes as field separators
+            # ("9mm – American Eagle 115gr FMJ") and typographic
+            # apostrophes in brand names like "Pow'R-Ball". Replace
+            # the most common typographic glyphs with ASCII so the
+            # listings table renders cleanly across terminals/locales.
+            TYPOGRAPHIC = str.maketrans({
+                '–': '-',   # en-dash (field separator on Velocity)
+                '—': '-',   # em-dash
+                '‘': "'",   # left single quote
+                '’': "'",   # right single quote / apostrophe
+                '“': '"',   # left double quote
+                '”': '"',   # right double quote
+                '®': '',    # registered ®
+                '™': '',    # trademark ™
+                '·': '*',   # middle dot
+                '•': '*',   # bullet
+                '×': 'x',   # multiplication sign (used in 7.62×39)
+            })
+            name = raw_name.translate(TYPOGRAPHIC).strip()
             if not name:
                 skipped += 1
                 continue
 
-            card_text = product.inner_text()
+            # Real listing price lives in the .price .woocommerce-Price-amount
+            # span. The card ALSO renders a "$0.32/rd" badge inside
+            # .price-per-round-wrap that appears earlier in the DOM —
+            # the previous regex on inner_text picked that up first
+            # and stored it as the listing price, which is why every
+            # saved row looked impossibly cheap.
+            price_el = product.query_selector('.price .woocommerce-Price-amount, span.price .amount')
+            base_price = None
+            if price_el:
+                price_text = (price_el.inner_text() or '').strip()
+                m = re.search(r'\$?(\d{1,5}(?:,\d{3})*(?:\.\d{1,2})?)', price_text)
+                if m:
+                    try:
+                        base_price = float(m.group(1).replace(',', ''))
+                    except ValueError:
+                        base_price = None
+            if not base_price or base_price <= 0:
+                # WooCommerce omits the .price span entirely on sold-out
+                # listings — no current price to record. Surface the
+                # reason so the totals are auditable.
+                card_lower = (product.inner_text() or '').lower()
+                reason = ('out of stock' if 'sold out' in card_lower or 'out of stock' in card_lower
+                          else 'no price element')
+                print(f"  Skipped ({reason}): {name[:55]}")
+                skipped += 1
+                continue
 
-            price_matches = re.findall(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', card_text)
-            if len(price_matches) >= 2 and price_matches[0] != price_matches[1]:
-                skipped += 1
-                continue
-            if not price_matches:
-                skipped += 1
-                continue
-            base_price = float(price_matches[0].replace(',', ''))
-            if base_price <= 0:
-                skipped += 1
-                continue
-
-            total_rounds = parse_rounds(name) or parse_rounds(card_text)
+            # Cross-check / round-count derivation from the displayed
+            # per-round badge when present — e.g. "$0.32/rd" pairs with
+            # a $31.99 listing to imply 100 rounds (no need to parse
+            # the title). Title fallback covers cards missing the badge.
+            total_rounds = None
+            cpr_el = product.query_selector('.price-per-round-wrap .badge-label, .price-per-round-wrap')
+            if cpr_el:
+                cpr_text = (cpr_el.inner_text() or '').strip()
+                cpr_match = re.search(r'\$([0-9.]+)\s*/\s*rd', cpr_text, re.IGNORECASE)
+                if cpr_match:
+                    try:
+                        cpr = float(cpr_match.group(1))
+                        if cpr > 0:
+                            total_rounds = round(base_price / cpr)
+                    except ValueError:
+                        total_rounds = None
+            if not total_rounds:
+                total_rounds = parse_rounds(name)
             if not total_rounds or total_rounds <= 0:
                 skipped += 1
                 continue
@@ -186,6 +234,8 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             seen_ids.add(product_id)
 
+            # Read card text once for stock + purchase-limit signals.
+            card_text = (product.inner_text() or '')
             card_lower = card_text.lower()
             in_stock = ('out of stock' not in card_lower and
                         'sold out' not in card_lower and
