@@ -143,6 +143,14 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
 
+            # Skip brand-carousel cards that occasionally render inside
+            # the product grid wrapper. They look like products to the
+            # price/round regex (promo banner + carousel number) and
+            # otherwise get saved with the loop's caliber tag attached.
+            if '/brands/' in product_url:
+                skipped += 1
+                continue
+
             title_el = product.query_selector('.woocommerce-loop-product__title, h2, h3')
             raw_name = (title_el.inner_text().strip() if title_el
                         else (link_el.get_attribute('aria-label') or link_el.inner_text().strip()))

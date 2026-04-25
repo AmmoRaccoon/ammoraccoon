@@ -184,11 +184,15 @@ jobs:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       #   run: python scraper_bulkmunitions.py
-      # - name: Run Gorilla Ammunition scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_gorilla.py
+      # Enabled 2026-04-25 — manual run confirmed 29 listings across
+      # the 5 calibers Gorilla actually carries (others were dropped
+      # from CALIBER_PATHS rather than left to 404). Prices verified
+      # against retail. See commit 1d62bd8.
+      - name: Run Gorilla Ammunition scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_gorilla.py
       # - name: Run Georgia Arms scraper
       #   env:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

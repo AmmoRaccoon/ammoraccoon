@@ -220,6 +220,15 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 skipped += 1
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
+
+            # Skip brand-carousel cards that occasionally render inside
+            # the product grid wrapper. They look like products to the
+            # price/round regex (promo banner + carousel number) and
+            # otherwise get saved with the loop's caliber tag attached.
+            if '/brands/' in product_url:
+                skipped += 1
+                continue
+
             name = (link_el.inner_text() or '').strip()
             if not name:
                 # card-figure__link's text is empty; the visible title

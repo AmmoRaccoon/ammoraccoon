@@ -59,7 +59,8 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/)",
       "Bash(curl -s \"http://localhost:3000/\" -o /tmp/idx.html)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} home\\\\n\" http://localhost:3000/)",
-      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} history\\\\n\" http://localhost:3000/history)"
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} history\\\\n\" http://localhost:3000/history)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/history)"
     ]
   }
 }
