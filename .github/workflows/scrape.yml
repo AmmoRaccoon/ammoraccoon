@@ -111,13 +111,14 @@ jobs:
 
       # New retailers — ids 20-36. Disabled by default until each scraper
       # has been verified against live DOM. Selectors are best-effort
-      # guesses from static HTML recon; uncomment after a manual run
-      # confirms it parses real listings.
-      # - name: Run Bucking Horse Outpost scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_buckinghorse.py
+      # Enabled 2026-04-25 — manual run confirmed 94 listings across
+      # all 10 calibers with realistic prices ($0.07/rd .22 LR bulk to
+      # $1.75/rd match-grade .308) after the URL/selector rewrite.
+      - name: Run Bucking Horse Outpost scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_buckinghorse.py
       # - name: Run RecoilGunWorks scraper
       #   env:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
