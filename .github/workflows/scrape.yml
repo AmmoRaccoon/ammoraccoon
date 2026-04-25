@@ -137,11 +137,15 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_outdoorlimited.py
-      # - name: Run Shadowsmith Ammo scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_shadowsmith.py
+      # Enabled 2026-04-25 — manual run confirmed 122 listings across
+      # all 10 calibers. 38 skips: 16 snap caps/dummy rounds (correctly
+      # filtered), 21 products without round count in title, 1 sanity
+      # rejection. Prices verified against retail.
+      - name: Run Shadowsmith Ammo scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_shadowsmith.py
       # Enabled 2026-04-25 — manual run confirmed 62 listings across
       # all 10 calibers; 58 skips are all sold-out products where
       # WooCommerce omits the .price span (no current price to record).
