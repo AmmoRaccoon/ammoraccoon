@@ -129,11 +129,14 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_recoilgunworks.py
-      # - name: Run Outdoor Limited scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_outdoorlimited.py
+      # Enabled 2026-04-25 — manual run confirmed 194 listings across
+      # all 10 calibers with 0 skips. CPR is rendered directly on each
+      # card so total_rounds = base_price / displayed_cpr is exact.
+      - name: Run Outdoor Limited scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_outdoorlimited.py
       # - name: Run Shadowsmith Ammo scraper
       #   env:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
