@@ -203,11 +203,15 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_georgiaarms.py
-      # - name: Run Black Basin scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_blackbasin.py
+      # Enabled 2026-04-25 — manual run confirmed 289 listings across
+      # all covered calibers; per-product variant-grid fetch capped at
+      # 30 SKUs per caliber to fit the 2h cron budget. Single skip is
+      # a single-variant Barnes SKU. See commit 19de400.
+      - name: Run Black Basin scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_blackbasin.py
 
       - name: Scraper health check
         if: always()
