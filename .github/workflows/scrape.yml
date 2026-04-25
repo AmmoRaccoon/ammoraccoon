@@ -119,11 +119,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_buckinghorse.py
-      # - name: Run RecoilGunWorks scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_recoilgunworks.py
+      # Enabled 2026-04-25 — manual run confirmed 88 listings across
+      # 8 covered calibers (.308 Win and .300 BLK have no RGW category
+      # pages and are dropped from CALIBER_PATHS). Prices verified
+      # against retail; 8 skips are products with no round-count
+      # signal anywhere on site, honestly excluded to preserve CPR.
+      - name: Run RecoilGunWorks scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_recoilgunworks.py
       # - name: Run Outdoor Limited scraper
       #   env:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
