@@ -20,11 +20,12 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "outdoorlimited"
 SITE_BASE = "https://www.outdoorlimited.com"
 
-# BigCommerce store. Confirmed paths use /[type]-ammo/[caliber]-ammo
-# pattern. .380, .38 spl, .357 mag are educated guesses.
+# Outdoor Limited paths — verified 2026-04-25 against the live homepage
+# nav. All [type]-ammo/[caliber]-ammo, but the .380 slug is "auto"
+# rather than "acp" (the only entry the previous map got wrong).
 CALIBER_PATHS = {
     '9mm':     '/handgun-ammo/9mm-ammo/',
-    '380acp':  '/handgun-ammo/380-acp-ammo/',
+    '380acp':  '/handgun-ammo/380-auto-ammo/',
     '40sw':    '/handgun-ammo/40-s-w-ammo/',
     '38spl':   '/handgun-ammo/38-special-ammo/',
     '357mag':  '/handgun-ammo/357-magnum-ammo/',
@@ -112,11 +113,24 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
         return 0, 0
-    time.sleep(6)
+    # Outdoor Limited renders the product grid client-side — products
+    # only mount after a few seconds of JS. domcontentloaded fires on
+    # an empty grid, so we explicitly wait for the title links to
+    # appear. The wrapper class is .row_inner (.v-product__img and
+    # .v-product__title are children, no bare .v-product class
+    # exists). 25s is generous; most pages settle in 5-10.
+    try:
+        page.wait_for_selector('.v-product__title', timeout=25000)
+    except Exception:
+        print(f"  no .v-product__title cards rendered after 25s - skipping caliber.")
+        return 0, 0
+    time.sleep(2)
 
-    products = page.query_selector_all('article.card, li.product, .productCard')
-    if not products:
-        products = page.query_selector_all('.card')
+    # Each card is a .row_inner wrapper containing image link, title
+    # link, total price, AND a displayed "per round" line — Outdoor
+    # Limited surfaces CPR directly, which lets us back-derive an
+    # exact round count instead of guessing from the title.
+    products = page.query_selector_all('.row_inner')
     print(f"  Found {len(products)} products")
     if not products:
         return 0, 0
@@ -126,33 +140,60 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
     for product in products:
         try:
-            link_el = product.query_selector('h4 a, h3 a, .card-title a')
+            # Title + URL — both live on the .v-product__title anchor.
+            link_el = product.query_selector('a.v-product__title')
+            if not link_el:
+                # Older theme variant: title is inside .column_name.
+                link_el = product.query_selector('.column_name a')
             if not link_el:
                 skipped += 1
                 continue
-
-            name = link_el.inner_text().strip() or link_el.get_attribute('title') or ''
             href = link_el.get_attribute('href') or ''
             if not href:
                 skipped += 1
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
+            name = ((link_el.inner_text() or '').strip()
+                    or link_el.get_attribute('title') or '').strip()
 
-            card_text = product.inner_text()
-
-            price_matches = re.findall(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', card_text)
-            if len(price_matches) >= 2 and price_matches[0] != price_matches[1]:
+            # Total price from the dedicated span — sidesteps regex
+            # collisions with the "Price per round $0.27" line that
+            # also lives in the card. Fall back to a regex on the
+            # price-block container if the span moves.
+            price_el = product.query_selector('.product_productprice .price')
+            if price_el:
+                base_text = (price_el.inner_text() or '').strip()
+            else:
+                price_block = product.query_selector('.product_productprice') or product
+                base_text = (price_block.inner_text() or '').strip()
+            price_match = re.search(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', base_text)
+            if not price_match:
                 skipped += 1
                 continue
-            if not price_matches:
-                skipped += 1
-                continue
-            base_price = float(price_matches[0].replace(',', ''))
+            base_price = float(price_match.group(1).replace(',', ''))
             if base_price <= 0:
                 skipped += 1
                 continue
 
-            total_rounds = parse_rounds(name) or parse_rounds(card_text)
+            # Displayed per-round price → exact round count, no
+            # title-parsing required for the common case. Falls back
+            # to title parsing when the CPR line is missing.
+            cpr_el = product.query_selector('.price_per_round')
+            displayed_cpr = None
+            if cpr_el:
+                cpr_text = (cpr_el.inner_text() or '').strip()
+                cpr_match = re.search(r'\$([0-9.]+)', cpr_text)
+                if cpr_match:
+                    try:
+                        displayed_cpr = float(cpr_match.group(1))
+                    except ValueError:
+                        displayed_cpr = None
+
+            total_rounds = None
+            if displayed_cpr and displayed_cpr > 0:
+                total_rounds = round(base_price / displayed_cpr)
+            if not total_rounds or total_rounds <= 0:
+                total_rounds = parse_rounds(name) or parse_rounds(product.inner_text() or '')
             if not total_rounds or total_rounds <= 0:
                 skipped += 1
                 continue
@@ -173,6 +214,10 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             seen_ids.add(product_id)
 
+            # Pull the rendered card text once so we can derive both
+            # stock state and purchase-limit hints. .proStk surfaces
+            # "5 in stock!" / "out of stock" copy.
+            card_text = (product.inner_text() or '')
             card_lower = card_text.lower()
             in_stock = ('out of stock' not in card_lower and
                         'sold out' not in card_lower and
