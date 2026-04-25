@@ -20,19 +20,25 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "gritr"
 SITE_BASE = "https://www.gritrsports.com"
 
-# BigCommerce. Caliber slugs are educated guesses under the
-# /shooting/ammunition/ root — runtime 404s are skipped gracefully.
+# Verified 2026-04-25 against the live "Shop by Caliber" nav. Each
+# value is a tuple: (path, optional title-filter regex). The title
+# filter narrows mixed-caliber category pages — Gritr puts .357 Mag
+# inside "other-handgun-calibers" alongside 10mm/.44/etc., and bundles
+# all rimfire calibers (.17 HMR, .22 WMR, .22 LR) into a single
+# /rimfire-ammo/ page; we drop rows whose title doesn't match.
 CALIBER_PATHS = {
-    '9mm':     '/shooting/ammunition/handgun-ammo/9mm-luger-ammo/',
-    '380acp':  '/shooting/ammunition/handgun-ammo/380-acp-ammo/',
-    '40sw':    '/shooting/ammunition/handgun-ammo/40-sw-ammo/',
-    '38spl':   '/shooting/ammunition/handgun-ammo/38-special-ammo/',
-    '357mag':  '/shooting/ammunition/handgun-ammo/357-magnum-ammo/',
-    '22lr':    '/shooting/ammunition/rimfire-ammo/22-lr-ammo/',
-    '223-556': '/shooting/ammunition/rifle-ammo/223-rem-556-nato-ammo/',
-    '308win':  '/shooting/ammunition/rifle-ammo/308-win-762-nato-ammo/',
-    '762x39':  '/shooting/ammunition/rifle-ammo/762x39-ammo/',
-    '300blk':  '/shooting/ammunition/rifle-ammo/300-blackout-ammo/',
+    '9mm':     ('/shooting/ammunition/handgun-ammo/9mm-luger-ammo/',     None),
+    '380acp':  ('/shooting/ammunition/handgun-ammo/380-auto-ammo/',      None),
+    '40sw':    ('/shooting/ammunition/handgun-ammo/40-s-w-ammo/',        None),
+    '38spl':   ('/shooting/ammunition/handgun-ammo/38-specials-ammo/',   None),
+    '357mag':  ('/shooting/ammunition/handgun-ammo/other-handgun-calibers/',
+                re.compile(r'\b357\b|\.357\b', re.IGNORECASE)),
+    '22lr':    ('/shooting/ammunition/rimfire-ammo/',
+                re.compile(r'\b22\s*(?:LR|long\s*rifle)\b|\.22\s*LR\b|22LR', re.IGNORECASE)),
+    '223-556': ('/shooting/ammunition/rifle-ammo/223-ammo/',              None),
+    '308win':  ('/shooting/ammunition/rifle-ammo/308-7-62x51-ammo/',      None),
+    '762x39':  ('/shooting/ammunition/rifle-ammo/7-62x39-ammo/',          None),
+    '300blk':  ('/shooting/ammunition/rifle-ammo/300-aac-blackout/',      None),
 }
 
 def get_retailer_id():
@@ -102,7 +108,8 @@ def parse_country(text):
     return None
 
 def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    url = SITE_BASE + CALIBER_PATHS[caliber_norm]
+    path, title_filter = CALIBER_PATHS[caliber_norm]
+    url = SITE_BASE + path
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
@@ -112,11 +119,20 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
         return 0, 0
-    time.sleep(6)
+    # Gritr renders its catalog through Searchspring's Snize widget,
+    # which mounts its <li class="snize-product"> cards client-side
+    # after the SPA boots. domcontentloaded fires on an empty grid;
+    # wait_for_selector below blocks until the cards exist.
+    try:
+        page.wait_for_selector('li.snize-product', timeout=25000)
+    except Exception:
+        print(f"  no snize-product cards rendered after 25s - skipping caliber.")
+        return 0, 0
+    time.sleep(2)
 
-    products = page.query_selector_all('article.card, li.product, .productCard')
-    if not products:
-        products = page.query_selector_all('.card')
+    # Old selectors targeted BigCommerce's stencil theme (article.card,
+    # li.product) and matched zero on Gritr's Snize-rendered grid.
+    products = page.query_selector_all('li.snize-product')
     print(f"  Found {len(products)} products")
     if not products:
         return 0, 0
@@ -126,33 +142,67 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
     for product in products:
         try:
-            link_el = product.query_selector('h4 a, h3 a, .card-title a')
+            # Title link — Snize wraps the whole card in <a class="snize-view-link">
+            # whose href is the product URL and whose aria-label/title
+            # carries the FULL product name (the .snize-title <span>
+            # truncates after 2 lines so reading from there can chop
+            # the round-count suffix off long titles).
+            link_el = product.query_selector('a.snize-view-link') or product.query_selector('a[href]')
             if not link_el:
                 skipped += 1
                 continue
-
-            name = link_el.inner_text().strip() or link_el.get_attribute('title') or ''
             href = link_el.get_attribute('href') or ''
             if not href:
                 skipped += 1
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
 
-            card_text = product.inner_text()
-
-            price_matches = re.findall(r'\$(\d{1,4}(?:,\d{3})*(?:\.\d{1,2})?)', card_text)
-            if len(price_matches) >= 2 and price_matches[0] != price_matches[1]:
-                skipped += 1
-                continue
-            if not price_matches:
-                skipped += 1
-                continue
-            base_price = float(price_matches[0].replace(',', ''))
-            if base_price <= 0:
+            name = ((link_el.get_attribute('aria-label') or link_el.get_attribute('title') or '').strip())
+            if not name:
+                title_el = product.query_selector('.snize-title')
+                name = (title_el.inner_text().strip() if title_el else '')
+            if not name:
                 skipped += 1
                 continue
 
-            total_rounds = parse_rounds(name) or parse_rounds(card_text)
+            # Title-based caliber filter for the mixed-caliber category
+            # pages (357mag → other-handgun-calibers, 22lr → all rimfire).
+            if title_filter and not title_filter.search(name):
+                skipped += 1
+                continue
+
+            # Skip non-ammo trainers that surface in some categories.
+            lname = name.lower()
+            if any(k in lname for k in ['snap cap', 'snap caps', 'dummy round', 'dummy rounds', 'a-zoom', 'azoom']):
+                skipped += 1
+                print(f"  Skipped (not real ammo): {name[:55]}")
+                continue
+
+            # Out-of-stock detection — Snize omits the snize-in-stock
+            # badge and adds snize-product-out-of-stock to the wrapper.
+            wrapper_class = product.get_attribute('class') or ''
+            in_stock = ('snize-product-out-of-stock' not in wrapper_class)
+
+            # Listing price lives in <span class="snize-price money">.
+            price_el = product.query_selector('.snize-price')
+            base_price = None
+            if price_el:
+                price_text = (price_el.inner_text() or '').strip()
+                m = re.search(r'\$(\d{1,5}(?:,\d{3})*(?:\.\d{1,2})?)', price_text)
+                if m:
+                    try:
+                        base_price = float(m.group(1).replace(',', ''))
+                    except ValueError:
+                        base_price = None
+            if not base_price or base_price <= 0:
+                skipped += 1
+                continue
+
+            # Round count comes from the title — Gritr/Snize doesn't
+            # render a per-round badge or variant grid on the listing
+            # tile. Titles consistently include "50 Round Box",
+            # "20 Round" or similar.
+            total_rounds = parse_rounds(name)
             if not total_rounds or total_rounds <= 0:
                 skipped += 1
                 continue
@@ -173,11 +223,9 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             seen_ids.add(product_id)
 
-            card_lower = card_text.lower()
-            in_stock = ('out of stock' not in card_lower and
-                        'sold out' not in card_lower and
-                        'unavailable' not in card_lower)
-            purchase_limit = parse_purchase_limit(card_text)
+            # in_stock already derived from the wrapper class above.
+            # purchase_limit not surfaced on the Gritr tile — leave None.
+            purchase_limit = None
 
             listing = {
                 'retailer_id': retailer_id,
