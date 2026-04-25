@@ -193,11 +193,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_gorilla.py
-      # - name: Run Georgia Arms scraper
-      #   env:
-      #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      #     SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      #   run: python scraper_georgiaarms.py
+      # Enabled 2026-04-25 — manual run confirmed 20 listings across
+      # 9 calibers (7.62x39 OOS at GA). 3 skips are CCI .22 LR resells
+      # without standard Npk variant labels. Variant grid is fetched
+      # per-product since GA house-brand titles carry no round count.
+      # See commit 38c396b.
+      - name: Run Georgia Arms scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_georgiaarms.py
       # - name: Run Black Basin scraper
       #   env:
       #     SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
