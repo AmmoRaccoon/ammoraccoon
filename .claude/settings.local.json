@@ -51,7 +51,15 @@
       "WebFetch(domain:www.ammosquared.com)",
       "WebFetch(domain:www.georgia-arms.com)",
       "WebFetch(domain:blackbasin.com)",
-      "Bash(python scripts/seed_new_retailers.py)"
+      "Bash(python scripts/seed_new_retailers.py)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /tmp/index.html -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/)",
+      "Read(//tmp/**)",
+      "Bash(curl -s \"http://localhost:3000/\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s \"http://localhost:3000/\" -o /tmp/idx.html)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} home\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} history\\\\n\" http://localhost:3000/history)"
     ]
   }
 }

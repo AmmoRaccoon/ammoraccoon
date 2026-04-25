@@ -151,6 +151,15 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             product_url = href if href.startswith('http') else SITE_BASE + href
 
+            # The .productGrid wrapper sometimes catches "Popular Brands"
+            # carousel cards that link to /brands/X. Those aren't products
+            # but pass the price/round regex via the "$200" promo banner
+            # and a stray round-count carousel number, so they got saved
+            # with the loop's caliber tag attached. Reject them up-front.
+            if '/brands/' in product_url:
+                skipped += 1
+                continue
+
             card_text = product.inner_text()
 
             # Real price lives in <span data-product-price-without-tax>.
