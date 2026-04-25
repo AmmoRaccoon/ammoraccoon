@@ -20,20 +20,18 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "gorilla"
 SITE_BASE = "https://www.gorillaammo.com"
 
-# WooCommerce. Gorilla is primarily a single-brand manufacturer; expect
-# 404s on calibers they don't load (most non-.300-BLK pistol calibers).
-# Listings will skip cleanly when the category page is missing.
+# WooCommerce. Gorilla is a single-brand manufacturer that loads only a
+# handful of calibers. Verified 2026-04-25 against the live "View Ammo
+# by Caliber" nav — the 5 tracked calibers Gorilla doesn't sell
+# (.40 S&W, .38 Spl, .357 Mag, .22 LR, 7.62x39) are dropped instead
+# of left to 404. Most slugs carry a "-view-ammo-by-caliber" suffix
+# from a WP duplicate-slug rename; .308 Win and 9mm don't.
 CALIBER_PATHS = {
-    '9mm':     '/product-category/view-ammo-by-caliber/9mm-luger/',
-    '380acp':  '/product-category/view-ammo-by-caliber/380-acp/',
-    '40sw':    '/product-category/view-ammo-by-caliber/40-sw/',
-    '38spl':   '/product-category/view-ammo-by-caliber/38-special/',
-    '357mag':  '/product-category/view-ammo-by-caliber/357-magnum/',
-    '22lr':    '/product-category/view-ammo-by-caliber/22-lr/',
-    '223-556': '/product-category/view-ammo-by-caliber/223-rem-5-56-nato/',
+    '9mm':     '/product-category/view-ammo-by-caliber/9-mm/',
+    '380acp':  '/product-category/view-ammo-by-caliber/380-acp-view-ammo-by-caliber/',
+    '223-556': '/product-category/view-ammo-by-caliber/223-5-56-view-ammo-by-caliber/',
     '308win':  '/product-category/view-ammo-by-caliber/308-win/',
-    '762x39':  '/product-category/view-ammo-by-caliber/7-62x39/',
-    '300blk':  '/product-category/view-ammo-by-caliber/300-blackout/',
+    '300blk':  '/product-category/view-ammo-by-caliber/300-blackout-view-ammo-by-caliber/',
 }
 
 def get_retailer_id():
@@ -119,7 +117,18 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
             href = link_el.get_attribute('href') or ''
             title_el = product.query_selector('.woocommerce-loop-product__title, h2, h3')
-            name = (title_el.inner_text().strip() if title_el else '') or link_el.inner_text().strip()
+            raw_name = (title_el.inner_text().strip() if title_el else '') or link_el.inner_text().strip()
+            # Gorilla titles include trademark glyphs ("Sierra MatchKing®")
+            # and en-dash field separators ("...MatchKing® – 20rd Box")
+            # that render as � on Windows terminals. Normalize to ASCII
+            # so the listings table reads cleanly across locales.
+            TYPOGRAPHIC = str.maketrans({
+                '–': '-', '—': '-',
+                '‘': "'", '’': "'", '“': '"', '”': '"',
+                '®': '', '™': '', '©': '',
+                '·': '*', '•': '*', '×': 'x',
+            })
+            name = raw_name.translate(TYPOGRAPHIC).strip()
             if not name or not href:
                 skipped += 1
                 continue
