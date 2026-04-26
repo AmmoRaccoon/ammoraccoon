@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AmmoRaccoon — Retailer Cart Test</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+    margin: 0; padding: 16px; background: #f4f4f4; color: #222;
+  }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 14px; }
+
+  .config {
+    background: #fff; border: 1px solid #ccc; padding: 12px;
+    margin-bottom: 16px; border-radius: 4px;
+  }
+  .config label { display: block; font-size: 12px; margin: 6px 0 2px; }
+  .config input { width: 100%; padding: 6px; font-family: inherit;
+    font-size: 12px; border: 1px solid #aaa; border-radius: 3px; }
+  .config-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 8px; }
+  .config-row > div { flex: 1; }
+  .config button {
+    padding: 8px 14px; background: #2c7; color: #fff; border: none;
+    border-radius: 3px; cursor: pointer; font-weight: bold;
+  }
+  .config button:hover { background: #2a6; }
+  .config-warn {
+    font-size: 11px; color: #842; margin-top: 6px; line-height: 1.45;
+    background: #fef6e0; border: 1px solid #f0d080; padding: 8px;
+    border-radius: 3px;
+  }
+  .conn-status {
+    display: inline-block; padding: 4px 10px; border-radius: 3px;
+    font-size: 12px; font-weight: bold;
+  }
+  .conn-status.ok { background: #d2f2d2; color: #050; }
+  .conn-status.bad { background: #f2d2d2; color: #500; }
+  .conn-status.unknown { background: #e0e0e0; color: #444; }
+
+  .progress {
+    background: #fff; border: 1px solid #ccc; padding: 10px 12px;
+    margin-bottom: 12px; border-radius: 4px; display: flex;
+    align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .progress .count { font-size: 18px; font-weight: bold; }
+  .progress .bar {
+    flex: 1; min-width: 200px; height: 14px; background: #e0e0e0;
+    border-radius: 3px; overflow: hidden;
+  }
+  .progress .bar > div { height: 100%; background: #2c7; transition: width .2s; }
+  .filter button {
+    padding: 5px 10px; font-size: 12px; border: 1px solid #aaa;
+    background: #fff; border-radius: 3px; cursor: pointer; margin-right: 4px;
+  }
+  .filter button.active { background: #2c7; color: #fff; border-color: #2c7; }
+
+  .retailer {
+    background: #fff; border: 1px solid #ccc; padding: 10px 14px;
+    margin-bottom: 8px; border-radius: 4px;
+  }
+  .retailer-header {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: 11px; font-weight: bold; white-space: nowrap;
+  }
+  .badge.verified { background: #d2f2d2; color: #050; }
+  .badge.pending { background: #fef0a0; color: #762; }
+  .badge.muted { background: #e0e0e0; color: #555; }
+  .name { font-weight: bold; font-size: 14px; }
+  .rid { color: #888; font-size: 11px; }
+  .open-link {
+    margin-left: auto; padding: 4px 10px; background: #36a;
+    color: #fff; text-decoration: none; border-radius: 3px;
+    font-size: 12px;
+  }
+  .open-link:hover { background: #258; }
+
+  .current {
+    background: #f8f8f8; border-left: 3px solid #ccc; padding: 6px 10px;
+    margin: 8px 0 10px; font-size: 12px; line-height: 1.55; color: #444;
+    font-family: monospace;
+  }
+  .current .key { color: #777; }
+  .current .val { color: #222; font-weight: bold; }
+
+  .form-grid {
+    display: grid; grid-template-columns: 180px 140px 1fr; gap: 10px;
+    align-items: start; font-size: 13px;
+  }
+  .form-grid label { font-size: 12px; color: #555; display: block; margin-bottom: 2px; }
+  .form-grid input[type="number"], .form-grid textarea, .form-grid input[type="text"] {
+    width: 100%; padding: 5px; border: 1px solid #aaa; border-radius: 3px;
+    font-family: inherit; font-size: 13px;
+  }
+  .form-grid textarea { min-height: 50px; resize: vertical; }
+  .form-grid .radio-row { display: flex; gap: 10px; align-items: center;
+    padding: 5px 0; }
+  .form-grid .radio-row label { display: inline-flex; align-items: center;
+    gap: 4px; font-size: 12px; margin: 0; cursor: pointer; }
+
+  .save-row {
+    margin-top: 10px; display: flex; gap: 10px; align-items: center;
+    flex-wrap: wrap;
+  }
+  .save-btn {
+    padding: 7px 14px; background: #2c7; color: #fff; border: none;
+    border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 13px;
+  }
+  .save-btn:hover { background: #2a6; }
+  .save-btn:disabled { background: #888; cursor: not-allowed; }
+  .save-feedback { font-size: 12px; }
+  .save-feedback.ok { color: #060; }
+  .save-feedback.err { color: #c00; font-weight: bold; }
+
+  .empty-state, .loading { padding: 40px; text-align: center; color: #888; }
+</style>
+</head>
+<body>
+
+<h1>AmmoRaccoon — Retailer Cart Test</h1>
+<div class="subtitle">
+  Internal tool for recording manual cart-test results (case of 9mm → 78130).
+  Updates <code>tax_nexus</code> and <code>retailers.shipping_notes</code>.
+</div>
+
+<div class="config">
+  <div class="config-row">
+    <div>
+      <label>Supabase URL</label>
+      <input id="cfg-url" value="https://hnrflhqgeyuxvvnnfqjo.supabase.co">
+    </div>
+    <div style="flex: 2;">
+      <label>Supabase Key (paste service_role for write access — never committed)</label>
+      <input id="cfg-key" type="password" placeholder="eyJ...">
+    </div>
+    <div style="flex: 0;">
+      <button id="cfg-connect">Connect</button>
+    </div>
+    <div style="flex: 0;">
+      <span id="conn-status" class="conn-status unknown">unknown</span>
+    </div>
+  </div>
+  <div class="config-warn">
+    <strong>Why a key field, not a hardcoded one:</strong> the anon key cannot
+    write to <code>tax_nexus</code> / <code>retailers</code> (Row-Level
+    Security denies anon writes — verified 2026-04-26). Paste the
+    <code>SUPABASE_KEY</code> (service_role) from <code>ammoraccoon/.env</code>
+    here. The key persists in this browser's <code>localStorage</code> and is
+    never sent anywhere except your own Supabase project. Don't commit a
+    saved version of this page.
+  </div>
+</div>
+
+<div class="progress" id="progress" style="display:none;">
+  <div><span class="count" id="prog-count">0 / 0</span> verified</div>
+  <div class="bar"><div id="prog-bar" style="width:0%"></div></div>
+  <div class="filter">
+    <button data-filter="all" class="active">All</button>
+    <button data-filter="pending">Pending</button>
+    <button data-filter="verified">Verified</button>
+  </div>
+</div>
+
+<div id="list"><div class="loading">Connect to Supabase to load retailers.</div></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const $ = (id) => document.getElementById(id);
+let sb = null;
+let retailers = [];
+let nexusByRetailer = {};
+let currentFilter = 'all';
+
+// --- Config persistence ---
+const CFG_KEY = 'ammoraccoon_cart_test_cfg_v1';
+function saveCfg(url, key) {
+  localStorage.setItem(CFG_KEY, JSON.stringify({ url, key }));
+}
+function loadCfg() {
+  try { return JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); }
+  catch { return {}; }
+}
+const stored = loadCfg();
+if (stored.url) $('cfg-url').value = stored.url;
+if (stored.key) $('cfg-key').value = stored.key;
+
+function setConn(state, msg) {
+  const el = $('conn-status');
+  el.className = 'conn-status ' + state;
+  el.textContent = msg;
+}
+
+async function connect() {
+  const url = $('cfg-url').value.trim();
+  const key = $('cfg-key').value.trim();
+  if (!url || !key) {
+    setConn('bad', 'missing url/key');
+    return;
+  }
+  sb = createClient(url, key);
+  setConn('unknown', 'connecting…');
+  try {
+    // Probe: read 1 row + try a no-op write to tax_nexus. If the
+    // no-op write returns 0 affected rows, RLS is silently denying
+    // — surface that loudly so the operator doesn't think saves
+    // worked when they didn't.
+    const r = await sb.from('retailers').select('id').limit(1);
+    if (r.error) throw r.error;
+    // Probe write permission: re-set notes on tax_nexus row id=1
+    // to its current value.
+    const probe = await sb.from('tax_nexus').select('id,notes').eq('id', 1).limit(1);
+    if (probe.data && probe.data[0]) {
+      const cur = probe.data[0].notes;
+      const w = await sb.from('tax_nexus').update({ notes: cur })
+        .eq('id', 1).select('id');
+      if (w.error) throw w.error;
+      if (!w.data || w.data.length === 0) {
+        setConn('bad', 'reads OK, writes BLOCKED (RLS — paste service_role)');
+        return;
+      }
+    }
+    saveCfg(url, key);
+    setConn('ok', 'connected — writes OK');
+    await loadAll();
+  } catch (e) {
+    setConn('bad', 'failed: ' + (e.message || e));
+  }
+}
+$('cfg-connect').addEventListener('click', connect);
+
+// --- Data load ---
+async function loadAll() {
+  $('list').innerHTML = '<div class="loading">Loading retailers…</div>';
+
+  const r = await sb.from('retailers')
+    .select('id,slug,name,website_url,free_ship_threshold,free_shipping_threshold,'
+          + 'flat_ship_rate,flat_shipping_rate,ships_free_always,'
+          + 'ships_free_never,membership_free_ship,is_active,shipping_notes')
+    .eq('is_active', true)
+    .order('id');
+  if (r.error) {
+    $('list').innerHTML = `<div class="empty-state">Load error: ${r.error.message}</div>`;
+    return;
+  }
+  retailers = r.data || [];
+
+  const n = await sb.from('tax_nexus')
+    .select('id,retailer_id,state_code,has_nexus,tax_rate,verified,verified_at,notes')
+    .eq('state_code', 'TX');
+  if (n.error) {
+    $('list').innerHTML = `<div class="empty-state">Load error: ${n.error.message}</div>`;
+    return;
+  }
+  nexusByRetailer = {};
+  for (const row of (n.data || [])) {
+    nexusByRetailer[row.retailer_id] = row;
+  }
+
+  $('progress').style.display = 'flex';
+  render();
+}
+
+function render() {
+  const total = retailers.length;
+  const verified = retailers.filter(r =>
+    nexusByRetailer[r.id] && nexusByRetailer[r.id].verified).length;
+  $('prog-count').textContent = `${verified} / ${total}`;
+  $('prog-bar').style.width = (total ? (verified/total*100) : 0) + '%';
+
+  const list = $('list');
+  list.innerHTML = '';
+  let shown = 0;
+  for (const r of retailers) {
+    const nx = nexusByRetailer[r.id];
+    const isVerified = !!(nx && nx.verified);
+    if (currentFilter === 'pending' && isVerified) continue;
+    if (currentFilter === 'verified' && !isVerified) continue;
+    list.appendChild(retailerCard(r, nx, isVerified));
+    shown++;
+  }
+  if (!shown) {
+    list.innerHTML = `<div class="empty-state">No retailers match filter "${currentFilter}".</div>`;
+  }
+}
+
+function fmt(v) {
+  if (v === null || v === undefined || v === '') return '<span class="val" style="color:#aaa">null</span>';
+  return `<span class="val">${String(v)}</span>`;
+}
+
+function retailerCard(r, nx, isVerified) {
+  const card = document.createElement('div');
+  card.className = 'retailer';
+  card.dataset.rid = r.id;
+
+  const threshold = r.free_ship_threshold ?? r.free_shipping_threshold ?? null;
+  const flat = r.flat_ship_rate ?? r.flat_shipping_rate ?? null;
+  const websiteUrl = r.website_url || '';
+
+  const has_nexus = nx ? nx.has_nexus : null;
+  const tax_rate = nx ? nx.tax_rate : null;
+  const notes_existing = nx ? (nx.notes || '') : '';
+
+  // Pre-fill the radio default from current has_nexus value.
+  const radioYes = has_nexus === true;
+  const radioNo  = has_nexus === false;
+
+  card.innerHTML = `
+    <div class="retailer-header">
+      <span class="badge ${isVerified ? 'verified' : 'pending'}">
+        ${isVerified ? 'VERIFIED' : 'PENDING'}
+      </span>
+      <span class="name">${r.name}</span>
+      <span class="rid">id=${r.id} · slug=${r.slug}</span>
+      ${websiteUrl ? `<a class="open-link" href="${websiteUrl}" target="_blank" rel="noopener">Open Site →</a>` : ''}
+    </div>
+
+    <div class="current">
+      <span class="key">free-ship threshold:</span> ${fmt(threshold)} &nbsp;·&nbsp;
+      <span class="key">flat rate:</span> ${fmt(flat)} &nbsp;·&nbsp;
+      <span class="key">ships_free_always:</span> ${fmt(r.ships_free_always)} &nbsp;·&nbsp;
+      <span class="key">never:</span> ${fmt(r.ships_free_never)} &nbsp;·&nbsp;
+      <span class="key">membership:</span> ${fmt(r.membership_free_ship)}<br>
+      <span class="key">tax_nexus.has_nexus:</span> ${fmt(has_nexus)} &nbsp;·&nbsp;
+      <span class="key">tax_rate:</span> ${fmt(tax_rate)} &nbsp;·&nbsp;
+      <span class="key">verified:</span> ${fmt(nx ? nx.verified : null)}<br>
+      <span class="key">existing notes:</span> ${fmt(notes_existing)}
+    </div>
+
+    <div class="form-grid">
+      <div>
+        <label>Shipping cost — case of 9mm to 78130 ($)</label>
+        <input type="number" step="0.01" min="0" placeholder="e.g. 14.99" data-field="ship_cost">
+      </div>
+      <div>
+        <label>Charges TX tax?</label>
+        <div class="radio-row">
+          <label><input type="radio" name="tax-${r.id}" value="yes" data-field="tax_yes" ${radioYes ? 'checked' : ''}> Yes</label>
+          <label><input type="radio" name="tax-${r.id}" value="no" data-field="tax_no" ${radioNo ? 'checked' : ''}> No</label>
+        </div>
+      </div>
+      <div>
+        <label>Notes (cart total, edge cases, free-ship trigger amount, etc.)</label>
+        <textarea data-field="notes" placeholder="optional"></textarea>
+      </div>
+    </div>
+
+    <div class="save-row">
+      <button class="save-btn" data-action="save">Save & Mark Verified</button>
+      <span class="save-feedback" data-role="feedback"></span>
+    </div>
+  `;
+
+  card.querySelector('[data-action="save"]').addEventListener('click', () => save(r, nx, card));
+  return card;
+}
+
+async function save(r, nx, card) {
+  const fb = card.querySelector('[data-role="feedback"]');
+  const btn = card.querySelector('[data-action="save"]');
+  fb.className = 'save-feedback';
+  fb.textContent = 'saving…';
+  btn.disabled = true;
+
+  try {
+    const shipCost = card.querySelector('[data-field="ship_cost"]').value.trim();
+    const taxYes = card.querySelector('[data-field="tax_yes"]').checked;
+    const taxNo  = card.querySelector('[data-field="tax_no"]').checked;
+    const userNotes = card.querySelector('[data-field="notes"]').value.trim();
+
+    if (!taxYes && !taxNo) throw new Error('select Yes or No for TX tax');
+
+    const today = new Date().toISOString().slice(0,10);
+    const noteParts = [
+      `Cart test ${today}`,
+      `TX tax ${taxYes ? 'YES' : 'NO'}`,
+      shipCost ? `9mm case to 78130: $${shipCost}` : null,
+      userNotes ? `notes: ${userNotes}` : null,
+    ].filter(Boolean);
+    const newNotes = noteParts.join(' · ');
+
+    // 1. Upsert tax_nexus row.
+    const taxRow = {
+      retailer_id: r.id,
+      state_code: 'TX',
+      has_nexus: taxYes,
+      tax_rate: taxYes ? 0.0825 : 0,
+      verified: true,
+      verified_at: new Date().toISOString(),
+      notes: newNotes,
+    };
+    const tx = await sb.from('tax_nexus').upsert(taxRow,
+      { onConflict: 'retailer_id,state_code' }).select('id');
+    if (tx.error) throw tx.error;
+    if (!tx.data || tx.data.length === 0) {
+      throw new Error('upsert returned 0 rows — RLS likely blocking writes');
+    }
+
+    // 2. Mirror the cart-test note onto retailers.shipping_notes
+    //    (stamp-style — preserves history by appending if there's
+    //    existing content, otherwise sets fresh).
+    const existing = (r.shipping_notes || '').trim();
+    const shippingNote = shipCost
+      ? `Cart test ${today}: $${shipCost} for 9mm case to 78130`
+      : `Cart test ${today}: shipping cost not recorded`;
+    const stamped = existing
+      ? `${existing}\n${shippingNote}`
+      : shippingNote;
+    const ru = await sb.from('retailers').update({ shipping_notes: stamped })
+      .eq('id', r.id).select('id');
+    if (ru.error) throw ru.error;
+    if (!ru.data || ru.data.length === 0) {
+      throw new Error('retailers update returned 0 rows — RLS likely blocking writes');
+    }
+
+    fb.className = 'save-feedback ok';
+    fb.textContent = `saved at ${new Date().toLocaleTimeString()}`;
+
+    // Refresh in-memory state + UI badge for this card.
+    nexusByRetailer[r.id] = { ...(nx||{}), ...taxRow };
+    card.querySelector('.badge').className = 'badge verified';
+    card.querySelector('.badge').textContent = 'VERIFIED';
+    // Update progress.
+    const verified = retailers.filter(rr =>
+      nexusByRetailer[rr.id] && nexusByRetailer[rr.id].verified).length;
+    $('prog-count').textContent = `${verified} / ${retailers.length}`;
+    $('prog-bar').style.width = (verified/retailers.length*100) + '%';
+  } catch (e) {
+    fb.className = 'save-feedback err';
+    fb.textContent = 'error: ' + (e.message || e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// --- Filter buttons ---
+document.querySelector('.filter').addEventListener('click', (e) => {
+  if (e.target.tagName !== 'BUTTON') return;
+  document.querySelectorAll('.filter button').forEach(b => b.classList.remove('active'));
+  e.target.classList.add('active');
+  currentFilter = e.target.dataset.filter;
+  render();
+});
+
+// --- Auto-connect if config persisted ---
+if (stored.key && stored.url) {
+  connect();
+}
+</script>
+
+</body>
+</html>
