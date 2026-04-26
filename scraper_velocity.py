@@ -8,7 +8,7 @@ from supabase import create_client
 
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
-    parse_brand, sanity_check_ppr,
+    parse_brand, sanity_check_ppr, clean_title,
 )
 
 load_dotenv()
@@ -156,23 +156,9 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                         else (link_el.get_attribute('aria-label') or link_el.inner_text().strip()))
             # Velocity titles use HTML en-dashes as field separators
             # ("9mm – American Eagle 115gr FMJ") and typographic
-            # apostrophes in brand names like "Pow'R-Ball". Replace
-            # the most common typographic glyphs with ASCII so the
-            # listings table renders cleanly across terminals/locales.
-            TYPOGRAPHIC = str.maketrans({
-                '–': '-',   # en-dash (field separator on Velocity)
-                '—': '-',   # em-dash
-                '‘': "'",   # left single quote
-                '’': "'",   # right single quote / apostrophe
-                '“': '"',   # left double quote
-                '”': '"',   # right double quote
-                '®': '',    # registered ®
-                '™': '',    # trademark ™
-                '·': '*',   # middle dot
-                '•': '*',   # bullet
-                '×': 'x',   # multiplication sign (used in 7.62×39)
-            })
-            name = raw_name.translate(TYPOGRAPHIC).strip()
+            # apostrophes in brand names like "Pow'R-Ball" — clean_title
+            # normalizes both to ASCII.
+            name = clean_title(raw_name)
             if not name:
                 skipped += 1
                 continue
