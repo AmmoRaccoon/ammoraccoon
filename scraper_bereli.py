@@ -204,7 +204,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 bullet_type = parse_bullet_type(name)
                 condition = parse_condition(name)
                 ppr = round(price / rounds, 4)
-                if not sanity_check_ppr(ppr, price, rounds, context=name[:60]):
+                if not sanity_check_ppr(ppr, price, rounds, context=name[:60], caliber=caliber_norm):
                     continue
                 product_id = entity_id[:100]
                 if product_id in seen_ids:

@@ -168,7 +168,7 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
                         continue
                     seen_ids.add(product_id)
                     ppr = round(price / rounds, 4)
-                    if not sanity_check_ppr(ppr, price, rounds, context=title[:60]):
+                    if not sanity_check_ppr(ppr, price, rounds, context=title[:60], caliber=caliber_norm):
                         continue
 
                     row = {

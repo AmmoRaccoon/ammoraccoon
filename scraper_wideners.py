@@ -205,7 +205,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 # sanity guard catches any future regression that slips a
                 # cents-as-dollars value (or the inverse) back in.
                 ppr = round(price / rounds, 4)
-                if not sanity_check_ppr(ppr, price, rounds, context=title[:60]):
+                if not sanity_check_ppr(ppr, price, rounds, context=title[:60], caliber=caliber_norm):
                     continue
 
                 product_id = slug[:100]

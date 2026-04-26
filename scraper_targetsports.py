@@ -164,7 +164,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
 
             if not sanity_check_ppr(price_per_round, base_price, total_rounds,
-                                    context=f'{RETAILER_SLUG} {caliber_norm}'):
+                                    context=f'{RETAILER_SLUG} {caliber_norm}', caliber=caliber_norm):
                 skipped += 1
                 continue
 

@@ -194,7 +194,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 brand = parse_brand(parse_text) or "Unknown"
                 condition = parse_condition(parse_text)
                 ppr = round(price / rounds, 4)
-                if not sanity_check_ppr(ppr, price, rounds, context=parse_text[:60]):
+                if not sanity_check_ppr(ppr, price, rounds, context=parse_text[:60], caliber=caliber_norm):
                     continue
                 product_id = extract_product_id(link)
                 if product_id in seen_ids:

@@ -228,23 +228,81 @@ def parse_brand_or_unknown(text):
     return parse_brand(text) or 'Unknown'
 
 
-PPR_FLOOR = 0.01   # Below this, something is off by 100x the other way.
-PPR_CEILING = 5.00 # $5/rd is premium-defensive territory; above it is almost
-                   # certainly a unit-conversion bug. Belt-and-suspenders
-                   # guard against the April 22 cents-to-dollars regression.
-                   # TODO: when .50 BMG (real-world ~$6-10/rd), .338 Lapua,
-                   # or similar premium-rifle calibers are added, raise the
-                   # ceiling OR scope it per caliber_normalized — a blanket
-                   # $5 ceiling will silently drop legitimate listings.
+PPR_ABSOLUTE_FLOOR = 0.01  # Catches the cents-as-dollars / 100x-off-the-other-way regression.
+PPR_CEILING = 5.00         # $5/rd is premium-defensive territory; above it is almost
+                           # certainly a unit-conversion bug. Belt-and-suspenders
+                           # guard against the April 22 cents-to-dollars regression.
+                           # TODO: when .50 BMG (real-world ~$6-10/rd), .338 Lapua,
+                           # or similar premium-rifle calibers are added, raise the
+                           # ceiling OR scope it per caliber_normalized — a blanket
+                           # $5 ceiling will silently drop legitimate listings.
+
+# Per-caliber lower bounds. The blanket $0.01 floor was too loose — a
+# misparsed 9mm at 3.2¢/rd was clearly impossible (street floor for
+# brass-case range 9mm hasn't been below ~22¢ in years) but still slipped
+# through. Each value is the lowest-plausible per-round price for *new*
+# brass-case range ammo in that caliber as of 2026. Set conservatively
+# below the cheapest seen on the market so an actual sale still passes.
+# Keys here are the loose names the project tracks publicly; the
+# CALIBERS-key normalization below maps the canonical `caliber_normalized`
+# slugs onto these.
+CALIBER_PRICE_FLOORS = {
+    '9mm':    0.15,
+    '22lr':   0.04,
+    '223':    0.20,
+    '556':    0.20,
+    '308':    0.40,
+    '380':    0.18,
+    '40sw':   0.20,
+    '45acp':  0.25,
+    '357mag': 0.25,
+    '38spl':  0.20,
+    '300blk': 0.35,
+    '762x39': 0.15,
+}
+DEFAULT_FLOOR = 0.15
+
+# Map the canonical CALIBERS keys (what scrapers actually emit as
+# caliber_normalized) onto the loose floor keys above. Combined slugs
+# like '223-556' fall back to the .223 floor since the chamber pressure
+# and street price for both rounds are roughly identical.
+_CALIBER_TO_FLOOR_KEY = {
+    '9mm':     '9mm',
+    '22lr':    '22lr',
+    '223-556': '223',
+    '380acp':  '380',
+    '40sw':    '40sw',
+    '38spl':   '38spl',
+    '357mag':  '357mag',
+    '308win':  '308',
+    '762x39':  '762x39',
+    '300blk':  '300blk',
+}
 
 
-def sanity_check_ppr(ppr, price, rounds, context=''):
+def floor_for_caliber(caliber):
+    """Return the per-round floor for a caliber identifier.
+
+    Accepts either a canonical CALIBERS key ('9mm', '223-556', '380acp',
+    …) or a loose name ('9mm', '223', '380'). Falls back to DEFAULT_FLOOR
+    for unrecognized inputs so a new caliber doesn't silently disable
+    the gate.
+    """
+    if not caliber:
+        return DEFAULT_FLOOR
+    key = _CALIBER_TO_FLOOR_KEY.get(caliber, caliber)
+    return CALIBER_PRICE_FLOORS.get(key, DEFAULT_FLOOR)
+
+
+def sanity_check_ppr(ppr, price, rounds, context='', caliber=None):
     """Return True if a computed price_per_round looks physically plausible.
 
     Falsifies when the scraper's arithmetic is obviously wrong — stops a
     misparsed row from leaking into the DB regardless of which scraper
     produced it. Scrapers should call this after computing ppr and
-    `continue` on False.
+    `continue` on False, passing `caliber=caliber_norm` so the per-caliber
+    floor (CALIBER_PRICE_FLOORS) applies. Without a caliber the function
+    falls back to DEFAULT_FLOOR.
     """
     if ppr is None:
         return False
@@ -252,9 +310,18 @@ def sanity_check_ppr(ppr, price, rounds, context=''):
         p = float(ppr)
     except (TypeError, ValueError):
         return False
-    if p < PPR_FLOOR or p > PPR_CEILING:
+    if p < PPR_ABSOLUTE_FLOOR or p > PPR_CEILING:
         print(
-            f"  [sanity] ppr ${p:.4f} outside [{PPR_FLOOR}, {PPR_CEILING}] "
+            f"  [sanity] ppr ${p:.4f} outside [{PPR_ABSOLUTE_FLOOR}, {PPR_CEILING}] "
+            f"(price=${price}, rounds={rounds}) {context}"
+        )
+        return False
+    floor = floor_for_caliber(caliber)
+    if p < floor:
+        # Distinct prefix so the per-caliber rejections are easy to grep
+        # out of the scrape log when tuning the floor map.
+        print(
+            f"  [floor] {caliber or 'default'}: ppr ${p:.4f} below floor ${floor:.2f} "
             f"(price=${price}, rounds={rounds}) {context}"
         )
         return False
