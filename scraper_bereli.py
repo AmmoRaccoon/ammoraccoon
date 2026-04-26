@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -165,6 +165,11 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 if link and not link.startswith('http'):
                     link = SITE_BASE + link
 
+                # Skip brand-carousel cards that BigCommerce stencil
+                # sometimes renders inside the product grid wrapper.
+                if link and '/brands/' in link:
+                    continue
+
                 price_el = await card.query_selector('.price.price--main')
                 price = None
                 if price_el:
@@ -199,6 +204,8 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 bullet_type = parse_bullet_type(name)
                 condition = parse_condition(name)
                 ppr = round(price / rounds, 4)
+                if not sanity_check_ppr(ppr, price, rounds, context=name[:60]):
+                    continue
                 product_id = entity_id[:100]
                 if product_id in seen_ids:
                     continue

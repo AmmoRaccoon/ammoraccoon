@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr
 
 load_dotenv()
 
@@ -160,6 +160,11 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             if not total_rounds and price_per_round > 0:
                 total_rounds = round(base_price / price_per_round)
             if not total_rounds:
+                skipped += 1
+                continue
+
+            if not sanity_check_ppr(price_per_round, base_price, total_rounds,
+                                    context=f'{RETAILER_SLUG} {caliber_norm}'):
                 skipped += 1
                 continue
 

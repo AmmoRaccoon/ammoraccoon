@@ -6,16 +6,12 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr
 
 load_dotenv()
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.getenv("SUPABASE_KEY")
-
-print(f"URL present: {bool(SUPABASE_URL)}")
-print(f"KEY present: {bool(SUPABASE_KEY)}")
-
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 RETAILER_SLUG = "ammunition-depot"
@@ -153,6 +149,10 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
             base_price = round(cpr * total_rounds, 2)
             price_per_round = cpr
+            if not sanity_check_ppr(price_per_round, base_price, total_rounds,
+                                    context=f'{RETAILER_SLUG} {caliber_norm}'):
+                skipped += 1
+                continue
             grain = parse_grain(name)
             case_material = parse_case_material(name)
             bullet_type = parse_bullet_type(name)

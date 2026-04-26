@@ -137,6 +137,11 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                 if link and not link.startswith('http'):
                     link = SITE_BASE + link
 
+                # Skip brand-carousel cards that BigCommerce stencil
+                # sometimes renders inside the product grid wrapper.
+                if link and '/brands/' in link:
+                    continue
+
                 price_el = await card.query_selector('.price--withoutTax')
                 if not price_el:
                     continue

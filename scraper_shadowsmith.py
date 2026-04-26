@@ -83,8 +83,6 @@ def parse_rounds(text):
         # or UPC fragments.
         r'\b(\d{2,4})/\d{1,4}\b',
         r'(\d[\d,]*)\s*count',
-        r'(\d[\d,]*)\s*/\s*bx',     # "50/bx" pattern seen on shadowsmith
-        r'(\d[\d,]*)\s*per\s*box',
     ]
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE)
