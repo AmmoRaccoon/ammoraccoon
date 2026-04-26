@@ -261,6 +261,24 @@ def sanity_check_ppr(ppr, price, rounds, context=''):
     return True
 
 
+# Map common typographic glyphs to ASCII so the listings table stays
+# clean across terminals/locales. Inlined in gorilla/velocity/shadowsmith;
+# new scrapers should import this instead of redefining it.
+TYPOGRAPHIC = str.maketrans({
+    '–': '-', '—': '-',
+    '‘': "'", '’': "'", '“': '"', '”': '"',
+    '®': '', '™': '',
+    '·': '*', '•': '*', '×': 'x',
+})
+
+
+def clean_title(text):
+    """Translate typographic glyphs in a product title and strip whitespace."""
+    if not text:
+        return ''
+    return text.translate(TYPOGRAPHIC).strip()
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
