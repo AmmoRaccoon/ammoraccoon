@@ -57,8 +57,12 @@ def normalize_caliber(text):
     if '357 mag' in t or '.357 mag' in t or '357 magnum' in t or '.357 magnum' in t \
             or '357mag' in t:
         return ('.357 Magnum', '357mag')
-    if '9mm' in t or '9 mm' in t or '9x19' in t or '9 x 19' in t or '9 luger' in t \
-            or '9mm luger' in t:
+    # Word-boundary regex on `\b9mm\b` so a title containing
+    # "5.45x39mm" (Russian 5.45) doesn't false-match the bare "9mm"
+    # substring inside "39mm". Sportsman's Guide surfaced this bug
+    # 2026-04-26 — Hornady Black 5.45x39mm got bucketed as 9mm.
+    if re.search(r'\b9mm\b', t) or '9 mm' in t or '9x19' in t \
+            or '9 x 19' in t or '9 luger' in t:
         return ('9mm Luger', '9mm')
     return (None, None)
 
