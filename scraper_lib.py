@@ -298,6 +298,42 @@ def floor_for_caliber(caliber):
     return CALIBER_PRICE_FLOORS.get(key, DEFAULT_FLOOR)
 
 
+# Per-caliber upper bounds. The blanket $5/rd ceiling let too much
+# premium-defensive / boutique pricing through and produced misleading
+# "deal" badges in the UI when a $4/rd Liberty Civil Defense round
+# briefly out-PPR'd a $0.50/rd bulk SKU after a parse error. Tightened
+# 2026-04-26 — values reflect the per-caliber ceiling above which a
+# listing is far more likely to be a misparse than a real boutique
+# SKU. Mirrors CALIBER_PRICE_FLOORS / floor_for_caliber.
+CALIBER_PRICE_CEILINGS = {
+    '9mm':    1.50,
+    '22lr':   0.75,
+    '223':    2.50,
+    '556':    2.50,
+    '308':    4.00,
+    '380':    2.00,
+    '40sw':   2.00,
+    '357mag': 3.00,
+    '38spl':  2.50,
+    '300blk': 4.00,
+    '762x39': 2.00,
+}
+DEFAULT_CEILING = 3.00
+
+
+def ceiling_for_caliber(caliber):
+    """Return the per-round ceiling for a caliber identifier.
+
+    Mirrors floor_for_caliber. Falls back to DEFAULT_CEILING for
+    unrecognized inputs so a new caliber doesn't silently disable
+    the upper gate.
+    """
+    if not caliber:
+        return DEFAULT_CEILING
+    key = _CALIBER_TO_FLOOR_KEY.get(caliber, caliber)
+    return CALIBER_PRICE_CEILINGS.get(key, DEFAULT_CEILING)
+
+
 def sanity_check_ppr(ppr, price, rounds, context='', caliber=None):
     """Return True if a computed price_per_round looks physically plausible.
 
@@ -326,6 +362,15 @@ def sanity_check_ppr(ppr, price, rounds, context='', caliber=None):
         # out of the scrape log when tuning the floor map.
         print(
             f"  [floor] {caliber or 'default'}: ppr ${p:.4f} below floor ${floor:.2f} "
+            f"(price=${price}, rounds={rounds}) {context}"
+        )
+        return False
+    ceiling = ceiling_for_caliber(caliber)
+    if p > ceiling:
+        # Distinct prefix mirrors the floor case so per-caliber
+        # ceiling rejections are easy to grep out of the scrape log.
+        print(
+            f"  [ceiling] {caliber or 'default'}: ppr ${p:.4f} above ceiling ${ceiling:.2f} "
             f"(price=${price}, rounds={rounds}) {context}"
         )
         return False
