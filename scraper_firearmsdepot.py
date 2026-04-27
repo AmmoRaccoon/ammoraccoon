@@ -40,6 +40,46 @@ PARENT_PATHS = [
 # when a page returns no cards.
 MAX_PAGES = 160
 
+# Non-ammo products that get cross-listed under /ammunition/ but are
+# storage / reloading accessories. Their titles often contain
+# "Holds 1000rds of 9mm" type copy, which fools both normalize_caliber
+# (matches "9mm") and parse_rounds (matches "1000rds"), letting the
+# accessory ride into listings as a $4970/round 9mm SKU. Surfaced
+# 2026-04-26 by the price audit (Hornady 99137 plastic ammo box, id
+# 53297). Block these by title/URL substring before extraction.
+NON_AMMO_TITLE_BLOCKLIST = (
+    'ammo box', 'ammobox',
+    'ammo storage', 'ammo-storage',
+    'ammo tray', 'ammo-tray',
+    'case feeder', 'casefeeder',
+    'bullet puller',
+    'reloading', 'loading block',
+    'brass catcher',
+    'speed loader', 'speedloader',
+    'powder funnel', 'priming tool', 'primer tool',
+    'magazine loader',
+    'cleaning kit', 'bore snake', 'gun cleaner',
+)
+NON_AMMO_URL_BLOCKLIST = (
+    'ammo-box', 'ammo-can-only', 'ammo-storage',
+    '/storage/', '/reloading/', '/cleaning/',
+)
+
+
+def is_non_ammo_product(name, product_url):
+    """Return True for storage/accessory products that share the
+    /ammunition/ category tree with real ammo. Conservative — only
+    rejects on phrases that wouldn't appear in a legit ammo title."""
+    nl = (name or '').lower()
+    ul = (product_url or '').lower()
+    for kw in NON_AMMO_TITLE_BLOCKLIST:
+        if kw in nl:
+            return True
+    for kw in NON_AMMO_URL_BLOCKLIST:
+        if kw in ul:
+            return True
+    return False
+
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -173,6 +213,14 @@ def scrape_parent(page, parent_path, retailer_id, seen_ids, counts):
                             or link_el.inner_text() or '').strip()
                 name = clean_title(raw_name)
                 if not name:
+                    skipped += 1
+                    continue
+
+                # Filter storage/reloading accessories before any
+                # caliber/rounds parsing — their titles ("Holds
+                # 1000rds of 9mm") otherwise extract a fake 9mm
+                # listing.
+                if is_non_ammo_product(name, product_url):
                     skipped += 1
                     continue
 
