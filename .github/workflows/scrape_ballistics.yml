@@ -1,0 +1,36 @@
+name: Scrape manufacturer ballistics
+
+# Once per week. Manufacturer-published ballistics (muzzle velocity, energy,
+# downrange) change very rarely — published specs are sticky for the life
+# of a SKU — so a weekly cadence is plenty. Catches new SKUs added to the
+# Kinetic Group catalog (Federal/Remington/CCI/Speer) and any spec
+# corrections published between cycles.
+#
+# Discovery is currently seed-list-driven (a small set of canonical SKUs
+# per brand). Once category-page crawl discovery lands, this workflow
+# will scale to hundreds of products without changing.
+on:
+  schedule:
+    - cron: '0 6 * * 0'   # Sunday 06:00 UTC, separate from condense.yml at 00:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ballistics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 python-dotenv "supabase==2.15.0"
+
+      - name: Scrape Kinetic Group ballistics (Federal, Remington, CCI, Speer)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_kinetic_ballistics.py
