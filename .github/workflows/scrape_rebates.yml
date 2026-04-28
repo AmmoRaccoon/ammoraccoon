@@ -1,0 +1,39 @@
+name: Scrape manufacturer rebates
+
+# Once per day. Federal & Remington (Kinetic Group) marketing pages
+# refresh seasonally — turkey rebates Mar-May, hunting rebates Sep-Dec —
+# and otherwise change rarely, so a daily cycle is plenty. The matcher
+# is paired in the same job: a new rebate row is useless without the
+# rebate_listing_matches refresh that powers per-listing badges.
+on:
+  schedule:
+    - cron: '0 13 * * *'   # 13:00 UTC = 09:00 EDT
+  workflow_dispatch:
+
+jobs:
+  rebates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 python-dotenv "supabase==2.15.0"
+
+      - name: Scrape Federal + Remington rebate pages
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_kinetic_rebates.py
+
+      - name: Match rebates to listings
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scripts/match_manufacturer_rebates_to_listings.py
