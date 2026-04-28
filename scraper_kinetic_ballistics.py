@@ -151,15 +151,21 @@ def _normalize_caliber(s: Optional[str]) -> Optional[str]:
     return CALIBER_NORMALIZE.get(key)
 
 
+# Sorted by needle length descending so the most specific phrase wins.
+# Note "hollow point" maps to JHP (not HP): retailers' listings.bullet_type
+# overwhelmingly uses JHP for any hollow-point product, even when the
+# manufacturer markets it as plain "Hollow Point" (Speer Gold Dot).
+# Aligning the manufacturer parser with that convention keeps the
+# 4-column equi-join in the matcher productive.
 _BULLET_TYPE_LOOKUP = [
-    ('full metal jacket', 'FMJ'),
     ('jacketed hollow point', 'JHP'),
-    ('hollow point', 'HP'),
     ('total metal jacket', 'TMJ'),
+    ('full metal jacket', 'FMJ'),
     ('open tip match', 'OTM'),
+    ('hollow point', 'JHP'),
     ('soft point', 'SP'),
-    ('flat point', 'FP'),
     ('round nose', 'LRN'),
+    ('flat point', 'FP'),
 ]
 
 
