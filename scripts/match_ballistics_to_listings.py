@@ -48,6 +48,14 @@ SUPABASE_KEY = os.environ['SUPABASE_KEY']
 
 PAGE = 1000
 
+# When a ballistics row carries bullet_type='JHP', also accept listings
+# whose bullet_type='HP'. Retailer scrapers that pulled the bullet type
+# from a manufacturer's "Gold Dot Hollow Point" / "Hollow Point" title
+# wrote 'HP' rather than 'JHP'. Same physical bullet either way.
+BULLET_TYPE_ALIASES = {
+    'JHP': ['JHP', 'HP'],
+}
+
 
 def fetch_ballistics(sb):
     rows = []
@@ -80,7 +88,7 @@ def find_matching_listings(sb, brand, caliber, grain, bullet):
             .eq('manufacturer', brand)
             .eq('caliber_normalized', caliber)
             .eq('grain', grain)
-            .eq('bullet_type', bullet)
+            .in_('bullet_type', BULLET_TYPE_ALIASES.get(bullet, [bullet]))
             .range(start, start + PAGE - 1)
             .execute()
             .data
