@@ -1,10 +1,12 @@
 name: Scrape manufacturer rebates
 
-# Once per day. Federal & Remington (Kinetic Group) marketing pages
-# refresh seasonally — turkey rebates Mar-May, hunting rebates Sep-Dec —
-# and otherwise change rarely, so a daily cycle is plenty. The matcher
-# is paired in the same job: a new rebate row is useless without the
-# rebate_listing_matches refresh that powers per-listing badges.
+# Once per day. Federal & Remington (Kinetic Group) and Winchester
+# marketing pages refresh seasonally — turkey rebates Mar-May, hunting
+# rebates Sep-Dec — and otherwise change rarely, so a daily cycle is
+# plenty. The matcher is paired in the same job: a new rebate row is
+# useless without the rebate_listing_matches refresh that powers
+# per-listing badges. Each scraper step uses if: always() so a single
+# brand's failure doesn't skip the others or the matcher refresh.
 on:
   schedule:
     - cron: '0 13 * * *'   # 13:00 UTC = 09:00 EDT
@@ -30,6 +32,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_kinetic_rebates.py
+
+      - name: Scrape Winchester rebate pages
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_winchester_rebates.py
 
       - name: Match rebates to listings
         if: always()
