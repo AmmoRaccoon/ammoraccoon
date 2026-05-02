@@ -232,6 +232,17 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_dancessportinggoods.py
+      # Enabled 2026-05-02 — manual 9mm + .223/5.56 run (3 pages each
+      # facet) saved 148 listings with realistic prices. Magento behind
+      # Cloudflare; layered-nav `?caliber=NNN` URLs 403 after 1-2 hits
+      # in the same session, so each pagination page opens in a fresh
+      # browser context. Combined-caliber facets (223+5.56, 308+7.62x51)
+      # are scraped separately and deduped via seen_ids.
+      - name: Run Gunbuyer scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_gunbuyer.py
 
       - name: Scraper health check
         if: always()
