@@ -64,15 +64,16 @@ BRAND = 'Winchester'
 # than Kinetic's because it covers every cartridge family on the catalog page,
 # not just the ones we want — products whose cartridge isn't here drop out.
 CALIBER_NORMALIZE = {
-    '9mm luger': '9mm',
+    '9mm luger': '9mm', '9mm luger +p': '9mm', '9mm nato': '9mm',
     '380 auto': '380acp', '.380 auto': '380acp', '380 acp': '380acp',
+    '380 automatic': '380acp',
     '38 special': '38spl', '38 special +p': '38spl',
     '357 magnum': '357mag',
-    '40 s&w': '40sw',
+    '40 s&w': '40sw', '40 smith & wesson': '40sw',
     '22 long rifle': '22lr',
-    '223 remington': '223-556', '5.56x45mm nato': '223-556',
+    '223 remington': '223-556', '5.56x45mm nato': '223-556', '5.56mm': '223-556',
     '308 winchester': '308win',
-    '7.62x39mm': '762x39',
+    '7.62x39mm': '762x39', '7.62 x 39mm': '762x39',
     '300 blackout': '300blk', '300 aac blackout': '300blk',
 }
 
@@ -95,8 +96,16 @@ SOURCES = {
         'brand': BRAND,
         'category_url': 'https://winchester.com/Products/Ammunition/Handgun',
     },
-    # Rifle / Rimfire / Shotshell categories follow the same template.
-    # Add their URLs here when you want coverage beyond handgun.
+    'winchester_rifle': {
+        'brand': BRAND,
+        'category_url': 'https://winchester.com/Products/Ammunition/Rifle',
+    },
+    'winchester_rimfire': {
+        'brand': BRAND,
+        'category_url': 'https://winchester.com/Products/Ammunition/Rimfire',
+    },
+    # Shotshell uses the same template; not added because we don't track
+    # shotshells in listings.
 }
 
 
@@ -201,6 +210,11 @@ def parse_category_page(html: str, source_url: str, target_calibers=None) -> lis
             sub_brand = _strip(a.get_text()) if a else None
 
         caliber_norm = _normalize_caliber(cartridge)
+        if caliber_norm is None:
+            # Cartridge isn't in CALIBER_NORMALIZE — a caliber we don't track
+            # (e.g. .270 Win, .243 Win, .30-06 on the rifle page). Drop it
+            # before downstream code sees a null join key.
+            continue
         if target_calibers and caliber_norm not in target_calibers:
             continue
 
