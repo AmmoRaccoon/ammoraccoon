@@ -35,11 +35,11 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_kinetic_ballistics.py
 
-      - name: Scrape Winchester ballistics (9mm)
+      - name: Scrape Winchester ballistics (handgun, rifle, rimfire)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python scraper_winchester_ballistics.py --calibers 9mm
+        run: python scraper_winchester_ballistics.py
 
       - name: Scrape Hornady ballistics (9mm handgun)
         env:
