@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -80,29 +80,6 @@ def parse_case_material(title):
         return 'Polymer'
     return 'Brass'
 
-def parse_bullet_type(title):
-    u = title.upper()
-    if 'JHP' in u or 'HOLLOW POINT' in u or 'BJHP' in u:
-        return 'JHP'
-    if 'TMJ' in u:
-        return 'TMJ'
-    if 'FMJ' in u or 'FULL METAL JACKET' in u:
-        return 'FMJ'
-    if 'LRN' in u or 'LEAD ROUND' in u:
-        return 'LRN'
-    if 'JSP' in u:
-        return 'JSP'
-    if 'FRANGIBLE' in u:
-        return 'Frangible'
-    if 'FTX' in u or 'FLEXLOCK' in u or 'XTP' in u or 'HONEYBADGER' in u:
-        return 'JHP'
-    if 'INCENDIARY' in u:
-        return 'Incendiary'
-    if 'BLANK' in u:
-        return 'Blank'
-    if 'HP' in u:
-        return 'JHP'
-    return 'FMJ'
 
 def parse_condition(title):
     t = title.lower()

@@ -242,7 +242,7 @@ def parse_brand_or_unknown(text):
 BULLET_TYPES = frozenset({
     'FMJ',       # Full Metal Jacket
     'TMJ',       # Total Metal Jacket
-    'JHP',       # Jacketed Hollow Point
+    'JHP',       # Jacketed Hollow Point — incl. brand lines FTX/FLEXLOCK/HONEYBADGER/BJHP
     'HP',        # Hollow Point and the polymer-tip / BTHP / V-MAX family
     'OTM',       # Open Tip Match
     'SP',        # Soft Point — incl. "jacketed soft point", Power Point
@@ -252,6 +252,7 @@ BULLET_TYPES = frozenset({
     'WC',        # Wadcutter
     'Frangible', # Frangible
     'Blank',     # Blank cartridge
+    'Incendiary', # Incendiary specialty round
 })
 
 
@@ -296,6 +297,11 @@ _BULLET_PATTERNS = [
     (re.compile(r'\bfxp\b'), 'HP'),     # Fenix FXP house brand HPs
     (re.compile(r'\bcphp\b'), 'HP'),    # Copper Plated HP (CCI Velocitor etc)
     (re.compile(r'\bcpfp\b'), 'FP'),    # Copper Plated Flat Point
+    (re.compile(r'\bftx\b'), 'JHP'),    # Hornady FTX (Flex Tip eXpanding) — JHP base
+    (re.compile(r'\bflexlock\b'), 'JHP'),    # Federal HST Flexlock — bonded JHP
+    (re.compile(r'\bhoneybadger\b'), 'JHP'),  # Black Hills HoneyBadger — solid copper, classed as JHP per legacy convention
+    (re.compile(r'\bbjhp\b'), 'JHP'),   # Bonded JHP
+    (re.compile(r'\bincendiary\b'), 'Incendiary'),
 
     # Compound abbreviations (longer/more-specific first within group)
     (re.compile(r'\bbthp\b|\bhpbt\b'), 'HP'),

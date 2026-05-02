@@ -8,7 +8,7 @@ from supabase import create_client
 
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
-    parse_brand, sanity_check_ppr, clean_title, normalize_caliber,
+    parse_brand, sanity_check_ppr, clean_title, normalize_caliber, parse_bullet_type as _shared_bullet_type,
 )
 
 load_dotenv()
@@ -86,21 +86,18 @@ def parse_case_material(text):
 
 
 def parse_bullet_type(text):
-    text_upper = text.upper()
-    for bt in ['FMJ', 'JHP', 'HP', 'OTM', 'TMJ', 'SP', 'FP']:
-        if bt in text_upper:
-            return bt
-    if 'HOLLOW POINT' in text_upper:
-        return 'JHP'
-    if 'FULL METAL' in text_upper:
-        return 'FMJ'
-    if 'XTREME DEFENDER' in text_upper or 'XTREME PENETRATOR' in text_upper:
-        # Lehigh Defense's solid-copper Xtreme line that Underwood
-        # loads — closest analog is a solid hollow point.
+    """Underwood loads several Lehigh Defense Xtreme lines whose bullet
+    type isn't named in standard parser tokens. Pre-check those, then
+    fall through to the canonical scraper_lib parser.
+    """
+    upper = (text or '').upper()
+    if 'XTREME DEFENDER' in upper or 'XTREME PENETRATOR' in upper:
+        # Solid copper fluted — closest analog is hollow point.
         return 'HP'
-    if 'XTREME HUNTER' in text_upper:
+    if 'XTREME HUNTER' in upper:
         return 'SP'
-    return None
+    return _shared_bullet_type(text)
+
 
 
 def parse_country(text):

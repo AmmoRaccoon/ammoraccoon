@@ -8,7 +8,7 @@ from supabase import create_client
 
 from scraper_lib import (
     CALIBERS, normalize_caliber, now_iso, with_stock_fields,
-    parse_purchase_limit, parse_brand, sanity_check_ppr, clean_title,
+    parse_purchase_limit, parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
 )
 
 load_dotenv()
@@ -84,16 +84,6 @@ def parse_case_material(text):
     return 'Brass'
 
 
-def parse_bullet_type(text):
-    text_upper = text.upper()
-    for bt in ['FMJ', 'JHP', 'HP', 'OTM', 'TMJ', 'SP', 'FP']:
-        if bt in text_upper:
-            return bt
-    if 'HOLLOW POINT' in text_upper:
-        return 'JHP'
-    if 'FULL METAL' in text_upper:
-        return 'FMJ'
-    return None
 
 
 def parse_country(text):

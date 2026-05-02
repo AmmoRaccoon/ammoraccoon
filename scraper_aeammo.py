@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type as _shared_bullet_type
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -61,23 +61,15 @@ def parse_case_material(title):
         return 'Polymer'
     return 'Brass'
 
-def parse_bullet_type(title):
-    title_upper = title.upper()
-    if 'JHP' in title_upper or 'HOLLOW POINT' in title_upper:
-        return 'JHP'
-    if 'TMJ' in title_upper:
-        return 'TMJ'
-    if 'FMJ' in title_upper:
-        return 'FMJ'
-    if 'LRN' in title_upper or 'LEAD ROUND' in title_upper:
-        return 'LRN'
-    if 'JSP' in title_upper:
-        return 'JSP'
-    if 'FRANGIBLE' in title_upper:
-        return 'Frangible'
-    if 'HP' in title_upper:
-        return 'JHP'
-    return 'FMJ'
+def parse_bullet_type(text):
+    """AE Ammo's catalog is dominated by their house-brand FMJ practice
+    line where titles often omit the bullet-type token entirely. Fall
+    back to FMJ when the canonical parser can't decide — preserves the
+    pre-migration assumption baked into AE Ammo's product mix.
+    """
+    bt = _shared_bullet_type(text)
+    return bt if bt is not None else 'FMJ'
+
 
 def parse_brand(title):
     brands = [
