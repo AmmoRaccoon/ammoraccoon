@@ -221,6 +221,17 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_classicfirearms.py
+      # Enabled 2026-05-02 — manual handgun + rifle run (3 pages each)
+      # saved 119 listings spanning 9 calibers with realistic prices.
+      # BigCommerce stencil; site only buckets ammo by gun type so we
+      # walk the three top-level type pages and normalize_caliber()
+      # filters to our tracked list. High skip count is expected — most
+      # rejections are off-list calibers (10mm, 45 ACP, 32-20 Win).
+      - name: Run Dance's Sporting Goods scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_dancessportinggoods.py
 
       - name: Scraper health check
         if: always()
