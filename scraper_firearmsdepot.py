@@ -9,6 +9,7 @@ from supabase import create_client
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, normalize_caliber,
+    parse_bullet_type_with_url_fallback,
 )
 
 load_dotenv()
@@ -131,18 +132,6 @@ def parse_case_material(text):
     elif 'nickel' in text_lower:
         return 'Nickel'
     return 'Brass'
-
-
-def parse_bullet_type(text):
-    text_upper = text.upper()
-    for bt in ['FMJ', 'JHP', 'HP', 'OTM', 'TMJ', 'SP', 'FP']:
-        if bt in text_upper:
-            return bt
-    if 'HOLLOW POINT' in text_upper:
-        return 'JHP'
-    if 'FULL METAL' in text_upper:
-        return 'FMJ'
-    return None
 
 
 def parse_country(text):
@@ -274,7 +263,11 @@ def scrape_parent(page, parent_path, retailer_id, seen_ids, counts):
 
                 grain = parse_grain(name)
                 case_material = parse_case_material(name)
-                bullet_type = parse_bullet_type(name)
+                # FD slugs commonly expose v-max / lrn / hornady-vmx
+                # tokens that the title parser misses; the audit found
+                # 96 slug-says-but-NULL rows here. Slug fallback closes
+                # most of those.
+                bullet_type = parse_bullet_type_with_url_fallback(name, product_url)
                 country = parse_country(name)
                 manufacturer = parse_brand(name) or "Unknown"
                 purchase_limit = parse_purchase_limit(card_text)

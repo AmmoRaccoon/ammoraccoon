@@ -232,6 +232,146 @@ def parse_brand_or_unknown(text):
     return parse_brand(text) or 'Unknown'
 
 
+# Canonical bullet types accepted by the listings table. Any value
+# parse_bullet_type emits MUST appear in this set so frontend filters
+# and per-retailer audits stay in sync. Five values (LRN/JSP/Frangible/
+# Blank/WC) were promoted into the canonical set 2026-05-02 after the
+# bullet-type quality audit found them already in production data — see
+# scripts/audit_bullet_type.py for the audit and scripts/backfill_bullet_type.py
+# for the rollout.
+BULLET_TYPES = frozenset({
+    'FMJ',       # Full Metal Jacket
+    'TMJ',       # Total Metal Jacket
+    'JHP',       # Jacketed Hollow Point
+    'HP',        # Hollow Point and the polymer-tip / BTHP / V-MAX family
+    'OTM',       # Open Tip Match
+    'SP',        # Soft Point — incl. "jacketed soft point", Power Point
+    'JSP',       # Jacketed Soft Point (legacy retained for in-DB rows)
+    'FP',        # Flat Point — incl. RNFP
+    'LRN',       # Lead Round Nose
+    'WC',        # Wadcutter
+    'Frangible', # Frangible
+    'Blank',     # Blank cartridge
+})
+
+
+# (regex, canonical) pairs for parse_bullet_type. The order is
+# significant — multi-word phrases come first so "jacketed soft point"
+# resolves before bare JSP/SP tokens; family aliases (V-MAX/A-MAX/ELD)
+# come next; bare 2-letter codes (HP/SP/FP/WC) come last so they don't
+# pre-empt longer matches. Every pattern uses \b boundaries and runs
+# against text normalized via _normalize_for_bullet_match() — which
+# lowercases the input and turns slug separators (-_./()) into spaces
+# so a single match list serves both human titles and URL slugs.
+_BULLET_PATTERNS = [
+    # Multi-word descriptive phrases (longest first within group)
+    (re.compile(r'\bjacketed\s+hollow\s+point\b'), 'JHP'),
+    (re.compile(r'\bsemi[\s-]?jacketed\s+hollow\s+point\b'), 'JHP'),
+    (re.compile(r'\bjacketed\s+soft\s+point\b'), 'SP'),
+    (re.compile(r'\bsemi[\s-]?jacketed\s+soft\s+point\b'), 'SP'),
+    (re.compile(r'\bfull\s+metal\s+jacket\b'), 'FMJ'),
+    (re.compile(r'\btotal\s+metal\s+jacket\b'), 'TMJ'),
+    (re.compile(r'\bopen\s+tip\s+match\b'), 'OTM'),
+    (re.compile(r'\blead\s+round\s+nose\b'), 'LRN'),
+    (re.compile(r'\broundn?\s*nose\s+flat\s+point\b'), 'FP'),
+    (re.compile(r'\bsoft\s+point\b'), 'SP'),
+    (re.compile(r'\bhollow\s+point\b'), 'JHP'),
+    (re.compile(r'\bflat\s+point\b'), 'FP'),
+    (re.compile(r'\bpower\s*point\b'), 'SP'),  # Winchester Power Point line
+    (re.compile(r'\bpolymer\s+tip(?:ped)?\b'), 'HP'),
+    (re.compile(r'\bballistic\s+tip\b'), 'HP'),
+    (re.compile(r'\bwadcutter\b'), 'WC'),
+    (re.compile(r'\bfrangible\b'), 'Frangible'),
+    (re.compile(r'\bblank\b'), 'Blank'),
+
+    # Family aliases — Hornady polymer-tip line, Fenix house brand.
+    # All map to HP because the open polymer cavity makes them
+    # mechanically hollow points; keeps filter buckets coherent.
+    (re.compile(r'\bv[\s-]?max\b'), 'HP'),
+    (re.compile(r'\ba[\s-]?max\b'), 'HP'),
+    (re.compile(r'\beld[\s-]?x\b'), 'HP'),
+    (re.compile(r'\beld[\s-]?m(?:atch)?\b'), 'HP'),  # "ELD M" or "ELD Match"
+    (re.compile(r'\beldx\b'), 'HP'),
+    (re.compile(r'\bxtp\b'), 'JHP'),    # Hornady XTP is a JHP
+    (re.compile(r'\bfxp\b'), 'HP'),     # Fenix FXP house brand HPs
+    (re.compile(r'\bcphp\b'), 'HP'),    # Copper Plated HP (CCI Velocitor etc)
+    (re.compile(r'\bcpfp\b'), 'FP'),    # Copper Plated Flat Point
+
+    # Compound abbreviations (longer/more-specific first within group)
+    (re.compile(r'\bbthp\b|\bhpbt\b'), 'HP'),
+    (re.compile(r'\bfmjbt\b|\bfmjfn\b|\bfmjfb\b'), 'FMJ'),
+    (re.compile(r'\bsjsp\b'), 'SP'),
+    (re.compile(r'\bsjhp\b'), 'JHP'),
+    (re.compile(r'\brnfp\b'), 'FP'),
+
+    # Bare 3-letter codes — safe enough that word-boundary catches
+    # most common false positives (e.g. "Speer" doesn't trip \bjhp\b).
+    (re.compile(r'\blrn\b'), 'LRN'),
+    (re.compile(r'\bjhp\b'), 'JHP'),
+    (re.compile(r'\bjsp\b'), 'SP'),  # treat JSP-the-token as SP per audit decision
+    (re.compile(r'\bfmj\b'), 'FMJ'),
+    (re.compile(r'\btmj\b'), 'TMJ'),
+    (re.compile(r'\botm\b'), 'OTM'),
+
+    # Bare 2-letter codes — word-bounded to avoid false positives like
+    # "Speer"/"Sport"/"Spire" → SP, "FPS" → FP, "WCC" → WC. Last so
+    # they can't shadow a longer match earlier in the list.
+    (re.compile(r'\bhp\b'), 'HP'),
+    (re.compile(r'\bsp\b'), 'SP'),
+    (re.compile(r'\bfp\b'), 'FP'),
+    (re.compile(r'\bwc\b'), 'WC'),
+]
+
+
+def _normalize_for_bullet_match(text):
+    """Lowercase and turn slug separators into spaces so the bullet-type
+    pattern list matches uniformly against both human titles
+    ("Jacketed Hollow Point") and URL slugs ("jacketed-hollow-point").
+    Collapses runs of whitespace so `\\s+` patterns work predictably."""
+    if not text:
+        return ''
+    s = text.lower()
+    for ch in '-_/.()':
+        s = s.replace(ch, ' ')
+    return re.sub(r'\s+', ' ', s).strip()
+
+
+def parse_bullet_type(text):
+    """Return a canonical bullet type from product text, or None.
+
+    Accepts both human-readable titles and URL slugs — the input is
+    normalized so a single pattern list serves both. Patterns are
+    word-bounded to avoid false positives like "Speer" → SP or
+    "FPS" → FP.
+
+    Return value is one of `BULLET_TYPES` or None when no canonical
+    type is detected.
+    """
+    s = _normalize_for_bullet_match(text)
+    if not s:
+        return None
+    for pat, bt in _BULLET_PATTERNS:
+        if pat.search(s):
+            return bt
+    return None
+
+
+def parse_bullet_type_with_url_fallback(title, product_url):
+    """parse_bullet_type with URL-slug fallback when title parsing fails.
+
+    Some retailers (Gunbuyer, Firearms Depot) abbreviate titles to SKU
+    codes that omit the bullet-type token even when the URL slug
+    includes it. Audit 2026-05-02 found ~150 in-stock NULLs across
+    these two retailers that the slug exposes but the title does not.
+    Use this variant in scrapers where titles are unreliable; titles
+    win when both have a hit so brand-specific aliases keep precedence.
+    """
+    bt = parse_bullet_type(title)
+    if bt is not None:
+        return bt
+    return parse_bullet_type(product_url)
+
+
 PPR_ABSOLUTE_FLOOR = 0.01  # Catches the cents-as-dollars / 100x-off-the-other-way regression.
 PPR_CEILING = 5.00         # $5/rd is premium-defensive territory; above it is almost
                            # certainly a unit-conversion bug. Belt-and-suspenders

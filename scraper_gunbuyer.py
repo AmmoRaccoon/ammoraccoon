@@ -9,6 +9,7 @@ from supabase import create_client
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title,
+    parse_bullet_type_with_url_fallback,
 )
 
 load_dotenv()
@@ -109,18 +110,6 @@ def parse_case_material(text):
     if 'nickel' in text_lower:
         return 'Nickel'
     return 'Brass'
-
-
-def parse_bullet_type(text):
-    text_upper = text.upper()
-    for bt in ['FMJ', 'JHP', 'HP', 'OTM', 'TMJ', 'SP', 'FP']:
-        if bt in text_upper:
-            return bt
-    if 'HOLLOW POINT' in text_upper:
-        return 'JHP'
-    if 'FULL METAL' in text_upper:
-        return 'FMJ'
-    return None
 
 
 def parse_country(text):
@@ -275,7 +264,12 @@ def scrape_facet(browser, caliber_norm, caliber_display, facet_path, retailer_id
                     purchase_limit = parse_purchase_limit(card.inner_text() or '')
                     grain = parse_grain(name)
                     case_material = parse_case_material(name)
-                    bullet_type = parse_bullet_type(name)
+                    # Gunbuyer titles abbreviate to SKU codes
+                    # ("WIN X193150 5.56 55 BOX 150RD") that frequently
+                    # omit the bullet-type token even when the URL slug
+                    # exposes it ("...-fmj-..."). Use the slug fallback
+                    # so the audit's 53 in-stock NULLs get caught.
+                    bullet_type = parse_bullet_type_with_url_fallback(name, product_url)
                     country = parse_country(name)
                     manufacturer = parse_brand(name) or "Unknown"
                     # Slug = filename minus the .html suffix; stable
