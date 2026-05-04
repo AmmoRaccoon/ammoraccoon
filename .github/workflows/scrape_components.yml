@@ -1,0 +1,44 @@
+name: AmmoRaccoon Component Scraper
+
+# Component prices (powder, primers, bullets, brass) change far less often
+# than loaded-ammo prices, so this runs once daily instead of every 2 hours.
+# 09:00 UTC = 04:00 America/Chicago during CDT, 03:00 during CST. Either
+# way we land in the early-morning Central window — ammo scrape (cron
+# every 2 hours) most recently fired at 08:00 UTC, and US daytime traffic
+# doesn't pick up until ~13:00 UTC, so we own the window cleanly.
+
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    # The full catalog (~2,500 variants across 4 categories) at the
+    # robots.txt-mandated 10s crawl-delay runs ~5.5–6 hours. GitHub-hosted
+    # runners hard-cap at 360 minutes; 355 lets us exit gracefully a few
+    # minutes before the cap if the run drifts long, instead of being
+    # terminated mid-write.
+    timeout-minutes: 355
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # No Playwright install here — the Powder Valley scraper is
+      # requests-only (Cloudflare is in CDN/cache mode, no JS challenge).
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 python-dotenv "supabase==2.15.0"
+
+      - name: Run Powder Valley component scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_powdervalley.py
