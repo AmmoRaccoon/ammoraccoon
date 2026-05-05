@@ -177,28 +177,51 @@ def _price_from_offers(offers) -> Optional[float]:
     return None
 
 
-_VARIANT_SUFFIX_RE = re.compile(r'\s-\s(\d+(?:\.\d+)?)\s*$')
-_VARIANT_URL_RE = re.compile(r'attribute_pa_(?:size|quantity|count|weight)=(\d+(?:\.\d+)?)')
+_VARIANT_SUFFIX_RE = re.compile(r'\s-\s(\S+)\s*$')
+_VARIANT_URL_RE = re.compile(r'attribute_pa_(?:size|quantity|count|weight)=([^&#]+)')
+_OZ_SLUG_RE = re.compile(r'^(\d+(?:\.\d+)?)-?oz$', re.IGNORECASE)
 
 
-def _variant_size(variant: dict) -> Optional[float]:
+def _parse_size_slug(raw, category: str) -> Optional[float]:
+    """pa_size/pa_quantity slug to numeric package_size in the canonical
+    unit for the category. Powder also accepts '<N>-oz' slugs and converts
+    to lbs (Trail Boss / Clays family / Titewad / Nitro 100 / Ramshot
+    Competition ship in oz containers, not pound jugs); all other slugs
+    must be bare numerics."""
+    if raw is None:
+        return None
+    s = str(raw).strip().lower()
+    if not s:
+        return None
+    if category == 'powder':
+        m = _OZ_SLUG_RE.match(s)
+        if m:
+            return round(float(m.group(1)) / 16.0, 4)
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _variant_size(variant: dict, category: str) -> Optional[float]:
     """Pack count for one variant. Powder uses JSON-LD `size`; bullet/brass
     have no size field so fall back to the URL query parameter, then to the
     name suffix (" - 100", " - 1000")."""
-    s = variant.get('size')
-    if s is not None:
-        try:
-            return float(s)
-        except (TypeError, ValueError):
-            pass
+    v = _parse_size_slug(variant.get('size'), category)
+    if v is not None:
+        return v
     url = variant.get('url') or ''
     m = _VARIANT_URL_RE.search(url)
     if m:
-        return float(m.group(1))
+        v = _parse_size_slug(m.group(1), category)
+        if v is not None:
+            return v
     name = variant.get('name') or ''
     m = _VARIANT_SUFFIX_RE.search(name)
     if m:
-        return float(m.group(1))
+        v = _parse_size_slug(m.group(1), category)
+        if v is not None:
+            return v
     return None
 
 
@@ -315,7 +338,7 @@ def parse_product_page(html: str, url: str, category: str) -> list[ComponentRow]
             v_sku = v.get('sku') or v.get('productID')
             if not v_sku:
                 continue
-            size = _variant_size(v)
+            size = _variant_size(v, category)
             if size is None:
                 # Skip; we won't write a row we can't price-per-unit.
                 continue
