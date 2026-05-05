@@ -6,6 +6,20 @@ name: AmmoRaccoon Component Scraper
 # way we land in the early-morning Central window — ammo scrape (cron
 # every 2 hours) most recently fired at 08:00 UTC, and US daytime traffic
 # doesn't pick up until ~13:00 UTC, so we own the window cleanly.
+#
+# Why a category matrix (one job per category, in parallel):
+# The 2026-05-04 single-job run hit the 355-minute timeout mid-bullet, so
+# brass never ran and bullets were partial. Telemetry from that run:
+# powder ~30m / primer ~13m / bullet 5h+ (incomplete) / brass est ~70m.
+# Bullet alone exceeds the serialized budget; parallel jobs give bullet
+# its own 355-minute budget and let the other three complete unconditionally.
+# Each runner has its own IP, so the robots.txt 10s crawl-delay still
+# applies per job — we hit Powder Valley from 4 IPs at once, not 4× faster
+# from one.
+#
+# Future option (path b) if bullet still doesn't complete in 355m on its
+# own runner: split bullet into sub-jobs by manufacturer or A-Z slug range
+# in the matrix. Holding off until we see whether path (a) here is enough.
 
 on:
   schedule:
@@ -15,12 +29,15 @@ on:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    # The full catalog (~2,500 variants across 4 categories) at the
-    # robots.txt-mandated 10s crawl-delay runs ~5.5–6 hours. GitHub-hosted
-    # runners hard-cap at 360 minutes; 355 lets us exit gracefully a few
-    # minutes before the cap if the run drifts long, instead of being
-    # terminated mid-write.
+    # 355 < the runner's 360-minute hard cap so we exit gracefully a few
+    # minutes early instead of being terminated mid-upsert.
     timeout-minutes: 355
+
+    strategy:
+      # One category failing must not cancel the others — each is independent.
+      fail-fast: false
+      matrix:
+        category: [powder, primer, bullet, brass]
 
     steps:
       - name: Checkout code
@@ -37,8 +54,8 @@ jobs:
         run: |
           pip install requests beautifulsoup4 python-dotenv "supabase==2.15.0"
 
-      - name: Run Powder Valley component scraper
+      - name: Run Powder Valley component scraper (${{ matrix.category }})
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python scraper_powdervalley.py
+        run: python scraper_powdervalley.py --category ${{ matrix.category }}
