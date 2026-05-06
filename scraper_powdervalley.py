@@ -91,6 +91,19 @@ CATEGORY_UNIT = {
     'brass':  'pieces',
 }
 
+# (category) → minimum product URL count expected from a clean full discovery.
+# Sized well below historical baselines so normal site churn doesn't false-positive,
+# but above zero so a Cloudflare block on page 1 (which currently breaks pagination
+# silently — see the 2026-05-05 bullet incident) can't masquerade as a green run.
+# Bypassed when --limit-pages or --limit-products is set, since those flags imply
+# a dev/test run that intentionally truncates discovery.
+CATEGORY_MIN_DISCOVERED = {
+    'powder': 50,
+    'primer': 20,
+    'bullet': 200,
+    'brass':  10,
+}
+
 
 @dataclass
 class ComponentRow:
@@ -413,12 +426,24 @@ def parse_product_page(html: str, url: str, category: str) -> list[ComponentRow]
 _PRODUCT_HREF_RE = re.compile(r'href="(https?://www\.powdervalley\.com/product/[^"?#]+/)"')
 
 
-def discover_product_urls(category: str, limit_pages: Optional[int] = None) -> list[str]:
-    """Walk /page/N/ pagination, return de-duplicated product URLs."""
+def discover_product_urls(
+    category: str,
+    limit_pages: Optional[int] = None,
+) -> tuple[list[str], Optional[str]]:
+    """Walk /page/N/ pagination. Returns (urls, discovery_error).
+
+    discovery_error is None on clean completion — that includes 404 (legitimate
+    end of pagination) and "no new URLs" (the last page wrapped cleanly). It is
+    a non-empty string when a discovery-time fetch failed in a way the caller
+    should treat as a job failure: a non-404 HTTP status (Cloudflare block,
+    server error) or a network exception. Per-product fetch errors are tracked
+    separately by the caller and don't surface here.
+    """
     base = SITE_BASE + CATEGORY_PATHS[category]
     found: list[str] = []
     seen: set[str] = set()
     page_num = 1
+    discovery_error: Optional[str] = None
     while True:
         if limit_pages is not None and page_num > limit_pages:
             print(f'  [discover {category}] limit-pages reached ({limit_pages})')
@@ -435,10 +460,12 @@ def discover_product_urls(category: str, limit_pages: Optional[int] = None) -> l
             if status == 404:
                 print(f'    404 — end of pagination')
                 break
-            print(f'    HTTP {status} — stopping')
+            discovery_error = f'HTTP {status} on page {page_num} ({url})'
+            print(f'    {discovery_error} — stopping')
             break
         except Exception as e:
-            print(f'    fetch error: {e} — stopping')
+            discovery_error = f'fetch error on page {page_num} ({url}): {e}'
+            print(f'    {discovery_error} — stopping')
             break
         finally:
             time.sleep(CRAWL_DELAY_SEC)
@@ -457,7 +484,7 @@ def discover_product_urls(category: str, limit_pages: Optional[int] = None) -> l
         print(f'    +{len(new_urls)} (running {len(found) + len(new_urls)})')
         found.extend(new_urls)
         page_num += 1
-    return found
+    return found, discovery_error
 
 
 # ---------- DB ----------
@@ -509,14 +536,32 @@ def main() -> int:
 
     categories = list(CATEGORY_PATHS.keys()) if args.category == 'all' else [args.category]
 
-    totals = {c: {'products': 0, 'variants': 0, 'in_stock_variants': 0, 'errors': 0}
+    totals = {c: {'products': 0, 'variants': 0, 'in_stock_variants': 0, 'errors': 0,
+                  'discovered': 0, 'discovery_status': 'OK'}
               for c in categories}
     errors: list[str] = []
+    discovery_failures: list[str] = []
+    # Test-mode flags bypass the discovery floor — they intentionally truncate.
+    enforce_floor = args.limit_pages is None and args.limit_products is None
 
     for cat in categories:
         print(f'\n=== {cat.upper()} ===')
-        urls = discover_product_urls(cat, limit_pages=args.limit_pages)
+        urls, discovery_error = discover_product_urls(cat, limit_pages=args.limit_pages)
         print(f'  discovered {len(urls)} product URL(s)')
+        totals[cat]['discovered'] = len(urls)
+        if discovery_error:
+            totals[cat]['discovery_status'] = f'ERROR: {discovery_error}'
+            discovery_failures.append(f'[{cat}] {discovery_error}')
+        elif enforce_floor:
+            floor = CATEGORY_MIN_DISCOVERED.get(cat, 0)
+            if len(urls) < floor:
+                shortfall = (
+                    f'discovered {len(urls)} URL(s); minimum expected {floor} '
+                    f'(silent block, pagination break, or category drift?)'
+                )
+                totals[cat]['discovery_status'] = f'BELOW FLOOR: {shortfall}'
+                discovery_failures.append(f'[{cat}] {shortfall}')
+                print(f'  [DISCOVERY-FLOOR] {shortfall}')
         if args.limit_products is not None:
             urls = urls[:args.limit_products]
             print(f'  capped to {len(urls)} for this run')
@@ -569,8 +614,13 @@ def main() -> int:
     mode = 'DRY RUN' if args.dry_run else 'LIVE'
     print(f'\n=== TOTALS ({mode}) ===')
     for cat, t in totals.items():
-        print(f'  {cat:7s}  products={t["products"]:4d}  variants={t["variants"]:4d}  '
-              f'stocked={t["in_stock_variants"]:4d}  errors={t["errors"]}')
+        print(f'  {cat:7s}  discovered={t["discovered"]:4d}  products={t["products"]:4d}  '
+              f'variants={t["variants"]:4d}  stocked={t["in_stock_variants"]:4d}  '
+              f'errors={t["errors"]}  discovery={t["discovery_status"]}')
+    if discovery_failures:
+        print(f'\n=== {len(discovery_failures)} DISCOVERY FAILURE(S) ===')
+        for f in discovery_failures:
+            print(f'  {f}')
     if errors:
         print(f'\n=== {len(errors)} ERROR(S) ===')
         for e in errors[:30]:
@@ -578,7 +628,7 @@ def main() -> int:
         if len(errors) > 30:
             print(f'  ... and {len(errors) - 30} more')
 
-    return 0 if not errors else 1
+    return 0 if (not errors and not discovery_failures) else 1
 
 
 if __name__ == '__main__':
