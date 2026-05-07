@@ -270,13 +270,28 @@ BULLET_TYPES = frozenset({
     'FMJ',       # Full Metal Jacket
     'TMJ',       # Total Metal Jacket
     'JHP',       # Jacketed Hollow Point — incl. brand lines FTX/FLEXLOCK/HONEYBADGER/BJHP
-    'HP',        # Hollow Point and the polymer-tip / BTHP / V-MAX family
+    'HP',        # Hollow Point and the polymer-tip / BTHP / V-MAX family;
+                 # includes spire-point/spitzer (formal SP family — see
+                 # 2026-05-07 expansion); brand lines SST/MatchKing/TSX/VLD/HST
     'OTM',       # Open Tip Match
-    'SP',        # Soft Point — incl. "jacketed soft point", Power Point
+    'SP',        # Soft Point — incl. "jacketed soft point", Power Point,
+                 # Spire Point, Spitzer (pointed soft-tip rifle bullets)
     'JSP',       # Jacketed Soft Point (legacy retained for in-DB rows)
     'FP',        # Flat Point — incl. RNFP
+    'FN',        # Flat Nose — distinct from FP (FN is the bullet shape;
+                 # FP is the older nomenclature commonly applied to lead
+                 # cast bullets). Promoted 2026-05-07 — Sierra Pro-Hunter
+                 # FN, Lehigh Dangerous Game FN dominate.
     'LRN',       # Lead Round Nose
-    'WC',        # Wadcutter
+    'RN',        # Round Nose — non-lead variant (jacketed round nose,
+                 # plated round nose). Promoted 2026-05-07.
+    'WC',        # Wadcutter — incl. Semi-Wadcutter (SWC/LSWC) and
+                 # Hollow Base Wadcutter (HBWC) folded in 2026-05-07.
+    'Solid',     # Monolithic copper / brass solid (non-expanding) —
+                 # Barnes Banded Solid, Hornady DGS, Lehigh Solid Copper
+                 # Fluted, etc. Distinct from solid-copper EXPANDING
+                 # bullets (TSX/CX) which are still classed as HP because
+                 # their hollow cavity does the work.
     'Frangible', # Frangible
     'Blank',     # Blank cartridge
     'Incendiary', # Incendiary specialty round
@@ -312,6 +327,25 @@ _BULLET_PATTERNS = [
     (re.compile(r'\bfrangible\b'), 'Frangible'),
     (re.compile(r'\bblank\b'), 'Blank'),
 
+    # Multi-word formal shapes added 2026-05-07 — these were the largest
+    # gap in coverage (NULL bullet_type at 19.9% site-wide before the fix;
+    # spire-point alone accounted for 152 NULLs across listings + components).
+    # Solid-family patterns are intentionally narrow ("banded solid",
+    # "solid dgs", "monolithic solid", "solid copper fluted") so the bare
+    # word "solid" — which appears in titles like "Solid Hollow Point CX"
+    # (Hornady CX, an EXPANDING monolithic) — doesn't out-priority the
+    # existing "hollow point" → JHP match. CX-family stays JHP per audit.
+    (re.compile(r'\bbanded\s+solid\b'), 'Solid'),
+    (re.compile(r'\bmonolithic\s+solid\b'), 'Solid'),
+    (re.compile(r'\bsolid\s+dgs\b'), 'Solid'),       # Hornady Dangerous Game Solid
+    (re.compile(r'\bsolid\s+copper\s+fluted\b'), 'Solid'),  # Lehigh Xtreme line
+    (re.compile(r'\bsemi[\s-]?wad\s*cutter\b'), 'WC'),
+    (re.compile(r'\bhollow\s+base\s+wadcutter\b'), 'WC'),
+    (re.compile(r'\bspire\s+point\b'), 'SP'),
+    (re.compile(r'\bspitzer\b'), 'SP'),              # synonym for spire point
+    (re.compile(r'\bround\s+nose\b'), 'RN'),
+    (re.compile(r'\bflat\s+nose\b'), 'FN'),
+
     # Family aliases — Hornady polymer-tip line, Fenix house brand.
     # All map to HP because the open polymer cavity makes them
     # mechanically hollow points; keeps filter buckets coherent.
@@ -330,12 +364,31 @@ _BULLET_PATTERNS = [
     (re.compile(r'\bbjhp\b'), 'JHP'),   # Bonded JHP
     (re.compile(r'\bincendiary\b'), 'Incendiary'),
 
+    # Definitive brand-line abbreviations added 2026-05-07. Each maps to
+    # exactly one bullet type across that line — context-dependent lines
+    # (InterLock, GameKing, Pro-Hunter) are intentionally NOT included
+    # because they span multiple shapes within the same product family.
+    (re.compile(r'\bgold\s*dot\b'), 'JHP'),  # Speer Gold Dot — bonded JHP
+    (re.compile(r'\bgdhp\b'), 'JHP'),        # Gold Dot HP abbreviation
+    (re.compile(r'\baccu[\s-]?tip\b'), 'HP'),  # Remington AccuTip — polymer tip
+    (re.compile(r'\bsst\b'), 'HP'),          # Hornady SST — polymer-tip Super Shock Tip
+    (re.compile(r'\bmatchking\b'), 'HP'),    # Sierra MatchKing — match BTHP family
+    (re.compile(r'\bvld\b'), 'HP'),          # Berger VLD — match HP
+    (re.compile(r'\bttsx\b'), 'HP'),         # Barnes TTSX — must match BEFORE \btsx\b
+    (re.compile(r'\btsx\b'), 'HP'),          # Barnes TSX — solid-copper expanding HP
+    (re.compile(r'\blrx\b'), 'HP'),          # Barnes LRX — long-range expanding
+    (re.compile(r'\bhst\b'), 'JHP'),         # Federal HST — bonded self-defense JHP
+
     # Compound abbreviations (longer/more-specific first within group)
     (re.compile(r'\bbthp\b|\bhpbt\b'), 'HP'),
     (re.compile(r'\bfmjbt\b|\bfmjfn\b|\bfmjfb\b'), 'FMJ'),
     (re.compile(r'\bsjsp\b'), 'SP'),
     (re.compile(r'\bsjhp\b'), 'JHP'),
     (re.compile(r'\brnfp\b'), 'FP'),
+    # Wadcutter-family abbreviations folded to WC 2026-05-07.
+    (re.compile(r'\blswc\b'), 'WC'),    # Lead Semi-Wadcutter
+    (re.compile(r'\bswc\b'), 'WC'),     # Semi-Wadcutter
+    (re.compile(r'\bhbwc\b'), 'WC'),    # Hollow Base Wadcutter
 
     # Bare 3-letter codes — safe enough that word-boundary catches
     # most common false positives (e.g. "Speer" doesn't trip \bjhp\b).
