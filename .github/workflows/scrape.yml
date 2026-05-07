@@ -270,6 +270,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_dancessportinggoods.py
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test today saved 18 rows across 5
+      # calibers (9mm/380acp/40sw/223-556/300blk) in ~30 seconds.
+      # Shopify storefront, no Playwright — uses /collections/<handle>/
+      # products.json JSON feed for each tracked caliber. No anti-bot.
+      - name: Run Fenix Ammunition scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_fenix.py
       # Enabled 2026-05-02 — manual 9mm + .223/5.56 run (3 pages each
       # facet) saved 148 listings with realistic prices. Magento behind
       # Cloudflare; layered-nav `?caliber=NNN` URLs 403 after 1-2 hits
@@ -281,6 +291,40 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_gunbuyer.py
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test today saved 12 listings across
+      # 4 calibers (9mm/223-556/308win/762x39/380acp). Tiny boutique
+      # catalog (~13-15 SKUs); sitemap.xml + Playwright per PDP. Site
+      # uses legacy SiteBuilder/ASP.NET stencil; selectors verified
+      # healthy (extrafieldsBlock, itemprop="price", h1 fallback chain).
+      - name: Run KR Armory scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_krarmory.py
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test (MAX_PAGES=2 cap, reverted)
+      # saved 68 listings spanning 9 calibers in ~3 minutes with no
+      # Cloudflare 403s. Stealth-Playwright per the in-scraper comment;
+      # the wall fires intermittently so first cron pass may yield
+      # partial results — next pass picks up the rest.
+      - name: Run Sportsman's Guide scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_sportsmansguide.py
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test saved 47 listings across 8
+      # calibers. BigCommerce stencil with three usage-type parents
+      # (handgun-defensive, rifle-target, rifle-hunting). Diagnosis
+      # flagged that h4.card-title selector returns 0 hits in plain
+      # HTML, but the scraper's OR-fallback (`a.card-figure__link,
+      # h4.card-title a`) resolves correctly — titles populated.
+      - name: Run Underwood Ammo scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_underwood.py
 
       - name: Scraper health check
         if: always()
