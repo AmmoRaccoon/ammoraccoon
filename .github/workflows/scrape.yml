@@ -280,6 +280,24 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_fenix.py
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test today verified selectors
+      # (.productGrid article.card, h4.card-title a, data-product-id,
+      # data-product-price-without-tax) all return expected counts via
+      # Playwright. Site unchanged — earlier "restructure" diagnosis
+      # was an artifact of probing with plain requests against a
+      # JS-hydrated Stencil store. ~150 pages × ~5s = ~12-15 min/run.
+      #
+      # Diagnostic note for future agents: when a Playwright-based
+      # scraper's selectors appear to "no longer match", probe with
+      # Playwright too — not just requests. Stencil/Shopify/Magento
+      # sites that hydrate via JS will look broken to plain HTTP even
+      # when nothing has changed.
+      - name: Run Firearms Depot scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_firearmsdepot.py
       # Enabled 2026-05-02 — manual 9mm + .223/5.56 run (3 pages each
       # facet) saved 148 listings with realistic prices. Magento behind
       # Cloudflare; layered-nav `?caliber=NNN` URLs 403 after 1-2 hits
