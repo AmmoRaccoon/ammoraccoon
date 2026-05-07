@@ -202,6 +202,27 @@ _BRAND_ALIASES = [
 ]
 
 
+# Caliber names that contain a brand token in their formal designation
+# (".223 Remington", ".308 Winchester", ".45 Colt", ".357 SIG Sauer", etc.).
+# Stripped from the input before brand matching so the caliber's brand
+# name doesn't outweigh the actual manufacturer prefix at the start of
+# the title via the longest-match rule. Without this, "Hornady Frontier
+# .223 Remington 55gr FMJ" parses as Remington (9 chars beats hornady's
+# 7) instead of Hornady. Audit 2026-05-07 found 109 listings affected
+# across .223 Rem, .308 Win, .357 SIG, .44 Rem Mag, .300 Win Mag, and
+# .22 WMR cartridges.
+_CAL_BRAND_NOISE_RE = re.compile(
+    r'\b\d+(?:\.\d+)?[\s.-]+'
+    r'(?:'
+        r'sig\s+sauer'   # ".357 SIG Sauer" — must come before bare "sig"
+        r'|long\s+colt'  # ".45 Long Colt"
+        r'|remington|winchester|colt|sig|rem|win'
+    r')'
+    r'(?:\s+(?:magnum|mag|rimfire|rim\s*fire))*',
+    re.IGNORECASE,
+)
+
+
 def parse_brand(text):
     """Return a canonical manufacturer name from product text, or None.
 
@@ -210,10 +231,16 @@ def parse_brand(text):
     separators are normalized to spaces so aliases written with spaces
     (e.g. "sellier and bellot", "prvi partizan") match URL slugs
     (e.g. "sellier-bellot", "prvi-partizan") too.
+
+    Caliber names that embed a brand token (".223 Remington",
+    ".308 Winchester", ".45 Colt", ".357 SIG") are stripped before the
+    alias scan — otherwise the bare brand inside the caliber name
+    out-lengths the actual manufacturer prefix and wins the longest-match.
     """
     if not text:
         return None
     t = text.lower().replace('-', ' ').replace('_', ' ').replace('/', ' ')
+    t = _CAL_BRAND_NOISE_RE.sub(' ', t)
     # Sort by descending pattern length for every call so new aliases
     # inserted anywhere in the list still yield longest-match behavior.
     for needle, canonical in sorted(_BRAND_ALIASES, key=lambda kv: -len(kv[0])):
