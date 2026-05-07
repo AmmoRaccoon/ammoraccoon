@@ -237,6 +237,19 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_brownells.py
+      # First scraper for retailer_id=5. Custom PHP / osCommerce-derived
+      # storefront on Cloudflare CDN-mode (no anti-bot). Card-based:
+      # /search.php/type/ammo paginates 28 pages (data-total-results=1000
+      # cap), each card has full schema.org Microdata so no PDP fetches
+      # are needed. Filter is title-driven via normalize_caliber because
+      # Bud's exposed caliber filter list is missing 4 of our 10 calibers
+      # (380acp, 762x39, 300blk, 357mag). Recon doc:
+      # scripts/buds_unit_mapping.md (web).
+      - name: Run Bud's Gun Shop scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_buds.py
       # Enabled 2026-05-02 — manual 9mm + .223/5.56 run confirmed 84
       # listings (39 + 45) with 0 skips. Magento storefront with the
       # split-decimal price quirk ("$11 99") and OOS stash in hidden
