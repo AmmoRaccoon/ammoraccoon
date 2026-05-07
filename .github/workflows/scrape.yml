@@ -203,6 +203,18 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_georgiaarms.py
+      # First scraper for retailer_id=6. Magento 2 storefront, no anti-bot.
+      # Sitemap-driven discovery (~1800 in-scope PDPs after caliber filter
+      # of the 4500-URL sitemap); each PDP carries clean Product JSON-LD
+      # with name/mpn/brand/price/availability. v1 skips the ~1-2% of
+      # OOS/discontinued PDPs that omit the Product schema. Crawl-delay
+      # 5s (no robots.txt requirement). Recon doc:
+      # scripts/ammoman_unit_mapping.md (web).
+      - name: Run AmmoMan scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_ammoman.py
       # Enabled 2026-04-25 — manual run confirmed 289 listings across
       # all covered calibers; per-product variant-grid fetch capped at
       # 30 SKUs per caliber to fit the 2h cron budget. Single skip is
