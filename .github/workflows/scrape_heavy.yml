@@ -1,0 +1,49 @@
+name: AmmoRaccoon Scraper - Heavy
+
+# AmmoMan averages ~3h per run (~1800 PDPs walked at a 5s crawl delay
+# against the Magento 2 sitemap). The cron fires every 2h, so two
+# consecutive ticks would otherwise overlap inside the same job. The
+# concurrency group below tells GitHub Actions to skip a new tick when
+# a previous run is still in progress (cancel-in-progress: false keeps
+# the in-flight run alive). Effective cadence is therefore ~every 4h,
+# which is fine for bulk-ammo restock signals.
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: scrape-heavy
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 python-dotenv playwright "supabase==2.15.0"
+          playwright install chromium
+
+      # First scraper for retailer_id=6. Magento 2 storefront, no anti-bot.
+      # Sitemap-driven discovery (~1800 in-scope PDPs after caliber filter
+      # of the 4500-URL sitemap); each PDP carries clean Product JSON-LD
+      # with name/mpn/brand/price/availability. v1 skips the ~1-2% of
+      # OOS/discontinued PDPs that omit the Product schema. Crawl-delay
+      # 5s (no robots.txt requirement). Recon doc:
+      # scripts/ammoman_unit_mapping.md (web).
+      - name: Run AmmoMan scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_ammoman.py

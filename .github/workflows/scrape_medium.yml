@@ -1,0 +1,168 @@
+name: AmmoRaccoon Scraper - Medium
+
+# Medium-tier retailers: 10 scrapers totalling ~30-35 minutes per run.
+# Ordered roughly slowest-first so a partial run still gets the
+# expensive ones in. Every step is continue-on-error so a single
+# scraper exiting non-zero (e.g. one bad parse) does not skip the
+# rest of the workflow.
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 python-dotenv playwright "supabase==2.15.0"
+          playwright install chromium
+
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test today verified selectors
+      # (.productGrid article.card, h4.card-title a, data-product-id,
+      # data-product-price-without-tax) all return expected counts via
+      # Playwright. Site unchanged — earlier "restructure" diagnosis
+      # was an artifact of probing with plain requests against a
+      # JS-hydrated Stencil store. ~150 pages × ~5s = ~12-15 min/run.
+      #
+      # Diagnostic note for future agents: when a Playwright-based
+      # scraper's selectors appear to "no longer match", probe with
+      # Playwright too — not just requests. Stencil/Shopify/Magento
+      # sites that hydrate via JS will look broken to plain HTTP even
+      # when nothing has changed.
+      - name: Run Firearms Depot scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_firearmsdepot.py
+
+      # Enabled 2026-05-02 — manual 9mm + .223/5.56 run confirmed 84
+      # listings (39 + 45) with 0 skips. Magento storefront with the
+      # split-decimal price quirk ("$11 99") and OOS stash in hidden
+      # data-price; both handled in the scraper.
+      - name: Run Classic Firearms scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_classicfirearms.py
+
+      # Enabled 2026-05-02 — manual 9mm + .223/5.56 run (3 pages each
+      # facet) saved 148 listings with realistic prices. Magento behind
+      # Cloudflare; layered-nav `?caliber=NNN` URLs 403 after 1-2 hits
+      # in the same session, so each pagination page opens in a fresh
+      # browser context. Combined-caliber facets (223+5.56, 308+7.62x51)
+      # are scraped separately and deduped via seen_ids.
+      - name: Run Gunbuyer scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_gunbuyer.py
+
+      # Enabled 2026-05-02 — manual handgun + rifle run (3 pages each)
+      # saved 119 listings spanning 9 calibers with realistic prices.
+      # BigCommerce stencil; site only buckets ammo by gun type so we
+      # walk the three top-level type pages and normalize_caliber()
+      # filters to our tracked list. High skip count is expected — most
+      # rejections are off-list calibers (10mm, 45 ACP, 32-20 Win).
+      - name: Run Dance's Sporting Goods scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_dancessportinggoods.py
+
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test today saved 12 listings across
+      # 4 calibers (9mm/223-556/308win/762x39/380acp). Tiny boutique
+      # catalog (~13-15 SKUs); sitemap.xml + Playwright per PDP. Site
+      # uses legacy SiteBuilder/ASP.NET stencil; selectors verified
+      # healthy (extrafieldsBlock, itemprop="price", h1 fallback chain).
+      - name: Run KR Armory scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_krarmory.py
+
+      # Enabled 2026-05-05 — first scraper for retailer_id=9. EpiServer
+      # Commerce on Cloudflare CDN-mode (no anti-bot fight). v1 ingests
+      # the SSR'd 32 cards from each of three parent ammo indexes
+      # (handgun/rifle/rimfire) and filters by normalize_caliber from
+      # the title — per-caliber URL slugs fall back to the parent index,
+      # and pagination beyond page 1 is JS-driven (infinite scroll). Card
+      # data-price + data-round give bulk-tier price/PPR directly without
+      # PDP fetches. Recon doc: scripts/brownells_unit_mapping.md (web).
+      - name: Run Brownells scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_brownells.py
+
+      # First scraper for retailer_id=5. Custom PHP / osCommerce-derived
+      # storefront on Cloudflare CDN-mode (no anti-bot). Card-based:
+      # /search.php/type/ammo paginates 28 pages (data-total-results=1000
+      # cap), each card has full schema.org Microdata so no PDP fetches
+      # are needed. Filter is title-driven via normalize_caliber because
+      # Bud's exposed caliber filter list is missing 4 of our 10 calibers
+      # (380acp, 762x39, 300blk, 357mag). Recon doc:
+      # scripts/buds_unit_mapping.md (web).
+      - name: Run Bud's Gun Shop scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_buds.py
+
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test (MAX_PAGES=2 cap, reverted)
+      # saved 68 listings spanning 9 calibers in ~3 minutes with no
+      # Cloudflare 403s. Stealth-Playwright per the in-scraper comment;
+      # the wall fires intermittently so first cron pass may yield
+      # partial results — next pass picks up the rest.
+      - name: Run Sportsman's Guide scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_sportsmansguide.py
+
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test saved 47 listings across 8
+      # calibers. BigCommerce stencil with three usage-type parents
+      # (handgun-defensive, rifle-target, rifle-hunting). Diagnosis
+      # flagged that h4.card-title selector returns 0 hits in plain
+      # HTML, but the scraper's OR-fallback (`a.card-figure__link,
+      # h4.card-title a`) resolves correctly — titles populated.
+      - name: Run Underwood Ammo scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_underwood.py
+
+      # Re-enabled 2026-05-07 — originally ran 2026-04-26 then dropped
+      # off the cron entirely; smoke test today saved 18 rows across 5
+      # calibers (9mm/380acp/40sw/223-556/300blk) in ~30 seconds.
+      # Shopify storefront, no Playwright — uses /collections/<handle>/
+      # products.json JSON feed for each tracked caliber. No anti-bot.
+      - name: Run Fenix Ammunition scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_fenix.py
