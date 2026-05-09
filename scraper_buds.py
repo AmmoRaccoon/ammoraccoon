@@ -5,27 +5,31 @@ CDN/cache mode (no JS challenge). Plain `requests` returns SSR'd HTML
 with rich schema.org Microdata on every product card — name, url,
 price, gtin, availability all exposed inline. No PDP fetches needed.
 
-Discovery walks the all-ammo search view:
-  /search.php/type/ammo                   (page 1)
-  /search.php/type/ammo/page/2 ... /page/N
+Discovery (v2 — 2026-05-09): walks each of the 6 per-caliber filter
+views Bud's exposes plus the all-ammo view, dedupes by data-pid.
 
-Stops when a page returns 0 product cards (page 29 in current data —
-27 full pages × 36 cards + 1 partial page = 1000-result hard ceiling).
+The all-ammo view caps at 1000 results and the broader catalog is
+heavily skewed toward 12-gauge (≥1000 SKUs in that one off-list
+caliber alone), which used to crowd our 10 tracked calibers out of
+the cap. Walking the per-caliber filter views first reaches the
+~1,200 SKUs Bud's actually carries across the 6 calibers it exposes
+filters for; the all-ammo backstop catches the 4 calibers with no
+exposed filter (380acp, 762x39, 300blk, 357mag).
 
 Three traps the parser must NOT fall into (full recon in
 scripts/buds_unit_mapping.md, web repo):
 
-  - The site-wide search caps at 1000 results; v1 lives with the cap.
-    v2 candidate is to walk per-caliber filter views and union.
+  - The site-wide search and each caliber filter view both cap at
+    1000 results. v2 mitigates by unioning multiple filter views.
   - Bud's exposed caliber filter list only covers 9 calibers (missing
-    380acp, 762x39, 300blk, 357mag from our 10). We walk the all-ammo
-    view and filter via normalize_caliber(title) so the missing 4 are
-    still picked up when they show up in the unfiltered listing.
+    380acp, 762x39, 300blk, 357mag from our 10). The all-ammo walk
+    is retained as a backstop so the missing 4 are still picked up.
   - Page 1 is /search.php/type/ammo (no /page/1 suffix). /page/1 returns
-    a 301 redirect to the root.
+    a 301 redirect to the root. Same special case applies to each
+    /caliber/<slug> root.
 
-Robots.txt has no Crawl-delay; v1 uses 5s between page fetches —
-matches the AmmoMan posture for unconstrained sites.
+Robots.txt has no Crawl-delay; v1 used 5s between page fetches —
+v2 retains that posture for parity with the AmmoMan scraper.
 """
 
 import argparse
@@ -34,6 +38,7 @@ import os
 import re
 import sys
 import time
+from collections import Counter
 from datetime import datetime
 from typing import Optional
 
@@ -52,6 +57,27 @@ load_dotenv()
 RETAILER_SLUG = "buds"
 SITE_BASE = "https://www.budsgunshop.com"
 LISTING_BASE = f"{SITE_BASE}/search.php/type/ammo"
+
+# Per-caliber filter slugs Bud's exposes in the all-ammo view's facet
+# panel (verified live 2026-05-09 by parsing the page-1 facet links).
+# Only 6 of our 10 tracked calibers have exposed filter URLs — the
+# remaining 4 (380acp, 762x39, 300blk, 357mag) are picked up by the
+# all-ammo backstop walk.
+#
+# Slugs are reproduced exactly as Bud's encodes them in the href —
+# `+` for spaces, `%26` for `&`, `%28`/`%29` for parentheses. The
+# numeric prefix (e.g. `22903-`, `10000601-`) is Bud's category id;
+# omitting or changing it yields a 404. If Bud's reorganizes their
+# taxonomy these will break — the loud-failure gate in main() detects
+# the case where every root 404s.
+CALIBER_FILTER_URLS = {
+    '9mm':     f'{LISTING_BASE}/caliber/22903-9mm',
+    '223-556': f'{LISTING_BASE}/caliber/10000601-.223+remington+5.56+nato',
+    '308win':  f'{LISTING_BASE}/caliber/10000660-308+winchester+%287.62+nato%29',
+    '22lr':    f'{LISTING_BASE}/caliber/10000844-22+long+rifle',
+    '40sw':    f'{LISTING_BASE}/caliber/10000719-40+smith+%26+wesson',
+    '38spl':   f'{LISTING_BASE}/caliber/10000566-38+special',
+}
 
 CRAWL_DELAY_SEC = 5
 PAGE_HARD_CAP = 50
@@ -247,43 +273,22 @@ def chunk_cards(html: str) -> list[tuple[str, str]]:
     return out
 
 
-# ---------- Entrypoint ----------
+# ---------- Walk one listing root (all-ammo OR a per-caliber filter view) ----------
 
-def page_url(n: int) -> str:
-    """Page 1 is the root URL — /page/1 returns a 301 to the root."""
-    return LISTING_BASE if n == 1 else f'{LISTING_BASE}/page/{n}'
+def walk_listing_root(
+    *, root_url, source_label, args, supabase, retailer_id,
+    seen_pids, errors, per_source_counts, dedup_hits,
+):
+    """Walk a single Bud's listing root URL via /page/N pagination.
 
-
-def main() -> int:
-    ap = argparse.ArgumentParser(description="Scrape Bud's Gun Shop ammunition listings.")
-    ap.add_argument('--dry-run', action='store_true',
-                    help='Parse and print only; no DB writes.')
-    ap.add_argument('--limit-products', type=int, default=None,
-                    help='Cap total products processed (dev/test).')
-    ap.add_argument('--limit-pages', type=int, default=None,
-                    help='Cap pages walked (dev/test).')
-    ap.add_argument('--crawl-delay', type=float, default=CRAWL_DELAY_SEC,
-                    help=f'Seconds between page fetches (default {CRAWL_DELAY_SEC}).')
-    args = ap.parse_args()
-
-    supabase = None
-    retailer_id: int = 0
-    if not args.dry_run:
-        supabase = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_KEY'])
-        rr = supabase.table('retailers').select('id').eq('slug', RETAILER_SLUG).execute()
-        if not rr.data:
-            print(f"ERROR: Retailer '{RETAILER_SLUG}' not found in retailers table")
-            return 1
-        retailer_id = rr.data[0]['id']
-
-    print(f'[{datetime.now().isoformat()}] Bud\'s Gun Shop scraper starting '
-          f'(mode={"DRY RUN" if args.dry_run else "LIVE"}, '
-          f'crawl_delay={args.crawl_delay}s, retailer_id={retailer_id})')
-
-    saved_total = 0
-    skipped_total = 0
-    errors: list[str] = []
-    seen_pids: set[str] = set()
+    Page 1 lives at the root URL (no /page/1 suffix); pages 2..N use
+    `<root>/page/N`. Stops when a page returns 0 cards or PAGE_HARD_CAP
+    is hit. Returns (saved, skipped, fetched_any) — fetched_any is True
+    iff at least one page on this root returned 200.
+    """
+    saved = 0
+    skipped = 0
+    fetched_any = False
 
     for page_num in range(1, PAGE_HARD_CAP + 1):
         if args.limit_pages is not None and page_num > args.limit_pages:
@@ -291,53 +296,58 @@ def main() -> int:
         if page_num > 1:
             time.sleep(args.crawl_delay)
 
-        url = page_url(page_num)
-        print(f'\n=== PAGE {page_num} === {url}')
+        url = root_url if page_num == 1 else f'{root_url}/page/{page_num}'
+        print(f'\n=== {source_label} PAGE {page_num} === {url}')
         try:
             html = fetch(url)
         except Exception as e:
-            msg = f'page {page_num} fetch failed: {e}'
+            msg = f'{source_label} page {page_num} fetch failed: {e}'
             print(f'  [FETCH-ERR] {msg}')
             errors.append(msg)
             continue
 
+        fetched_any = True
         cards = chunk_cards(html)
         print(f'  {len(cards)} card(s) on page {page_num}')
         if not cards:
-            # Past the last page — Bud's returns 200 with the empty
-            # search-list shell. Stop walking.
             print('  (no cards — end of paginated set)')
             break
 
         for pid, card_html in cards:
-            if args.limit_products is not None and saved_total >= args.limit_products:
+            if args.limit_products is not None and saved >= args.limit_products:
                 break
             if pid in seen_pids:
+                # Cross-strategy dedup hit — pids from a per-caliber
+                # filter walk already in seen_pids show up again in
+                # the all-ammo backstop. Tracked so the dry-run report
+                # can quantify how much overlap exists between the two
+                # discovery strategies.
+                dedup_hits[0] += 1
                 continue
 
             try:
                 row = parse_card(card_html, pid)
             except Exception as e:
-                msg = f'page {page_num} pid {pid}: parse failed: {e}'
+                msg = f'{source_label} page {page_num} pid {pid}: parse failed: {e}'
                 print(f'  [PARSE-ERR] {msg}')
                 errors.append(msg)
-                skipped_total += 1
+                skipped += 1
                 continue
             if not row:
-                skipped_total += 1
+                skipped += 1
                 continue
 
             cal_disp, cal_norm = normalize_caliber(row['title'])
             if not cal_norm:
                 # Off-list caliber (45 ACP, 12 ga, 5.7x28, etc.) — quiet skip.
-                skipped_total += 1
+                skipped += 1
                 continue
 
             if not sanity_check_ppr(
                 row['price_per_round'], row['base_price'], row['total_rounds'],
                 context=f'{RETAILER_SLUG} {cal_norm}', caliber=cal_norm,
             ):
-                skipped_total += 1
+                skipped += 1
                 continue
 
             seen_pids.add(row['pid'])
@@ -377,7 +387,8 @@ def main() -> int:
                     f"${row['base_price']:>7.2f} ({row['price_per_round']}/rd) "
                     f"{'IN ' if row['in_stock'] else 'OUT'} {row['title'][:55]}"
                 )
-                saved_total += 1
+                saved += 1
+                per_source_counts.setdefault(source_label, Counter())[cal_norm] += 1
             else:
                 try:
                     result = supabase.table('listings').upsert(
@@ -389,30 +400,135 @@ def main() -> int:
                         'price_per_round': row['price_per_round'],
                         'in_stock': row['in_stock'],
                     }).execute()
-                    saved_total += 1
+                    saved += 1
+                    per_source_counts.setdefault(source_label, Counter())[cal_norm] += 1
                     print(
                         f"  Saved pid={row['pid']:>7} cal={cal_norm:<8} "
                         f"${row['base_price']:>7.2f} ({row['price_per_round']}/rd) "
                         f"{'IN ' if row['in_stock'] else 'OUT'} {row['title'][:55]}"
                     )
                 except Exception as e:
-                    msg = f'page {page_num} {row["pid"]}: upsert failed: {e}'
+                    msg = f'{source_label} page {page_num} {row["pid"]}: upsert failed: {e}'
                     print(f'  [DB-ERR] {msg}')
                     errors.append(msg)
 
-        if args.limit_products is not None and saved_total >= args.limit_products:
+        if args.limit_products is not None and saved >= args.limit_products:
             print(f'  hit --limit-products {args.limit_products}; stopping')
             break
 
+    return saved, skipped, fetched_any
+
+
+# ---------- Entrypoint ----------
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Scrape Bud's Gun Shop ammunition listings.")
+    ap.add_argument('--dry-run', action='store_true',
+                    help='Parse and print only; no DB writes.')
+    ap.add_argument('--limit-products', type=int, default=None,
+                    help='Cap total products processed (dev/test).')
+    ap.add_argument('--limit-pages', type=int, default=None,
+                    help='Cap pages walked per listing root (dev/test).')
+    ap.add_argument('--crawl-delay', type=float, default=CRAWL_DELAY_SEC,
+                    help=f'Seconds between page fetches (default {CRAWL_DELAY_SEC}).')
+    args = ap.parse_args()
+
+    supabase = None
+    retailer_id: int = 0
+    if not args.dry_run:
+        supabase = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_KEY'])
+        rr = supabase.table('retailers').select('id').eq('slug', RETAILER_SLUG).execute()
+        if not rr.data:
+            print(f"ERROR: Retailer '{RETAILER_SLUG}' not found in retailers table")
+            return 1
+        retailer_id = rr.data[0]['id']
+
+    print(f'[{datetime.now().isoformat()}] Bud\'s Gun Shop scraper starting '
+          f'(mode={"DRY RUN" if args.dry_run else "LIVE"}, '
+          f'crawl_delay={args.crawl_delay}s, retailer_id={retailer_id})')
+    started_at = time.time()
+
+    saved_total = 0
+    skipped_total = 0
+    errors: list[str] = []
+    seen_pids: set[str] = set()
+    per_source_counts: dict[str, Counter] = {}
+    # Mutable single-element list so walk_listing_root() can increment
+    # the cross-strategy dedup-hit counter without needing a wrapper class.
+    dedup_hits = [0]
+    successful_roots = 0
+    total_roots = len(CALIBER_FILTER_URLS) + 1  # +1 for the all-ammo backstop
+
+    # Walk per-caliber filter views first. Six of our 10 calibers are
+    # exposed via filter URLs; ordering them first means the all-ammo
+    # backstop's dedup_hits counter quantifies how much its top-1000
+    # overlap with the (smaller, focused) caliber views.
+    for cal_norm, filter_url in CALIBER_FILTER_URLS.items():
+        s, sk, ok = walk_listing_root(
+            root_url=filter_url,
+            source_label=f'filter[{cal_norm}]',
+            args=args, supabase=supabase, retailer_id=retailer_id,
+            seen_pids=seen_pids, errors=errors,
+            per_source_counts=per_source_counts, dedup_hits=dedup_hits,
+        )
+        saved_total += s
+        skipped_total += sk
+        if ok:
+            successful_roots += 1
+        if args.limit_products is not None and saved_total >= args.limit_products:
+            break
+
+    # All-ammo backstop. Picks up the 4 calibers Bud's exposes no
+    # filter URL for (380acp, 357mag, 762x39, 300blk) and any in-scope
+    # SKUs that fall outside the per-caliber views.
+    if args.limit_products is None or saved_total < args.limit_products:
+        s, sk, ok = walk_listing_root(
+            root_url=LISTING_BASE,
+            source_label='all_ammo',
+            args=args, supabase=supabase, retailer_id=retailer_id,
+            seen_pids=seen_pids, errors=errors,
+            per_source_counts=per_source_counts, dedup_hits=dedup_hits,
+        )
+        saved_total += s
+        skipped_total += sk
+        if ok:
+            successful_roots += 1
+
+    elapsed = time.time() - started_at
     mode = 'DRY RUN' if args.dry_run else 'LIVE'
     print(f'\n=== TOTALS ({mode}) ===')
     print(f'  saved={saved_total}  skipped={skipped_total}  errors={len(errors)}')
+    print(f'  dedup_hits (pid already seen by an earlier root): {dedup_hits[0]}')
+    print(f'  URL roots loaded: {successful_roots} / {total_roots}')
+    print(f'  elapsed: {elapsed:.1f}s')
+
+    print('\nPer-source per-caliber save counts:')
+    for source in sorted(per_source_counts):
+        counts = per_source_counts[source]
+        print(f'  {source}:')
+        for cal, n in counts.most_common():
+            print(f'    {cal:10s} {n}')
+
     if errors:
         print(f'\n=== {len(errors)} ERROR(S) ===')
         for e in errors[:30]:
             print(f'  {e}')
         if len(errors) > 30:
             print(f'  ... and {len(errors) - 30} more')
+
+    # Loud-failure gate — every URL root failed to load. Mirrors the
+    # gate added to scraper_blackbasin.py 2026-05-08 to prevent the
+    # silent-stale class of bug, where a wholesale site migration or
+    # CDN block left a scraper writing 0 rows behind exit code 0 for
+    # nine days. Returning non-zero here makes the GitHub Actions
+    # step go red and triggers the health-check email.
+    if successful_roots == 0:
+        print(
+            "\nFATAL: every Bud's listing URL failed to load — site may "
+            "have moved, slugs may have churned, or anti-bot wall is up. "
+            "Manual recon needed."
+        )
+        return 1
 
     return 0 if not errors else 1
 
