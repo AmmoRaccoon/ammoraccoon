@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
@@ -16,18 +17,30 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
 
-# Freedom Munitions Shopify collection handles per caliber.
+# Freedom Munitions Shopify collection handles per caliber. Values
+# are lists for parity with the other CALIBER_PATHS scrapers. The
+# configured handles for 7 of 10 calibers had drifted by 2026-05-09:
+# the old handles still resolve to HTTP 200 (Shopify keeps empty
+# legacy collections live for SEO continuity) but products had
+# migrated to renamed/split collections. The pattern looks like a
+# storefront re-keying — separator changes (-7-62x39 -> -762x39),
+# alias unification (-380-acp -> -380-auto), and category splits
+# (-223-556 -> -223-remington + -556-nato; -308-7-62x51 ->
+# -308-winchester + -762x51-nato). Confirmed by crawling
+# /collections.json (298 collections live).
 COLLECTION_HANDLES = {
-    '9mm':     'pistol-9mm',
-    '380acp':  'pistol-380-acp',
-    '40sw':    'pistol-40-s-w',
-    '38spl':   'pistol-38-special',
-    '357mag':  'pistol-357-magnum',
-    '22lr':    'rimfire-22-lr',
-    '223-556': 'rifle-223-556',
-    '308win':  'rifle-308-7-62x51',
-    '762x39':  'rifle-7-62x39',
-    '300blk':  'rifle-300-blackout',
+    '9mm':     ['pistol-9mm'],
+    '380acp':  ['pistol-380-auto'],
+    '40sw':    ['pistol-40-sw'],
+    '38spl':   ['pistol-38-special'],
+    '357mag':  ['pistol-357-magnum'],
+    '22lr':    ['rimfire-22-long-rifle'],
+    '223-556': ['rifle-223-remington',
+                'rifle-556-nato'],
+    '308win':  ['rifle-308-winchester',
+                'rifle-762x51-nato'],
+    '762x39':  ['rifle-762x39'],
+    '300blk':  ['rifle-300-aac-blackout'],
 }
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -81,7 +94,7 @@ def parse_bullet_type(text):
     if bt is not None:
         return bt
     upper = (text or '').upper()
-    if ('ROUND NOSE' in upper or re.search(r'RN', upper)) and 'LEAD' not in upper:
+    if ('ROUND NOSE' in upper or re.search(r'RN', upper)) and 'LEAD' not in upper:
         return 'FMJ'
     return None
 
@@ -94,113 +107,161 @@ def parse_condition(text):
 
 
 def scrape_caliber(caliber_norm, caliber_display, seen_ids):
-    handle = COLLECTION_HANDLES[caliber_norm]
+    """Scrape every configured handle for a caliber.
+
+    Returns (rows, flags) where flags is a list of (handle,
+    empty_first_page) tuples. The orchestrator in scrape() uses the
+    flags to fire the storefront-drift guardrail when too many
+    handles silently render zero products on first page.
+    """
     rows = []
-    page_num = 1
-    while True:
-        url = f"{SITE_BASE}/collections/{handle}/products.json?page={page_num}&limit=250"
-        print(f"\n[{caliber_norm}] page {page_num}: {url}")
-        try:
-            data = fetch_json(url)
-        except Exception as e:
-            print(f"  Fetch failed: {e}")
-            break
+    flags = []
 
-        products = data.get("products", [])
-        if not products:
-            print(f"  No products on page {page_num}, stopping caliber.")
-            break
+    for handle in COLLECTION_HANDLES[caliber_norm]:
+        page_num = 1
+        empty_first_page = False
 
-        for p in products:
-            title = p.get("title", "")
-            handle_p = p.get("handle", "")
-            vendor_raw = (p.get("vendor") or "").strip() or None
-            # Prefer a canonical brand from the title; fall back to the raw
-            # vendor only if the title doesn't surface a known brand.
-            vendor = parse_brand(title) or parse_brand(vendor_raw or '') or vendor_raw or 'Unknown'
-            if not handle_p:
-                continue
+        while True:
+            url = f"{SITE_BASE}/collections/{handle}/products.json?page={page_num}&limit=250"
+            print(f"\n[{caliber_norm}/{handle}] page {page_num}: {url}")
+            try:
+                data = fetch_json(url)
+            except Exception as e:
+                print(f"  Fetch failed: {e}")
+                if page_num == 1:
+                    empty_first_page = True
+                    print(f"  WARN: Freedom Munitions collection {handle} returned "
+                          f"zero products on first page (caliber {caliber_norm}).")
+                break
 
-            # Defensive: confirm caliber matches title - skip cross-listed items.
-            _, detected = normalize_caliber(title)
-            if detected and detected != caliber_norm:
-                continue
+            products = data.get("products", [])
+            if not products:
+                if page_num == 1:
+                    empty_first_page = True
+                    print(f"  WARN: Freedom Munitions collection {handle} returned "
+                          f"zero products on first page (caliber {caliber_norm}).")
+                else:
+                    print(f"  No products on page {page_num}, stopping handle.")
+                break
 
-            grain = parse_grain(title)
-            case_material = parse_case_material(title)
-            bullet_type = parse_bullet_type(title)
-            condition = parse_condition(title)
-            tag_text = ' '.join(p.get('tags') or [])
-            body_html = p.get('body_html') or ''
-            purchase_limit = parse_purchase_limit(title) or \
-                             parse_purchase_limit(tag_text) or \
-                             parse_purchase_limit(body_html)
-
-            for v in p.get("variants", []):
-                try:
-                    variant_title = v.get("title", "") or ""
-                    rounds = parse_rounds(title, variant_title)
-                    if not rounds or rounds < 1:
-                        continue
-
-                    price_raw = v.get("price")
-                    if price_raw is None:
-                        continue
-                    price = float(price_raw)
-                    if price <= 0:
-                        continue
-
-                    available = bool(v.get("available", False))
-                    variant_id = v.get("id")
-                    link = f"{SITE_BASE}/products/{handle_p}"
-                    product_id = (f"{handle_p}-{variant_id}" if variant_id else handle_p)[:100]
-                    if product_id in seen_ids:
-                        continue
-                    seen_ids.add(product_id)
-                    ppr = round(price / rounds, 4)
-                    if not sanity_check_ppr(ppr, price, rounds, context=title[:60], caliber=caliber_norm):
-                        continue
-
-                    row = {
-                        'retailer_id': RETAILER_ID,
-                        'retailer_product_id': product_id,
-                        'caliber': caliber_display,
-                        'caliber_normalized': caliber_norm,
-                        'product_url': link,
-                        'base_price': round(price, 2),
-                        'price_per_round': ppr,
-                        'rounds_per_box': rounds,
-                        'total_rounds': rounds,
-                        'manufacturer': vendor,
-                        'grain': grain,
-                        'bullet_type': bullet_type,
-                        'case_material': case_material,
-                        'condition_type': condition,
-                        'purchase_limit': purchase_limit,
-                        'last_updated': now_iso(),
-                    }
-                    with_stock_fields(row, available)
-                    rows.append(row)
-                    print(f"  [ok] {title[:55]} | {rounds}rd | ${price} | {ppr:.2f}/rd | {'in' if available else 'OUT'}")
-                except Exception as e:
-                    print(f"  Error on variant: {e}")
+            for p in products:
+                title = p.get("title", "")
+                handle_p = p.get("handle", "")
+                vendor_raw = (p.get("vendor") or "").strip() or None
+                # Prefer a canonical brand from the title; fall back to the raw
+                # vendor only if the title doesn't surface a known brand.
+                vendor = parse_brand(title) or parse_brand(vendor_raw or '') or vendor_raw or 'Unknown'
+                if not handle_p:
                     continue
 
-        page_num += 1
-        if page_num > 10:
-            break
-    return rows
+                # Defensive: confirm caliber matches title - skip cross-listed items.
+                _, detected = normalize_caliber(title)
+                if detected and detected != caliber_norm:
+                    continue
+
+                grain = parse_grain(title)
+                case_material = parse_case_material(title)
+                bullet_type = parse_bullet_type(title)
+                condition = parse_condition(title)
+                tag_text = ' '.join(p.get('tags') or [])
+                body_html = p.get('body_html') or ''
+                purchase_limit = parse_purchase_limit(title) or \
+                                 parse_purchase_limit(tag_text) or \
+                                 parse_purchase_limit(body_html)
+
+                for v in p.get("variants", []):
+                    try:
+                        variant_title = v.get("title", "") or ""
+                        rounds = parse_rounds(title, variant_title)
+                        if not rounds or rounds < 1:
+                            continue
+
+                        price_raw = v.get("price")
+                        if price_raw is None:
+                            continue
+                        price = float(price_raw)
+                        if price <= 0:
+                            continue
+
+                        available = bool(v.get("available", False))
+                        variant_id = v.get("id")
+                        link = f"{SITE_BASE}/products/{handle_p}"
+                        product_id = (f"{handle_p}-{variant_id}" if variant_id else handle_p)[:100]
+                        if product_id in seen_ids:
+                            continue
+                        seen_ids.add(product_id)
+                        ppr = round(price / rounds, 4)
+                        if not sanity_check_ppr(ppr, price, rounds, context=title[:60], caliber=caliber_norm):
+                            continue
+
+                        row = {
+                            'retailer_id': RETAILER_ID,
+                            'retailer_product_id': product_id,
+                            'caliber': caliber_display,
+                            'caliber_normalized': caliber_norm,
+                            'product_url': link,
+                            'base_price': round(price, 2),
+                            'price_per_round': ppr,
+                            'rounds_per_box': rounds,
+                            'total_rounds': rounds,
+                            'manufacturer': vendor,
+                            'grain': grain,
+                            'bullet_type': bullet_type,
+                            'case_material': case_material,
+                            'condition_type': condition,
+                            'purchase_limit': purchase_limit,
+                            'last_updated': now_iso(),
+                        }
+                        with_stock_fields(row, available)
+                        rows.append(row)
+                        print(f"  [ok] {title[:55]} | {rounds}rd | ${price} | {ppr:.2f}/rd | {'in' if available else 'OUT'}")
+                    except Exception as e:
+                        print(f"  Error on variant: {e}")
+                        continue
+
+            page_num += 1
+            if page_num > 10:
+                break
+
+        flags.append((handle, empty_first_page))
+    return rows, flags
 
 
 def scrape():
     all_rows = []
     seen_ids = set()
+    empty_handles = []  # list of (caliber_norm, handle) for guardrail
+
     for caliber_norm in COLLECTION_HANDLES:
         caliber_display = CALIBERS[caliber_norm]
-        rows = scrape_caliber(caliber_norm, caliber_display, seen_ids)
+        rows, flags = scrape_caliber(caliber_norm, caliber_display, seen_ids)
         all_rows.extend(rows)
+        for handle, empty in flags:
+            if empty:
+                empty_handles.append((caliber_norm, handle))
 
     print(f"\nTotal scraped: {len(all_rows)}")
+
+    # Storefront-drift guardrail. A single transient empty handle is
+    # fine; three or more is a strong signal that Freedom Munitions
+    # renamed/split Shopify collections and the scraper is silently
+    # producing partial data (the exact symptom that hid 7 of 10
+    # calibers from the DB until the 2026-05-09 audit, masked by
+    # Shopify keeping empty legacy collections live at HTTP 200 for
+    # SEO continuity). Exit non-zero so CI runs go red, and skip the
+    # upsert step so partial data doesn't replace good rows.
+    EMPTY_FAIL_THRESHOLD = 3
+    if len(empty_handles) >= EMPTY_FAIL_THRESHOLD:
+        print(f"\nFAIL: {len(empty_handles)} Freedom Munitions collections returned "
+              f"zero products on first page — likely storefront drift:")
+        for cal, h in empty_handles:
+            print(f"  - {cal}: Freedom Munitions collection {h} returned zero products on first page")
+        sys.exit(1)
+    elif empty_handles:
+        print(f"\nWARN: {len(empty_handles)} Freedom Munitions collection(s) returned "
+              f"zero products on first page (transient or worth investigating):")
+        for cal, h in empty_handles:
+            print(f"  - {cal}: Freedom Munitions collection {h} returned zero products on first page")
 
     if not all_rows:
         print("Nothing to upsert.")
