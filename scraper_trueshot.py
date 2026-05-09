@@ -104,9 +104,12 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
             if not handle_p:
                 continue
 
-            # Defensive: confirm caliber matches title - skip cross-listed items.
+            # Strict: require positive in-list detection from the title.
+            # Off-list calibers (.45 ACP, .38 Super, 10mm, etc.) make
+            # normalize_caliber return None — we want to skip those, not
+            # silently bucket them under the collection's caliber.
             _, detected = normalize_caliber(title)
-            if detected and detected != caliber_norm:
+            if detected != caliber_norm:
                 continue
 
             grain = parse_grain(title)
