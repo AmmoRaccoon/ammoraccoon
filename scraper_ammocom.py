@@ -1,6 +1,7 @@
 import asyncio
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
@@ -16,17 +17,28 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
 )
 
+# Ammo.com category paths per caliber. Values are lists for parity
+# with the other CALIBER_PATHS scrapers. 223-556 splits into two
+# collections (.223 and 5.56 are separate Ammo.com pages, mirroring
+# Natchez/TrueShot/LG/BulkAmmo). Four entries below were renamed
+# during a 2026-05-09-or-earlier storefront restructure: the prior
+# values silently 404'd until the audit caught the absence (4 of 10
+# configured URLs were dead, exact-match to the 4 calibers missing
+# in the DB). Pattern: shorter slugs (-sw- → -cal-, -winchester- →
+# -win-, dotted variants like 7.62x39, and a separate 5.56x45
+# collection split off from .223).
 CALIBER_PATHS = {
-    '9mm':     '/handgun/9mm-ammo',
-    '380acp':  '/handgun/380-acp-ammo',
-    '40sw':    '/handgun/40-sw-ammo',
-    '38spl':   '/handgun/38-special-ammo',
-    '357mag':  '/handgun/357-magnum-ammo',
-    '22lr':    '/rimfire/22-lr-ammo',
-    '223-556': '/rifle/223-remington-ammo',
-    '308win':  '/rifle/308-winchester-ammo',
-    '762x39':  '/rifle/762x39-ammo',
-    '300blk':  '/rifle/300-blackout-ammo',
+    '9mm':     ['/handgun/9mm-ammo'],
+    '380acp':  ['/handgun/380-acp-ammo'],
+    '40sw':    ['/handgun/40-cal-ammo'],
+    '38spl':   ['/handgun/38-special-ammo'],
+    '357mag':  ['/handgun/357-magnum-ammo'],
+    '22lr':    ['/rimfire/22-lr-ammo'],
+    '223-556': ['/rifle/223-rem-ammo',
+                '/rifle/5.56x45-ammo'],
+    '308win':  ['/rifle/308-win-ammo'],
+    '762x39':  ['/rifle/7.62x39-ammo'],
+    '300blk':  ['/rifle/300-blackout-ammo'],
 }
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -105,113 +117,138 @@ def parse_condition(title):
     return 'New'
 
 async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
-    base = SITE_BASE + CALIBER_PATHS[caliber_norm]
+    """Scrape every configured handle for a caliber.
+
+    Returns (products, flags) where flags is a list of (handle,
+    empty_first_page) tuples. The orchestrator in scrape() uses the
+    flags to fire the storefront-drift guardrail when too many handles
+    silently render zero li.b-product-list-item elements.
+    """
     products = []
-    page_num = 1
+    flags = []
 
-    while True:
-        url = base if page_num == 1 else f"{base}?p={page_num}"
-        print(f"\n[{caliber_norm}] page {page_num}: {url}")
-        try:
-            resp = await page.goto(url, wait_until='domcontentloaded', timeout=45000)
-        except Exception as e:
-            print(f"  goto failed: {e}")
-            break
-        if resp and resp.status >= 400:
-            print(f"  HTTP {resp.status} - skipping caliber.")
-            break
-        await page.wait_for_timeout(4000)
+    for handle in CALIBER_PATHS[caliber_norm]:
+        base = SITE_BASE + handle
+        page_num = 1
+        empty_first_page = False
 
-        cards = await page.query_selector_all('li.b-product-list-item')
-        if not cards:
-            print(f"  No cards on page {page_num}, stopping caliber.")
-            break
-
-        new_on_page = 0
-        for card in cards:
+        while True:
+            url = base if page_num == 1 else f"{base}?p={page_num}"
+            print(f"\n[{caliber_norm}/{handle}] page {page_num}: {url}")
             try:
-                title_el = await card.query_selector('h2.b-product-list-item__product-name')
-                if not title_el:
-                    continue
-                title = (await title_el.inner_text()).strip()
-                product_slug = await title_el.get_attribute('id')
-                if not product_slug:
-                    li_id = await card.get_attribute('id')
-                    product_slug = li_id[len('product-'):] if li_id and li_id.startswith('product-') else li_id
-                if not product_slug:
-                    continue
-                link = f"{base}#{product_slug}"
-
-                price_el = await card.query_selector('.b-price-sale__special .price')
-                if not price_el:
-                    price_el = await card.query_selector('.b-price-regular .price')
-                if not price_el:
-                    continue
-                price_text = (await price_el.inner_text()).strip()
-                price_match = re.search(r'\$?([\d,]+\.?\d*)', price_text.replace(',', ''))
-                if not price_match:
-                    continue
-                price = float(price_match.group(1))
-
-                in_stock_el = await card.query_selector('.b-availability__in-stock')
-                in_stock = in_stock_el is not None
-                card_text = await card.inner_text()
-                purchase_limit = parse_purchase_limit(card_text)
-
-                rounds = parse_rounds(title)
-                if not rounds or rounds < 1:
-                    continue
-
-                grain = parse_grain(title)
-                case_material = parse_case_material(title)
-                bullet_type = parse_bullet_type(title)
-                brand = parse_brand(title) or "Unknown"
-                condition = parse_condition(title)
-                ppr = round(price / rounds, 4)
-                if not sanity_check_ppr(ppr, price, rounds, context=title[:60], caliber=caliber_norm):
-                    continue
-                product_id = product_slug[:100]
-                if product_id in seen_ids:
-                    continue
-                seen_ids.add(product_id)
-
-                product = {
-                    'retailer_id': RETAILER_ID,
-                    'retailer_product_id': product_id,
-                    'caliber': caliber_display,
-                    'caliber_normalized': caliber_norm,
-                    'product_url': link,
-                    'base_price': round(price, 2),
-                    'price_per_round': ppr,
-                    'rounds_per_box': rounds,
-                    'total_rounds': rounds,
-                    'manufacturer': brand,
-                    'grain': grain,
-                    'bullet_type': bullet_type,
-                    'case_material': case_material,
-                    'condition_type': condition,
-                    'purchase_limit': purchase_limit,
-                    'last_updated': now_iso(),
-                }
-                with_stock_fields(product, in_stock)
-                products.append(product)
-                new_on_page += 1
-                print(f"  [ok] {title[:55]} | ${price} | {rounds}rd | {ppr:.2f}/rd")
+                resp = await page.goto(url, wait_until='domcontentloaded', timeout=45000)
             except Exception as e:
-                print(f"  Error on card: {e}")
-                continue
+                print(f"  goto failed: {e}")
+                if page_num == 1:
+                    empty_first_page = True
+                    print(f"  WARN: Ammo.com collection {handle} returned "
+                          f"zero products on first page (caliber {caliber_norm}).")
+                break
+            if resp and resp.status >= 400:
+                print(f"  HTTP {resp.status} - skipping handle.")
+                if page_num == 1:
+                    empty_first_page = True
+                    print(f"  WARN: Ammo.com collection {handle} returned "
+                          f"zero products on first page (caliber {caliber_norm}).")
+                break
+            await page.wait_for_timeout(4000)
 
-        if new_on_page == 0:
-            break
+            cards = await page.query_selector_all('li.b-product-list-item')
+            if not cards:
+                if page_num == 1:
+                    empty_first_page = True
+                    print(f"  WARN: Ammo.com collection {handle} returned "
+                          f"zero products on first page (caliber {caliber_norm}).")
+                else:
+                    print(f"  No cards on page {page_num}, stopping handle.")
+                break
 
-        next_link = await page.query_selector('link[rel="next"]')
-        if not next_link:
-            break
-        page_num += 1
-        if page_num > 15:
-            break
+            new_on_page = 0
+            for card in cards:
+                try:
+                    title_el = await card.query_selector('h2.b-product-list-item__product-name')
+                    if not title_el:
+                        continue
+                    title = (await title_el.inner_text()).strip()
+                    product_slug = await title_el.get_attribute('id')
+                    if not product_slug:
+                        li_id = await card.get_attribute('id')
+                        product_slug = li_id[len('product-'):] if li_id and li_id.startswith('product-') else li_id
+                    if not product_slug:
+                        continue
+                    link = f"{base}#{product_slug}"
 
-    return products
+                    price_el = await card.query_selector('.b-price-sale__special .price')
+                    if not price_el:
+                        price_el = await card.query_selector('.b-price-regular .price')
+                    if not price_el:
+                        continue
+                    price_text = (await price_el.inner_text()).strip()
+                    price_match = re.search(r'\$?([\d,]+\.?\d*)', price_text.replace(',', ''))
+                    if not price_match:
+                        continue
+                    price = float(price_match.group(1))
+
+                    in_stock_el = await card.query_selector('.b-availability__in-stock')
+                    in_stock = in_stock_el is not None
+                    card_text = await card.inner_text()
+                    purchase_limit = parse_purchase_limit(card_text)
+
+                    rounds = parse_rounds(title)
+                    if not rounds or rounds < 1:
+                        continue
+
+                    grain = parse_grain(title)
+                    case_material = parse_case_material(title)
+                    bullet_type = parse_bullet_type(title)
+                    brand = parse_brand(title) or "Unknown"
+                    condition = parse_condition(title)
+                    ppr = round(price / rounds, 4)
+                    if not sanity_check_ppr(ppr, price, rounds, context=title[:60], caliber=caliber_norm):
+                        continue
+                    product_id = product_slug[:100]
+                    if product_id in seen_ids:
+                        continue
+                    seen_ids.add(product_id)
+
+                    product = {
+                        'retailer_id': RETAILER_ID,
+                        'retailer_product_id': product_id,
+                        'caliber': caliber_display,
+                        'caliber_normalized': caliber_norm,
+                        'product_url': link,
+                        'base_price': round(price, 2),
+                        'price_per_round': ppr,
+                        'rounds_per_box': rounds,
+                        'total_rounds': rounds,
+                        'manufacturer': brand,
+                        'grain': grain,
+                        'bullet_type': bullet_type,
+                        'case_material': case_material,
+                        'condition_type': condition,
+                        'purchase_limit': purchase_limit,
+                        'last_updated': now_iso(),
+                    }
+                    with_stock_fields(product, in_stock)
+                    products.append(product)
+                    new_on_page += 1
+                    print(f"  [ok] {title[:55]} | ${price} | {rounds}rd | {ppr:.2f}/rd")
+                except Exception as e:
+                    print(f"  Error on card: {e}")
+                    continue
+
+            if new_on_page == 0:
+                break
+
+            next_link = await page.query_selector('link[rel="next"]')
+            if not next_link:
+                break
+            page_num += 1
+            if page_num > 15:
+                break
+
+        flags.append((handle, empty_first_page))
+    return products, flags
 
 
 async def scrape():
@@ -222,15 +259,39 @@ async def scrape():
 
         all_products = []
         seen_ids = set()
+        empty_handles = []  # list of (caliber_norm, handle) for guardrail
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            products = await scrape_caliber(page, caliber_norm, caliber_display, seen_ids)
+            products, flags = await scrape_caliber(page, caliber_norm, caliber_display, seen_ids)
             all_products.extend(products)
+            for handle, empty in flags:
+                if empty:
+                    empty_handles.append((caliber_norm, handle))
 
         await browser.close()
 
         print(f"\nTotal scraped: {len(all_products)}")
+
+        # Storefront-drift guardrail. A single transient empty handle
+        # is fine; three or more is a strong signal that Ammo.com
+        # renamed collection paths and the scraper is silently
+        # producing partial data (the exact symptom that hid 4 of 10
+        # calibers from the DB until the 2026-05-09 audit). Exit
+        # non-zero so CI runs go red, and skip the upsert step so
+        # partial data doesn't replace good rows.
+        EMPTY_FAIL_THRESHOLD = 3
+        if len(empty_handles) >= EMPTY_FAIL_THRESHOLD:
+            print(f"\nFAIL: {len(empty_handles)} Ammo.com collections returned "
+                  f"zero products on first page — likely storefront drift:")
+            for cal, h in empty_handles:
+                print(f"  - {cal}: Ammo.com collection {h} returned zero products on first page")
+            sys.exit(1)
+        elif empty_handles:
+            print(f"\nWARN: {len(empty_handles)} Ammo.com collection(s) returned "
+                  f"zero products on first page (transient or worth investigating):")
+            for cal, h in empty_handles:
+                print(f"  - {cal}: Ammo.com collection {h} returned zero products on first page")
 
         if not all_products:
             print("Nothing to upsert.")
