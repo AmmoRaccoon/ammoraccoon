@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type
 
 load_dotenv()
 
@@ -127,6 +127,18 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 continue
             name = name_el.inner_text().strip()
 
+            # Strict caliber gate. Target Sports collection pages
+            # cross-pollinate (e.g. .44 Rem Mag and .45 GAP appearing
+            # on the 223-556 / 300blk pages). normalize_caliber returns
+            # (None, None) for off-list cartridges, so we skip those
+            # entirely instead of silently bucketing them under the
+            # collection's caliber. Mirrors the gate added to
+            # scraper_trueshot 2026-05-08.
+            _, detected = normalize_caliber(name)
+            if detected != caliber_norm:
+                skipped += 1
+                continue
+
             text_lower = text.lower()
             in_stock = 'out of stock' not in text_lower and \
                        'sold out' not in text_lower and \
@@ -148,7 +160,14 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
             total_rounds = parse_rounds(name)
             if not total_rounds and price_per_round > 0:
-                total_rounds = round(base_price / price_per_round)
+                # Derive from base_price / ppr only when the result is
+                # a credible box size. When the listing card surfaces
+                # only the per-round price, base_price collapses onto
+                # price_per_round and the division rounds to 1 — a stub
+                # the user can't actually buy. Require >= 2.
+                derived = round(base_price / price_per_round)
+                if derived >= 2:
+                    total_rounds = derived
             if not total_rounds:
                 skipped += 1
                 continue
