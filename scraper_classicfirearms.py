@@ -182,6 +182,13 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                     skipped += 1
                     continue
 
+                # CF caliber facets include component bullets (-bul- SKU)
+                # and unprimed brass — drop them before parsing.
+                slug = product_url.rstrip('/').split('/')[-1].lower()
+                if '-bul-' in slug or 'unprimed' in slug or slug.startswith('starline-'):
+                    skipped += 1
+                    continue
+
                 # Prefer the title attribute (always full); fall back to
                 # inner text. Run both through clean_title for typographic
                 # cleanup before any further parsing.
