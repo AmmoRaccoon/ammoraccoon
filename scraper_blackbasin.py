@@ -1,14 +1,16 @@
 import os
 import re
-import time
-from datetime import datetime, timezone
+import sys
+import urllib.request
+import urllib.error
+import json
+from datetime import datetime
 from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
 from supabase import create_client
 
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
-    parse_brand, sanity_check_ppr, parse_bullet_type,
+    parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
 )
 
 load_dotenv()
@@ -19,25 +21,36 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 RETAILER_SLUG = "blackbasin"
 SITE_BASE = "https://blackbasin.com"
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
 
-# BigCommerce stencil. Verified 2026-04-25 against the live homepage
-# nav. Black Basin's slug pattern is INCONSISTENT — some calibers
-# carry a leading dot, some don't, and they use abbreviated/expanded
-# names interchangeably ("357-mag" not "magnum"; "40-smith-wesson"
-# not "40-s-w"; "380-auto" not "380-acp"; "22-long-rifle" not "22-lr"
-# in the rimfire path; "300-aac-blackout" without leading dot).
+# Black Basin migrated to Shopify on/around 2026-05-08; the previous
+# BigCommerce URLs (/handgun-ammo/9mm/, /rifle-ammo/.223-remington/, …)
+# now all return 404 and the scraper had been silently writing zero
+# rows for nine days. Shopify exposes a per-collection JSON feed at
+# /collections/<handle>/products.json with full variant detail (round
+# count in option1, price/sku/available per variant) — far cleaner
+# than DOM-scraping a theme.
+#
+# .223 and 5.56 live in two separate Shopify collections on Black
+# Basin even though we bucket them together as `223-556` in CALIBERS.
+# We hit both URLs and dedup by retailer_product_id (variant SKU) so a
+# Federal XM193 listed in both collections doesn't double-count.
 CALIBER_PATHS = {
-    '9mm':     '/handgun-ammo/9mm/',
-    '380acp':  '/handgun-ammo/.380-auto/',
-    '40sw':    '/handgun-ammo/.40-smith-wesson/',
-    '38spl':   '/handgun-ammo/.38-special/',
-    '357mag':  '/handgun-ammo/.357-mag/',
-    '22lr':    '/rimfire-ammo/22-long-rifle/',
-    '223-556': '/rifle-ammo/.223-remington/',
-    '308win':  '/rifle-ammo/7.62x51-.308/',
-    '762x39':  '/rifle-ammo/7.62x39/',
-    '300blk':  '/rifle-ammo/300-aac-blackout/',
+    '9mm':     ['/collections/9mm-ammo'],
+    '380acp':  ['/collections/380-auto-ammo'],
+    '40sw':    ['/collections/40-sw-ammo'],
+    '38spl':   ['/collections/38-special-ammo'],
+    '357mag':  ['/collections/357-mag-ammo'],
+    '22lr':    ['/collections/22-lr-ammo'],
+    '223-556': ['/collections/223-remington-ammo', '/collections/556x45-nato-ammo'],
+    '308win':  ['/collections/308-ammo'],
+    '762x39':  ['/collections/762x39mm-ammo'],
+    '300blk':  ['/collections/300-aac-blackout-ammo'],
 }
+
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -47,82 +60,61 @@ def get_retailer_id():
     return result.data[0]["id"]
 
 
-def fetch_smallest_variant(page, product_url):
-    """Visit a Black Basin product page and pull the smallest variant
-    from its option grid. BB renders variants as a QTY/PRICE/PRICE-PER-
-    ROUND table:
-
-        <div class="option-grid-value">
-          <input type="radio" data-product-attribute-value="N">
-          <label>50</label>
-          <span class="option-grid-value--price">$24.07</span>
-          <span class="option-grid-value--ppr">$0.48</span>
-        </div>
-
-    Returns (smallest_qty, smallest_qty_price) or (None, None) when no
-    variant grid is present. The category-page tile shows the lowest
-    variant's price already, but reading the grid lets us record the
-    EXACT round count too (titles carry no count on Black Basin).
-    """
-    try:
-        resp = page.goto(product_url, wait_until='domcontentloaded', timeout=60000)
-    except Exception:
-        return None, None
-    if resp and resp.status >= 400:
-        return None, None
-    rows = page.query_selector_all('.option-grid-value')
-    best_qty = None
-    best_price = None
-    for row in rows:
-        label = row.query_selector('label.form-label[data-product-attribute-value]')
-        price_el = row.query_selector('.option-grid-value--price')
-        if not label or not price_el:
-            continue
-        qty_text = (label.inner_text() or '').strip()
-        m = re.search(r'(\d[\d,]*)', qty_text)
-        if not m:
-            continue
-        qty = int(m.group(1).replace(',', ''))
-        price_text = (price_el.inner_text() or '').strip()
-        pm = re.search(r'\$?(\d{1,5}(?:,\d{3})*(?:\.\d{1,2})?)', price_text)
-        if not pm:
-            continue
-        price = float(pm.group(1).replace(',', ''))
-        if best_qty is None or qty < best_qty:
-            best_qty = qty
-            best_price = price
-    return best_qty, best_price
-
 def parse_grain(text):
-    match = re.search(r'(\d+)[\s-]*gr(?:ain)?', text, re.IGNORECASE)
-    return int(match.group(1)) if match else None
+    m = re.search(r'(\d+)[\s-]*gr(?:ain)?\b', text, re.IGNORECASE)
+    return int(m.group(1)) if m else None
 
-def parse_rounds(text):
-    patterns = [
-        r'(\d[\d,]*)\s*rounds?',
-        r'(\d[\d,]*)\s*rds?\b',
-        r'(\d[\d,]*)\s*count',
-        r'(\d[\d,]*)\s*per\s*box',
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            return int(match.group(1).replace(',', ''))
+
+def parse_rounds_from_variant(variant):
+    """Return the round count for a Shopify variant.
+
+    On Black Basin, option1 is the round count as a bare numeric
+    string ('50', '100', '1000'). Falls back to the variant title
+    (typically identical to option1 on single-option products) and
+    finally to the SKU suffix after the last dash (Black Basin SKUs
+    look like `754908500086-50` where `-50` is the pack qty).
+    """
+    opt1 = variant.get('option1')
+    if opt1 is not None:
+        m = re.fullmatch(r'\s*(\d{1,5})\s*', str(opt1))
+        if m:
+            n = int(m.group(1))
+            if 10 <= n <= 10000:
+                return n
+
+    t = variant.get('title')
+    if t:
+        m = re.search(r'\b(\d{1,5})\b', str(t))
+        if m:
+            n = int(m.group(1))
+            if 10 <= n <= 10000:
+                return n
+
+    sku = variant.get('sku') or ''
+    if '-' in sku:
+        suffix = sku.rsplit('-', 1)[-1]
+        m = re.fullmatch(r'(\d{1,5})', suffix)
+        if m:
+            n = int(m.group(1))
+            if 10 <= n <= 10000:
+                return n
     return None
+
 
 def parse_case_material(text):
     text_lower = text.lower()
-    steel_brands = ['wolf', 'tula', 'tulammo', 'brown bear', 'silver bear', 'golden bear', 'barnaul']
-    if any(brand in text_lower for brand in steel_brands):
+    steel_brands = ['wolf', 'tula', 'tulammo', 'brown bear',
+                    'silver bear', 'golden bear', 'barnaul']
+    if any(b in text_lower for b in steel_brands):
         return 'Steel'
     if 'steel' in text_lower:
         return 'Steel'
-    elif 'brass' in text_lower:
-        return 'Brass'
-    elif 'aluminum' in text_lower:
+    if 'aluminum' in text_lower:
         return 'Aluminum'
-    elif 'nickel' in text_lower:
+    if 'nickel' in text_lower:
         return 'Nickel'
+    if 'brass' in text_lower:
+        return 'Brass'
     return 'Brass'
 
 
@@ -131,215 +123,223 @@ def parse_country(text):
     mapping = {
         'federal': 'USA', 'winchester': 'USA', 'remington': 'USA',
         'cci': 'USA', 'speer': 'USA', 'hornady': 'USA',
-        'blazer': 'USA', 'fiocchi': 'USA', 'american eagle': 'USA',
+        'blazer': 'USA', 'fiocchi': 'Italy', 'american eagle': 'USA',
         'magtech': 'Brazil', 'cbc': 'Brazil',
         'ppu': 'Serbia', 'prvi partizan': 'Serbia',
         'sellier': 'Czech Republic', 'tula': 'Russia',
         'wolf': 'Russia', 'aguila': 'Mexico',
     }
-    for keyword, country in mapping.items():
-        if keyword in text_lower:
-            return country
+    for k, v in mapping.items():
+        if k in text_lower:
+            return v
     return None
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    url = SITE_BASE + CALIBER_PATHS[caliber_norm]
-    print(f"\n[{caliber_norm}] Loading: {url}")
+
+def fetch_collection_page(path, page=1, limit=250):
+    """GET a single page of /<path>/products.json. Returns (products,
+    http_status). Caller distinguishes 200/404/other by inspecting status."""
+    url = f"{SITE_BASE}{path}/products.json?limit={limit}&page={page}"
+    req = urllib.request.Request(url, headers={
+        'User-Agent': USER_AGENT,
+        'Accept': 'application/json',
+    })
     try:
-        resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+        return data.get('products', []) or [], resp.status
+    except urllib.error.HTTPError as e:
+        return [], e.code
     except Exception as e:
-        print(f"  goto failed: {e}")
-        return 0, 0
-    if resp and resp.status >= 400:
-        print(f"  HTTP {resp.status} - skipping caliber.")
-        return 0, 0
-    time.sleep(6)
+        print(f"  fetch failed for {url}: {e}")
+        return [], None
 
-    # Scope to the main product grid. Pre-fix selector matched 100
-    # cards including 50 phantom carousel items; .productGrid scopes
-    # to the 50 real products.
-    products = page.query_selector_all('.productGrid article.card')
-    if not products:
-        products = page.query_selector_all('ul.productGrid li.product')
-    print(f"  Found {len(products)} products")
-    if not products:
-        return 0, 0
 
-    # Two-pass loop — collect URL/title from category page, then visit
-    # each product page for the QTY/PRICE/PRICE-PER-ROUND grid. Black
-    # Basin titles never include round count and the category-page
-    # price is a "$X.XX - $Y.YY" range, so the existing single-pass
-    # extractor silently dropped every product.
-    candidates = []
-    skipped = 0
-    for product in products:
-        try:
-            link_el = product.query_selector('h3.card-title a, h4.card-title a, .card-title a')
-            if not link_el:
-                skipped += 1
-                continue
-            href = link_el.get_attribute('href') or ''
-            if not href:
-                skipped += 1
-                continue
-            product_url = href if href.startswith('http') else SITE_BASE + href
-            if '/brands/' in product_url or '/categories/' in product_url:
-                skipped += 1
-                continue
-            name = (link_el.inner_text() or '').strip() or (link_el.get_attribute('title') or '').split(',')[0].strip()
-            if not name:
-                skipped += 1
-                continue
-            # data-name on the article is cleaner than scraping h3 text
-            # which sometimes wraps mid-word with extra whitespace.
-            data_name = product.get_attribute('data-name')
-            if data_name:
-                name = data_name.strip()
-            candidates.append((product_url, name))
-        except Exception as e:
-            skipped += 1
-            print(f"  Skipped (card parse): {e}")
+def fetch_collection(path):
+    """Paginate through a collection's products.json feed. Returns
+    (all_products, ok). ok is False when the first page didn't 200 —
+    used by the loud-failure check at the end of scrape()."""
+    all_products = []
+    page = 1
+    while True:
+        chunk, status = fetch_collection_page(path, page=page)
+        if page == 1 and status != 200:
+            return [], False
+        if not chunk:
+            break
+        all_products.extend(chunk)
+        if len(chunk) < 250:
+            break
+        page += 1
+        if page > 20:  # safety stop — no caliber currently has >5k products
+            break
+    return all_products, True
+
+
+def scrape_caliber(caliber_norm, caliber_display, retailer_id, seen_ids, counts):
+    """Scrape every URL mapped to a caliber. Returns
+    (saved, skipped, fetched_any) — fetched_any flips True the moment
+    a single URL for this caliber loads, so callers can tell "no rows"
+    from "site is gone."
+    """
+    paths = CALIBER_PATHS[caliber_norm]
+    saved_total = 0
+    skipped_total = 0
+    fetched_any = False
+
+    for path in paths:
+        print(f"\n[{caliber_norm}] GET {path}/products.json")
+        products, ok = fetch_collection(path)
+        if not ok:
+            print(f"  FAILED to load {path}")
             continue
+        fetched_any = True
+        print(f"  {len(products)} products in feed")
 
-    # Black Basin lists ~100 products per caliber. Visiting every
-    # product page for the variant grid would push the per-caliber
-    # runtime to several minutes; cap at 30 so the full scrape fits
-    # in the 2-hour cron window. Sort by price-low-first so we cover
-    # the most common (and cheapest) SKUs every cycle. The cap can be
-    # raised once we move scraping to a worker with longer budgets.
-    BLACK_BASIN_PER_CALIBER_CAP = 30
-    candidates = candidates[:BLACK_BASIN_PER_CALIBER_CAP]
-
-    saved = 0
-    for product_url, name in candidates:
-        try:
-            # Smallest variant from the QTY grid — Black Basin is the
-            # only retailer that publishes per-round price directly per
-            # variant. We pair the smallest variant's QTY with its
-            # price (not the category-page lowest price, since the two
-            # always agree here but reading from the grid is unambiguous).
-            total_rounds, base_price = fetch_smallest_variant(page, product_url)
-            if not total_rounds or not base_price:
-                # Fallback: title parsing for the rare single-variant SKU
-                # whose option grid is replaced by a plain price block.
-                total_rounds = parse_rounds(name)
-                if not total_rounds:
-                    skipped += 1
-                    print(f"  Skipped (no variant grid + no round count): {name[:55]}")
+        for prod in products:
+            try:
+                title = clean_title(prod.get('title') or '')
+                handle = (prod.get('handle') or '').strip()
+                if not title or not handle:
+                    skipped_total += 1
                     continue
-                # No price either — last resort: try the page's main
-                # price element after the goto in fetch_smallest_variant.
-                price_el = page.query_selector('[data-product-price-without-tax]')
-                if price_el:
-                    pt = (price_el.inner_text() or '').strip()
-                    pm = re.search(r'\$(\d{1,5}(?:,\d{3})*(?:\.\d{1,2})?)', pt)
-                    if pm:
-                        base_price = float(pm.group(1).replace(',', ''))
-                if not base_price or base_price <= 0:
-                    skipped += 1
-                    print(f"  Skipped (no price): {name[:55]}")
+
+                product_url = f"{SITE_BASE}/products/{handle}"
+
+                variants = prod.get('variants') or []
+                if not variants:
+                    skipped_total += 1
                     continue
-            if total_rounds <= 0 or base_price <= 0:
-                skipped += 1
+
+                # Black Basin sells the same SKU at multiple pack sizes
+                # via Shopify variants. Pick the smallest priced variant
+                # — the cheapest absolute price most users see first —
+                # and use its `available` flag for the listing's stock.
+                priced = []
+                for v in variants:
+                    n = parse_rounds_from_variant(v)
+                    try:
+                        p = float(v.get('price') or 0)
+                    except (TypeError, ValueError):
+                        p = 0
+                    if n and p > 0:
+                        priced.append((n, p, v))
+
+                if not priced:
+                    skipped_total += 1
+                    continue
+
+                priced.sort(key=lambda t: t[0])
+                total_rounds, base_price, v_chosen = priced[0]
+
+                price_per_round = round(base_price / total_rounds, 4)
+                if not sanity_check_ppr(price_per_round, base_price, total_rounds,
+                                        context=f'{RETAILER_SLUG} {caliber_norm}',
+                                        caliber=caliber_norm):
+                    skipped_total += 1
+                    continue
+
+                in_stock = bool(v_chosen.get('available'))
+                grain = parse_grain(title)
+                case_material = parse_case_material(title)
+                bullet_type = parse_bullet_type(title)
+                country = parse_country(title)
+                # Vendor on every Black Basin product is the storefront
+                # name "Black Basin" — useless for manufacturer. Always
+                # parse from the title.
+                manufacturer = parse_brand(title) or 'Unknown'
+                purchase_limit = parse_purchase_limit(title)
+
+                product_id = (v_chosen.get('sku') or '').strip() or handle
+                product_id = product_id[:100]
+                if not product_id or product_id in seen_ids:
+                    continue
+                seen_ids.add(product_id)
+
+                listing = {
+                    'retailer_id': retailer_id,
+                    'retailer_product_id': product_id,
+                    'product_url': product_url,
+                    'caliber': caliber_display,
+                    'caliber_normalized': caliber_norm,
+                    'grain': grain,
+                    'bullet_type': bullet_type,
+                    'case_material': case_material,
+                    'condition_type': 'New',
+                    'country_of_origin': country,
+                    'manufacturer': manufacturer,
+                    'rounds_per_box': total_rounds,
+                    'boxes_per_case': 1,
+                    'total_rounds': total_rounds,
+                    'base_price': base_price,
+                    'price_per_round': price_per_round,
+                    'purchase_limit': purchase_limit,
+                    'last_updated': now_iso(),
+                }
+                with_stock_fields(listing, in_stock)
+
+                result = supabase.table('listings').upsert(
+                    listing,
+                    on_conflict='retailer_id,retailer_product_id'
+                ).execute()
+                supabase.table('price_history').insert({
+                    'listing_id': result.data[0]['id'],
+                    'price': base_price,
+                    'price_per_round': price_per_round,
+                    'in_stock': in_stock,
+                }).execute()
+
+                saved_total += 1
+                counts[caliber_norm] = counts.get(caliber_norm, 0) + 1
+                print(f"  Saved [{caliber_norm}]: {title[:55]} | ${base_price} | {price_per_round}/rd")
+
+            except Exception as e:
+                skipped_total += 1
+                print(f"  Skipped: {e}")
                 continue
 
-            price_per_round = round(base_price / total_rounds, 4)
-            if not sanity_check_ppr(price_per_round, base_price, total_rounds,
-                                    context=f'{RETAILER_SLUG} {caliber_norm}', caliber=caliber_norm):
-                skipped += 1
-                continue
-
-            grain = parse_grain(name)
-            case_material = parse_case_material(name)
-            bullet_type = parse_bullet_type(name)
-            country = parse_country(name)
-            manufacturer = parse_brand(name) or "Unknown"
-            product_id = product_url.rstrip('/').split('/')[-1]
-            if not product_id or product_id in seen_ids:
-                continue
-            seen_ids.add(product_id)
-
-            # We're sitting on the product page after fetch_smallest_variant.
-            # Read stock + purchase-limit from its body text.
-            page_text = (page.locator('body').inner_text() or '').lower()
-            in_stock = ('out of stock' not in page_text and
-                        'sold out' not in page_text and
-                        'currently unavailable' not in page_text)
-            purchase_limit = parse_purchase_limit(page_text)
-
-            listing = {
-                'retailer_id': retailer_id,
-                'retailer_product_id': product_id,
-                'product_url': product_url,
-                'caliber': caliber_display,
-                'caliber_normalized': caliber_norm,
-                'grain': grain,
-                'bullet_type': bullet_type,
-                'case_material': case_material,
-                'condition_type': 'New',
-                'country_of_origin': country,
-                'manufacturer': manufacturer,
-                'rounds_per_box': total_rounds,
-                'boxes_per_case': 1,
-                'total_rounds': total_rounds,
-                'base_price': base_price,
-                'price_per_round': price_per_round,
-                'purchase_limit': purchase_limit,
-                'last_updated': now_iso(),
-            }
-            with_stock_fields(listing, in_stock)
-
-            result = supabase.table('listings').upsert(
-                listing,
-                on_conflict='retailer_id,retailer_product_id'
-            ).execute()
-
-            supabase.table('price_history').insert({
-                'listing_id': result.data[0]['id'],
-                'price': base_price,
-                'price_per_round': price_per_round,
-                'in_stock': in_stock,
-            }).execute()
-
-            saved += 1
-            print(f"  Saved [{caliber_norm}]: {name[:55]} | ${base_price} | {price_per_round}/rd")
-
-        except Exception as e:
-            skipped += 1
-            print(f"  Skipped: {e}")
-            continue
-
-    return saved, skipped
+    return saved_total, skipped_total, fetched_any
 
 
 def scrape():
-    print(f"[{datetime.now()}] Starting Black Basin scraper (all calibers)...")
+    print(f"[{datetime.now()}] Starting Black Basin scraper (Shopify JSON)...")
     retailer_id = get_retailer_id()
     if not retailer_id:
-        return
-
+        return 1
     print(f"Retailer ID: {retailer_id}")
 
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    counts = {}
+    successful_calibers = 0
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.set_extra_http_headers({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        })
-
-        for caliber_norm in CALIBER_PATHS:
-            caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
-            total_saved += saved
-            total_skipped += skipped
-
-        browser.close()
+    for caliber_norm in CALIBER_PATHS:
+        caliber_display = CALIBERS[caliber_norm]
+        saved, skipped, fetched_any = scrape_caliber(
+            caliber_norm, caliber_display, retailer_id, seen_ids, counts
+        )
+        total_saved += saved
+        total_skipped += skipped
+        if fetched_any:
+            successful_calibers += 1
 
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
+    print("Per-caliber counts:")
+    for cal in CALIBER_PATHS:
+        print(f"  {cal}: {counts.get(cal, 0)}")
+
+    # Loud-failure check — every caliber URL 404'd / failed to load.
+    # Returning a non-zero exit code makes the GitHub Actions step go
+    # red and triggers the health-check email so silent staleness can
+    # never repeat the May 2026 incident, where a wholesale Shopify
+    # migration broke every URL but the scraper still printed
+    # "Saved: 0" and exited 0 for nine consecutive days.
+    if successful_calibers == 0:
+        print("\nFATAL: every Black Basin caliber URL failed to load. "
+              "Site may have moved or migrated again — manual check needed.")
+        return 1
+    return 0
+
 
 if __name__ == '__main__':
-    scrape()
+    sys.exit(scrape())
