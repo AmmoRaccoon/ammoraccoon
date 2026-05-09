@@ -343,8 +343,17 @@ def main() -> int:
         bullet_type = parse_bullet_type(row['title'])
         case_material = parse_case_material(row['title'])
         country = parse_country(row['title'])
-        # Prefer brand from JSON-LD; fall back to title-parsed brand.
-        manufacturer = row['brand_jsonld'] or parse_brand(row['title']) or 'Unknown'
+        # Prefer brand from the title (parse_brand normalizes to the
+        # canonical short form). The JSON-LD brand string runs through
+        # parse_brand too before being trusted verbatim — without it
+        # JSON-LD values like "Sierra Bullets" / "Hornady Manufacturing"
+        # / "Federal Premium Ammunition" leak into the manufacturer
+        # column un-normalized. Final fallback is the raw JSON-LD
+        # string for cases parse_brand doesn't know.
+        manufacturer = (parse_brand(row['title'])
+                        or parse_brand(row['brand_jsonld'])
+                        or row['brand_jsonld']
+                        or 'Unknown')
         purchase_limit = parse_purchase_limit(html)
 
         listing = {
