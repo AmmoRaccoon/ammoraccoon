@@ -49,6 +49,14 @@ SUPABASE_KEY = os.environ['SUPABASE_KEY']
 ACTIVE_FRESHNESS = timedelta(hours=48)
 PAGE = 1000
 
+# Caliber sets per firearm_type. Listings without a caliber_normalized
+# value won't match any non-NULL gate — defensible: if we can't classify
+# the listing, we don't claim a rebate covers it.
+HANDGUN_CALIBERS = ('9mm', '380acp', '40sw', '38spl', '357mag')
+RIFLE_CALIBERS   = ('223-556', '308win', '762x39', '300blk')
+RIMFIRE_CALIBERS = ('22lr',)
+SHOTSHELL_BULLET_TYPES = ('Slug', 'Buckshot', 'Birdshot')
+
 
 def derive_keyword(product_line: str, match_pattern: str | None) -> str:
     if match_pattern:
@@ -61,7 +69,8 @@ def fetch_active_rebates(sb):
     cutoff = (datetime.now(timezone.utc) - ACTIVE_FRESHNESS).isoformat()
     rows = (
         sb.table('manufacturer_rebates')
-        .select('id,external_id,source,brand,title,amount_max_per_unit,valid_through,submit_by,last_seen_active_at')
+        .select('id,external_id,source,brand,title,amount_max_per_unit,'
+                'firearm_type,valid_through,submit_by,last_seen_active_at')
         .gte('valid_through', today)
         .gte('submit_by', today)
         .gte('last_seen_active_at', cutoff)
@@ -81,20 +90,39 @@ def fetch_eligible_products(sb, rebate_id):
     )
 
 
-def find_matching_listings(sb, brand, keyword):
-    """Listings where manufacturer = brand AND product_url ILIKE '%keyword%'."""
+def find_matching_listings(sb, brand, keyword, firearm_type):
+    """Listings where manufacturer = brand AND product_url ILIKE '%keyword%'
+    AND (firearm_type gate, if rebate.firearm_type is set).
+
+    The firearm_type gate is what stops a turkey-shotshell rebate from
+    claiming Winchester Super-X 9mm listings are eligible — see the
+    2026-05-09 rebate-id-5 audit and migration 012.
+    """
     matches = []
     start = 0
     while True:
-        batch = (
+        q = (
             sb.table('listings')
             .select('id,product_url,manufacturer')
             .eq('manufacturer', brand)
             .ilike('product_url', f'%{keyword}%')
-            .range(start, start + PAGE - 1)
-            .execute()
-            .data
         )
+        if firearm_type == 'shotshell':
+            q = q.or_(
+                'caliber_normalized.like.12ga%,'
+                'caliber_normalized.like.16ga%,'
+                'caliber_normalized.like.20ga%,'
+                f'bullet_type.in.({",".join(SHOTSHELL_BULLET_TYPES)})'
+            )
+        elif firearm_type == 'handgun':
+            q = q.in_('caliber_normalized', list(HANDGUN_CALIBERS))
+        elif firearm_type == 'rifle':
+            q = q.in_('caliber_normalized', list(RIFLE_CALIBERS))
+        elif firearm_type == 'rimfire':
+            q = q.in_('caliber_normalized', list(RIMFIRE_CALIBERS))
+        # firearm_type IS NULL -> no extra gate (backward-compat)
+
+        batch = q.range(start, start + PAGE - 1).execute().data
         if not batch:
             break
         matches.extend(batch)
@@ -113,6 +141,7 @@ def compute_matches_for_rebate(sb, rebate):
     # listing_id -> (best_amount, best_reason)
     best = {}
     fallback_amount = rebate.get('amount_max_per_unit')
+    firearm_type = rebate.get('firearm_type')
 
     for row in eligible:
         product_line = row['product_line']
@@ -125,8 +154,10 @@ def compute_matches_for_rebate(sb, rebate):
             # invent an amount we can't source.
             continue
 
-        listings = find_matching_listings(sb, rebate['brand'], keyword)
-        reason = f'url_contains:{keyword}'
+        listings = find_matching_listings(sb, rebate['brand'], keyword, firearm_type)
+        reason = f'url_contains:{keyword}' + (
+            f';firearm_type:{firearm_type}' if firearm_type else ''
+        )
         for l in listings:
             current = best.get(l['id'])
             if current is None or float(amount) > current[0]:
@@ -180,29 +211,36 @@ def main() -> int:
         print(f'  eligible products: {len(eligible)}')
 
         matches = compute_matches_for_rebate(sb, r)
-        if not matches:
-            print('  matched listings: 0')
-            continue
-
-        # Per-amount breakdown for the dry-run report.
-        by_amount = defaultdict(int)
-        for _, amt, _ in matches:
-            by_amount[amt] += 1
         print(f'  matched listings: {len(matches)}')
-        for amt in sorted(by_amount.keys(), reverse=True):
-            print(f'    ${amt:.2f}: {by_amount[amt]} listings')
 
-        # Per-keyword breakdown — useful to see which product lines drive matches.
-        by_reason = defaultdict(int)
-        for _, _, reason in matches:
-            by_reason[reason] += 1
-        print('  by keyword (best-amount per listing):')
-        for reason, n in sorted(by_reason.items(), key=lambda x: -x[1]):
-            print(f'    {n:>4}  {reason}')
+        if matches:
+            # Per-amount breakdown for the dry-run report.
+            by_amount = defaultdict(int)
+            for _, amt, _ in matches:
+                by_amount[amt] += 1
+            for amt in sorted(by_amount.keys(), reverse=True):
+                print(f'    ${amt:.2f}: {by_amount[amt]} listings')
 
+            # Per-keyword breakdown — useful to see which product lines drive matches.
+            by_reason = defaultdict(int)
+            for _, _, reason in matches:
+                by_reason[reason] += 1
+            print('  by keyword (best-amount per listing):')
+            for reason, n in sorted(by_reason.items(), key=lambda x: -x[1]):
+                print(f'    {n:>4}  {reason}')
+
+        # write_matches always runs in live mode, even when matches is
+        # empty — the function's contract is "delete this rebate's
+        # existing matches, then insert the current set." Skipping it
+        # for empty sets used to leave stale matches behind whenever a
+        # rebate's matches went from non-empty to empty (the exact
+        # symptom that left 141 false matches on rebate id=5 stranded
+        # after the 2026-05-09 firearm_type-gating fix made the new
+        # match set empty).
         if not args.dry_run:
             written = write_matches(sb, r['id'], matches)
-            print(f'  wrote {written} rows to manufacturer_rebate_listing_matches')
+            print(f'  wrote {written} rows to manufacturer_rebate_listing_matches '
+                  f'(stale rows for this rebate were cleared first)')
             grand_total += written
         else:
             grand_total += len(matches)
