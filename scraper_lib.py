@@ -199,6 +199,58 @@ _BRAND_ALIASES = [
     ('elite v crown', 'Sig Sauer'),
     ('xie9mm', 'Sig Sauer'),  # SKU prefix used in some URLs
     ('xi51', 'Sig Sauer'),  # SKU prefix
+    # Tier 2 brand audit (2026-05-09). 21 high-confidence brands
+    # surfaced from the manufacturer='Unknown' audit across all
+    # retailers — each appeared 10+ times as a leading-token in
+    # Unknown listings' product URLs. Trailing-space aliases on
+    # short bare tokens (`hsm `, `fsm `, `dbltap `, `rws `, `wyoming `)
+    # require a token boundary so substring matches inside unrelated
+    # words can't false-positive. Frontier Cartridge maps to Hornady
+    # because Frontier IS Hornady's economy sub-brand (mirrors the
+    # American-Eagle→Federal pattern). `cor bon` is a normalization
+    # variant of the existing 'corbon' alias — slug separators get
+    # turned into spaces before matching, so hyphenated "cor-bon"
+    # arrives here as "cor bon".
+    ('ammo incorporated', 'Ammo Inc'),
+    ('ammo inc', 'Ammo Inc'),
+    ('hsm ammunition', 'HSM'),
+    ('hsm ', 'HSM'),
+    ('buffalo bore ammunition', 'Buffalo Bore'),
+    ('buffalo bore ammo', 'Buffalo Bore'),
+    ('buffalo bore', 'Buffalo Bore'),
+    ('fort scott munitions', 'Fort Scott Munitions'),
+    ('fort scott', 'Fort Scott Munitions'),
+    ('fsm ', 'Fort Scott Munitions'),
+    ('doubletap ammunition', 'DoubleTap'),
+    ('doubletap', 'DoubleTap'),
+    ('double tap', 'DoubleTap'),
+    ('dbltap ', 'DoubleTap'),
+    ('frontier cartridge', 'Hornady'),  # Hornady's economy sub-brand
+    ('frontier ammo', 'Hornady'),
+    ('grizzly cartridge', 'Grizzly Cartridge'),
+    ('grizzly ammo', 'Grizzly Cartridge'),
+    ('grizzly', 'Grizzly Cartridge'),
+    ('eley', 'Eley'),
+    ('cor bon', 'Corbon'),  # Slug-normalized form of 'cor-bon' / 'corbon'
+    ('novx', 'NovX'),
+    ('lehigh defense', 'Lehigh Defense'),
+    ('lehigh', 'Lehigh Defense'),
+    ('berger bullets', 'Berger'),
+    ('berger', 'Berger'),
+    ('wilson combat', 'Wilson Combat'),
+    ('glaser silver', 'Glaser'),
+    ('glaser blue', 'Glaser'),
+    ('glaser', 'Glaser'),
+    ('supernova', 'Supernova'),
+    ('wyoming cartridge company', 'Wyoming Cartridge'),
+    ('wyoming cartridge co', 'Wyoming Cartridge'),
+    ('wyoming cartridge', 'Wyoming Cartridge'),
+    ('wyoming ', 'Wyoming Cartridge'),
+    ('atlanta arms', 'Atlanta Arms'),
+    ('piney mountain', 'Piney Mountain'),
+    ('maxim defense', 'Maxim Defense'),
+    ('global ordnance', 'Global Ordnance'),
+    ('rws ', 'RWS'),
 ]
 
 
