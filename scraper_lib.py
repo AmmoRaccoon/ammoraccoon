@@ -680,6 +680,112 @@ def clean_title(text):
     return text.translate(TYPOGRAPHIC).strip()
 
 
+# Firearm-type classification for manufacturer_rebates rows. Mirrors
+# the values accepted by the manufacturer_rebates_firearm_type_chk
+# constraint added in migration 012: 'shotshell' | 'handgun' | 'rifle'
+# | 'rimfire'. NULL is the explicit "ambiguous / unknown" state — the
+# matcher (scripts/match_manufacturer_rebates_to_listings.py) gates
+# conservatively when firearm_type IS NULL, so a NULL is always safer
+# than a misclassification.
+#
+# Token lists per category — kept here (not in a regex) so future
+# additions are diff-friendly. Tokens are matched as case-insensitive
+# substrings against (title + ' ' + raw_terms) lowercased.
+_FIREARM_TYPE_SHOTSHELL = (
+    'shotshell', 'shot shell', 'shotgun',
+    'turkey', 'waterfowl', 'upland', 'clays', 'sporting clays',
+    'slug', 'birdshot', 'buckshot',
+    '12 ga', '12ga', '12 gauge',
+    '20 ga', '20ga', '20 gauge',
+    '16 ga', '16ga', '16 gauge',
+    '28 ga', '28ga', '28 gauge',
+    '410 bore', '.410',
+    'long beard',  # Winchester turkey sub-brand — strong shotshell signal
+)
+# Bare 'rifle' is intentionally NOT in this list — observed 2026-05-10
+# in Winchester's rebate page boilerplate ("Winchester Ammunition
+# Products: rifle, handgun, rimfire, shotshell …") which appears in
+# raw_terms after the rebate-specific copy. The bare word lit up every
+# Winchester rebate as cross-category and forced the classifier to
+# NULL even on plainly-shotshell rebates. Specific rifle calibers /
+# 'rifle ammunition' / 'centerfire rifle' / AR-15 / MSR all remain as
+# strong unambiguous signals; a real rifle rebate will carry at least
+# one of them.
+_FIREARM_TYPE_RIFLE = (
+    'rifle ammunition', 'centerfire rifle',
+    '.223', '5.56', '.308', '7.62x', '7.62 x', '30-06', '30 06',
+    '6.5 creedmoor', 'creedmoor', '.243', '.270', '.300 win mag',
+    '.338', '.50 bmg',
+    'ar-15', 'ar15', 'ar-10', 'precision rifle', 'msr',
+)
+_FIREARM_TYPE_HANDGUN = (
+    'handgun', 'pistol',
+    '9mm', '.45 acp', '45 acp', '45acp',
+    '.40 s&w', '40 s&w', '.380', '380 acp',
+    '.357 sig', '.357 mag', '38 special', '38spl', '.38 spl',
+    '.44 mag', '.44 special', '.44 magnum',
+    '10mm',
+)
+_FIREARM_TYPE_RIMFIRE = (
+    'rimfire',
+    '.22 lr', '22 lr', '22lr', '.22lr', '.22 long rifle', '22 long rifle',
+    '.22 wmr', '22 wmr', '17 hmr', '17hmr', '.17 hmr', '.17hmr',
+)
+_FIREARM_TYPE_CATEGORIES = {
+    'shotshell': _FIREARM_TYPE_SHOTSHELL,
+    'rifle':     _FIREARM_TYPE_RIFLE,
+    'handgun':   _FIREARM_TYPE_HANDGUN,
+    'rimfire':   _FIREARM_TYPE_RIMFIRE,
+}
+
+
+def _firearm_type_hits(text):
+    text = (text or '').lower()
+    return {cat: sum(1 for t in toks if t in text)
+            for cat, toks in _FIREARM_TYPE_CATEGORIES.items()}
+
+
+def parse_firearm_type(title, raw_terms):
+    """Classify a rebate as 'shotshell' | 'rifle' | 'handgun' | 'rimfire',
+    or return None when the rebate covers multiple categories or has no
+    discernible firearm-type signal.
+
+    Tiered approach (chosen 2026-05-10 after a naive "any token in any
+    field" classifier returned NULL on plainly-shotshell Winchester
+    rebates whose raw_terms fields carried trailing site boilerplate
+    mentioning every product category):
+
+      1. Scan title alone. If exactly one category hits, return it.
+         Most rebate titles are unambiguous ("Winchester 16 GA Ammunition
+         Rebate", "Federal Pistol Rebate") and this short-circuits the
+         common case.
+      2. Otherwise scan title + raw_terms together and apply a dominance
+         test: the top-scoring category must have at least 2x the hits
+         of the runner-up AND at least 2 absolute hits. The 2x margin
+         absorbs occasional cross-category boilerplate noise; the 2-hit
+         floor prevents a single ambiguous word from carrying the call.
+      3. If neither pass commits, return None — the matcher gates
+         conservatively on NULL, so under-classifying is the safe
+         default.
+
+    Output domain is constrained by the manufacturer_rebates check
+    constraint introduced in migration 012; values outside the four
+    listed categories will fail insert.
+    """
+    title_hits = _firearm_type_hits(title)
+    title_present = {c: n for c, n in title_hits.items() if n > 0}
+    if len(title_present) == 1:
+        return next(iter(title_present))
+
+    combined = _firearm_type_hits((title or '') + ' ' + (raw_terms or ''))
+    sorted_hits = sorted(combined.items(), key=lambda kv: -kv[1])
+    top_cat, top_n = sorted_hits[0]
+    second_n = sorted_hits[1][1] if len(sorted_hits) > 1 else 0
+    if top_n >= 2 and top_n >= 2 * max(second_n, 1):
+        return top_cat
+    return None
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 

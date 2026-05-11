@@ -34,6 +34,8 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client
 
+from scraper_lib import parse_firearm_type
+
 load_dotenv()
 
 SUPABASE_URL = os.environ['SUPABASE_URL']
@@ -298,6 +300,23 @@ def upsert_rebate(supabase, source: str, brand: str, source_url: str,
         'raw_terms': rebate.raw_terms,
         'terms_html_hash': html_hash,
     }
+
+    # firearm_type: only set on inserts and on rows whose existing value
+    # is NULL. Jon's manual classification, when present, is the source
+    # of truth — never overwrite it with a heuristic call. Pre-fetch on
+    # (source, external_id) is the upsert key, so the lookup is cheap
+    # and unambiguous.
+    existing = (
+        supabase.table('manufacturer_rebates')
+        .select('firearm_type')
+        .eq('source', source)
+        .eq('external_id', rebate.external_id)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not existing or existing[0].get('firearm_type') is None:
+        row['firearm_type'] = parse_firearm_type(rebate.title, rebate.raw_terms)
 
     res = (
         supabase.table('manufacturer_rebates')
