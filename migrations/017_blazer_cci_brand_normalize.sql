@@ -1,0 +1,75 @@
+-- 017_blazer_cci_brand_normalize.sql
+-- Second of two data-hygiene backfills closing the manufacturer-bucket
+-- fragmentation surfaced by tonight's inline-parse_brand refactor
+-- (commit c0bf8be, 2026-05-10). Migration 016 normalized
+-- 'Sellier and Bellot' → 'Sellier & Bellot'; this one normalizes
+-- Blazer-line listings currently mis-labeled as CCI to the sub-brand
+-- name customers actually shop under.
+--
+-- Brand-hierarchy decision: Blazer is the sub-brand line (Brass /
+-- Aluminum / Reduced Recoil) marketed under CCI/ATK as the parent
+-- corporate entity. Customers searching for 9mm Blazer Brass are
+-- looking for "Blazer" on the manufacturer filter, not "CCI" — the
+-- sub-brand is the user-facing line. Pure-CCI products (CCI Mini-Mag,
+-- Standard Velocity, Quiet, Sub-Sonic, Varmint, Competition Pistol
+-- Match, the .22LR rimfire and specialty SKUs) stay 'CCI' because
+-- those are sold and shopped as CCI directly.
+--
+-- This split mirrors what the canonical scraper_lib.parse_brand
+-- already does for *new* scrapes: it sees the 'blazer brass' alias
+-- (12 chars) and the 'blazer' alias (6 chars), and longest-match
+-- resolves any title containing those tokens to 'Blazer' — but
+-- titles without 'blazer' that contain 'cci' resolve to 'CCI'. So
+-- the canonical pipeline already produces this split going forward;
+-- this migration retroactively applies it to existing rows that
+-- predate canonical adoption (chiefly the 6 retailers refactored in
+-- c0bf8be whose inline parse_brand functions hardcoded `if brand ==
+-- 'CCI Blazer': return 'CCI'`).
+--
+-- Heuristic — scope filter:
+--
+--     manufacturer = 'CCI' AND product_url ILIKE '%blazer%'
+--
+-- Verified pre-migration on 2026-05-10:
+--   * 108 rows match (target — become Blazer)
+--   * 430 CCI rows do NOT match (untouched, stay CCI)
+--   * 357 existing Blazer rows untouched
+--   * Sample of 10 from each group inspected: zero false positives
+--     in the target group, zero false negatives in the unchanged
+--     group, zero cross-brand contamination (no target URL contains
+--     a competing brand token like 'speer', 'federal', 'winchester',
+--     'remington', 'hornady', 'magtech', 'pmc', 'fiocchi', 'sellier').
+--   * 12 of the 108 target rows have a URL slug that contains
+--     'blazer' but not 'cci' (the scraper got 'CCI' from page-level
+--     brand metadata rather than the URL, then the inline parser's
+--     'CCI Blazer' override forced 'CCI'); these are still genuine
+--     Blazer products — manually verified — and the heuristic
+--     correctly catches them.
+--
+-- Why URL substring instead of a smarter title-based check: the
+-- listings table doesn't store the raw scraped title (only the
+-- resolved manufacturer + product_url); product_url is the only
+-- post-hoc artifact carrying the brand-line signal. The heuristic
+-- works because every retailer in the wild puts the product line in
+-- the URL slug for SEO. Audit confirmed this on a 10-row sample of
+-- each group (see refactor report).
+--
+-- Idempotency: re-running this migration after it succeeds is a
+-- no-op. The first run reclassifies the 108 matching rows; the
+-- second run's WHERE clause finds zero CCI rows whose URL contains
+-- 'blazer' (because all such rows now say 'Blazer'), Postgres reports
+-- "UPDATE 0", no rows change, no error. Safe to re-apply across
+-- environments.
+--
+-- Companion change in this same drop: scraper_lib._BRAND_ALIASES
+-- loses its dead ('cci blazer', 'CCI') entry. The longer 'blazer
+-- brass' (12 chars) was already winning longest-match for every
+-- canonical-using scraper, making 'cci blazer' (10 chars) load-
+-- bearing-by-misunderstanding rather than an actual policy. Removing
+-- it keeps the alias table honest about what's load-bearing without
+-- changing canonical's behavior.
+
+UPDATE listings
+   SET manufacturer = 'Blazer'
+ WHERE manufacturer = 'CCI'
+   AND product_url ILIKE '%blazer%';

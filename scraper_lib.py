@@ -119,7 +119,14 @@ _BRAND_ALIASES = [
     ('hornady critical duty', 'Hornady'),
     ('hornady critical defense', 'Hornady'),
     ('hornady', 'Hornady'),
-    ('cci blazer', 'CCI'),
+    # Note: an earlier ('cci blazer', 'CCI') entry was removed
+    # 2026-05-10. It was load-bearing-by-misunderstanding — the longer
+    # 'blazer brass' (12 chars) already wins longest-match against
+    # 'cci blazer' (10) for every Blazer Brass title, so the entry
+    # only fired for the rare bare "CCI Blazer" stub without "brass",
+    # and that's what migration 017 reclassifies anyway. Customers
+    # shop the Blazer line as "Blazer", not "CCI"; canonical now
+    # produces 'Blazer' for any title carrying the 'blazer' token.
     ('cci', 'CCI'),
     ('speer gold dot', 'Speer'),
     ('speer lawman', 'Speer'),
