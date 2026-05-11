@@ -1,3 +1,15 @@
+"""Bulk Munitions scraper — currently disabled.
+
+2026-05-10 probe: Cloudflare hard-blocks every URL (homepage + category
+pages) with HTTP 403 from `Server: cloudflare`, no `cf-mitigated`
+header — i.e. an IP/UA reputation block at the edge, not a solvable
+JS challenge. Same operational class as MidwayUSA and guns.com.
+Re-enabling requires residential-proxy egress plus stealth-Playwright
+fingerprint spoofing (or a paid scraping API), not the vanilla
+Playwright + datacenter IP this scraper currently uses. Leave
+is_active=false until that infrastructure exists.
+"""
+
 import os
 import re
 import time
