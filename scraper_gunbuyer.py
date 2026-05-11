@@ -8,7 +8,7 @@ from supabase import create_client
 
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
-    parse_brand, sanity_check_ppr, clean_title,
+    parse_brand_with_url, sanity_check_ppr, clean_title,
     parse_bullet_type_with_url_fallback,
 )
 
@@ -271,7 +271,7 @@ def scrape_facet(browser, caliber_norm, caliber_display, facet_path, retailer_id
                     # so the audit's 53 in-stock NULLs get caught.
                     bullet_type = parse_bullet_type_with_url_fallback(name, product_url)
                     country = parse_country(name)
-                    manufacturer = parse_brand(name) or "Unknown"
+                    manufacturer = parse_brand_with_url(name, product_url) or "Unknown"
                     # Slug = filename minus the .html suffix; stable
                     # across runs and unique per SKU on Magento.
                     product_id = product_url.rstrip('/').split('/')[-1].replace('.html', '')[:100]

@@ -8,7 +8,7 @@ from supabase import create_client
 
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
-    parse_brand, sanity_check_ppr, clean_title, normalize_caliber,
+    parse_brand_with_url, sanity_check_ppr, clean_title, normalize_caliber,
     parse_bullet_type_with_url_fallback,
 )
 
@@ -269,7 +269,7 @@ def scrape_parent(page, parent_path, retailer_id, seen_ids, counts):
                 # most of those.
                 bullet_type = parse_bullet_type_with_url_fallback(name, product_url)
                 country = parse_country(name)
-                manufacturer = parse_brand(name) or "Unknown"
+                manufacturer = parse_brand_with_url(name, product_url) or "Unknown"
                 purchase_limit = parse_purchase_limit(card_text)
 
                 # FD exposes a stable numeric id as data-product-id on the

@@ -11,6 +11,7 @@ shelves) can still tag listings correctly.
 
 from datetime import datetime, timezone
 import re
+from urllib.parse import urlparse
 
 CALIBERS = {
     '9mm': '9mm Luger',
@@ -258,6 +259,7 @@ _BRAND_ALIASES = [
     ('maxim defense', 'Maxim Defense'),
     ('global ordnance', 'Global Ordnance'),
     ('rws ', 'RWS'),
+    ('century arms', 'Century Arms'),
 ]
 
 
@@ -316,6 +318,76 @@ def parse_brand_or_unknown(text):
     class brand bucket users can choose to include or exclude.
     """
     return parse_brand(text) or 'Unknown'
+
+
+# Slug-start-only brand abbreviations. Keyed by exact lowercase token —
+# matched ONLY against the leading [a-z]+ run of a product URL's last
+# path segment (i.e. the SKU-style slug). Cannot live in _BRAND_ALIASES
+# above because that table uses unanchored substring matching: a 3-4
+# letter abbreviation like 'win' or 'fed' would false-positive against
+# slugs containing 'twin', 'winston', 'federalist', 'winnow', etc., or
+# random page chrome that happened to embed the trigram. Anchoring at
+# slug-start scopes the match to retailer SKU prefixes (Gunbuyer's
+# 'WIN X193150…', Firearms Depot's 'cent-arms-…', Shadowsmith's
+# 'rem-22lr-…') where the abbreviation is unambiguous.
+#
+# Sourced from the 2026-05-10 Unknown-rows audit. Resolves ~115 rows
+# concentrated in three retailers (Gunbuyer for win/fed/fio/spr,
+# Shadowsmith for rem, Firearms Depot for cent).
+_BRAND_SLUG_PREFIX_ALIASES = {
+    'win':  'Winchester',
+    'fed':  'Federal',
+    'fio':  'Fiocchi',
+    'rem':  'Remington',
+    'cent': 'Century Arms',
+    'spr':  'Speer',
+}
+
+_LEADING_TOKEN_RE = re.compile(r'^([a-z]+)')
+
+
+def _slug_prefix_brand(url):
+    """Look up the leading [a-z]+ run of a URL's last path segment in
+    _BRAND_SLUG_PREFIX_ALIASES. Returns None if no URL, no leading
+    alpha token, or no matching prefix."""
+    if not url:
+        return None
+    last = urlparse(url).path.rstrip('/').rsplit('/', 1)[-1]
+    last = last.split('?')[0].split('#')[0].lower()
+    m = _LEADING_TOKEN_RE.match(last)
+    if not m:
+        return None
+    return _BRAND_SLUG_PREFIX_ALIASES.get(m.group(1))
+
+
+def parse_brand_with_url(title, url):
+    """parse_brand with a slug-start fallback for SKU-prefix abbreviations.
+
+    Resolution order:
+      1. parse_brand(title) — the title-text alias scan as it has always
+         worked. Returns immediately if it resolves.
+      2. _slug_prefix_brand(url) — slug-start-only lookup against
+         _BRAND_SLUG_PREFIX_ALIASES. Catches retailer-specific 3-4
+         letter SKU prefixes (Gunbuyer 'win-…', Shadowsmith 'rem-…',
+         Firearms Depot 'cent-…') that can't safely live in the main
+         alias table because their bare-substring form would collide.
+         Runs BEFORE step 3 because slug-prefix is SKU-anchored and
+         more specific than unanchored URL substring; e.g. Gunbuyer's
+         `spr-lawman-…cci53651bx-b.html` is a Speer Lawman product
+         that step 3 would mis-tag as CCI on the embedded SKU stem.
+      3. parse_brand(url) — same alias scan against the URL. Catches
+         cases where the title is empty or stripped to a SKU code while
+         the URL slug carries a full brand name and no slug-prefix
+         alias resolved.
+
+    Use this in scrapers that have product_url in scope at brand-parse
+    time. Scrapers without URL context should keep using parse_brand;
+    they lose nothing — the slug-start aliases only kick in when the
+    title-based pass returns None.
+    """
+    return (parse_brand(title)
+            or _slug_prefix_brand(url)
+            or parse_brand(url))
 
 
 # Canonical bullet types accepted by the listings table. Any value
