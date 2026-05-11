@@ -50,6 +50,7 @@ from scraper_lib import (
     normalize_caliber, now_iso, with_stock_fields,
     parse_purchase_limit, parse_brand, sanity_check_ppr, clean_title,
     parse_bullet_type,
+    mark_retailer_scraped,
 )
 
 load_dotenv()
@@ -530,6 +531,8 @@ def main() -> int:
         )
         return 1
 
+    if not args.dry_run:
+        mark_retailer_scraped(supabase, retailer_id)
     return 0 if not errors else 1
 
 

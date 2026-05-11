@@ -10,6 +10,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand_with_url, sanity_check_ppr, clean_title,
     parse_bullet_type_with_url_fallback,
+    mark_retailer_scraped,
 )
 
 load_dotenv()
@@ -366,6 +367,7 @@ def scrape():
                 time.sleep(3)
         browser.close()
 
+    mark_retailer_scraped(supabase, retailer_id)
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 

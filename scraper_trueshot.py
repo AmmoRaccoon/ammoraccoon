@@ -6,7 +6,7 @@ import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -236,6 +236,8 @@ def scrape():
               f"zero products on first page (transient or worth investigating):")
         for cal, h in empty_handles:
             print(f"  - {cal}: TrueShot collection {h} returned zero products on first page")
+
+    mark_retailer_scraped(supabase, RETAILER_ID)
 
     if not all_rows:
         print("Nothing to upsert.")

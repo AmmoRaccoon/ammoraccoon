@@ -11,6 +11,7 @@ from supabase import create_client
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
+    mark_retailer_scraped,
 )
 
 load_dotenv()
@@ -338,6 +339,8 @@ def scrape():
         print("\nFATAL: every Black Basin caliber URL failed to load. "
               "Site may have moved or migrated again — manual check needed.")
         return 1
+
+    mark_retailer_scraped(supabase, retailer_id)
     return 0
 
 

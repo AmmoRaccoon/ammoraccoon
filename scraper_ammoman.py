@@ -53,6 +53,7 @@ from scraper_lib import (
     normalize_caliber, now_iso, with_stock_fields,
     parse_purchase_limit, parse_brand, sanity_check_ppr, clean_title,
     parse_bullet_type,
+    mark_retailer_scraped,
 )
 
 load_dotenv()
@@ -409,6 +410,8 @@ def main() -> int:
                 print(f'  [DB-ERR] {msg}')
                 errors.append(msg)
 
+    if not args.dry_run:
+        mark_retailer_scraped(supabase, retailer_id)
     mode = 'DRY RUN' if args.dry_run else 'LIVE'
     print(f'\n=== TOTALS ({mode}) ===')
     print(f'  saved={saved_total}  skipped={skipped_total}  '

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -282,6 +282,8 @@ async def scrape():
                   f"zero products on first page (transient or worth investigating):")
             for cal, h in empty_handles:
                 print(f"  - {cal}: Natchez collection {h} returned zero products on first page")
+
+        mark_retailer_scraped(supabase, RETAILER_ID)
 
         if not all_products:
             print("Nothing to upsert.")

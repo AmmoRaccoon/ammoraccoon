@@ -11,6 +11,7 @@ from supabase import create_client
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, normalize_caliber, parse_bullet_type,
+    mark_retailer_scraped,
 )
 
 load_dotenv()
@@ -384,6 +385,7 @@ def scrape():
 
         browser.close()
 
+    mark_retailer_scraped(supabase, retailer_id)
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
     print("Per-caliber counts:")
     for cal in CALIBERS:

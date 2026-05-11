@@ -862,6 +862,35 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+def mark_retailer_scraped(supabase, retailer_id):
+    """Bump retailers.last_scraped_at to NOW() for the given retailer_id.
+
+    Call from the END of a scraper's scrape()/main() — AFTER the upsert
+    loop AND AFTER any storefront-drift guardrail (the
+    EMPTY_FAIL_THRESHOLD pattern in 9 scrapers as of 2026-05-10) has
+    cleared. A successful run that finds 0 in-stock listings (everything
+    OOS, or a transient empty result the guardrail accepts) writes
+    nothing to listings.last_updated; this column is the truth signal
+    for "the scraper ran fine, just had nothing to upsert", which is
+    the gap /status currently struggles with when MAX(listings.last_updated)
+    is the only freshness signal.
+
+    Drift-fail (sys.exit(1) inside the EMPTY_FAIL_THRESHOLD block) and
+    unhandled-exception paths skip this naturally, because they exit
+    or raise before control reaches the call. That's deliberate —
+    drift detection is the explicit "do not silently succeed"
+    guardrail and should NOT be hidden by a fresh-looking timestamp.
+
+    Wired into 34 active-retailer listings scrapers as of 2026-05-10.
+    Out of scope for non-listings scrapers (rebates, ballistics,
+    components — no retailer concept) and inactive-retailer scrapers
+    (academy, bereli, bulkmunitions).
+    """
+    supabase.table('retailers').update({
+        'last_scraped_at': now_iso(),
+    }).eq('id', retailer_id).execute()
+
+
 def with_stock_fields(listing, in_stock, now=None):
     """Add in_stock / stock_level / last_seen_in_stock to a listing dict.
 

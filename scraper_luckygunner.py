@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped
 
 load_dotenv()
 
@@ -299,6 +299,8 @@ def scrape():
               f"zero products on first page (transient or worth investigating):")
         for cal, h in empty_handles:
             print(f"  - {cal}: Lucky Gunner collection {h} returned zero products on first page")
+
+    mark_retailer_scraped(supabase, retailer_id)
 
 if __name__ == '__main__':
     scrape()
