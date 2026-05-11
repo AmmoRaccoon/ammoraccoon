@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type as _shared_bullet_type
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type as _shared_bullet_type, parse_brand
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -82,19 +82,6 @@ def parse_bullet_type(text):
     bt = _shared_bullet_type(text)
     return bt if bt is not None else 'FMJ'
 
-
-def parse_brand(title):
-    brands = [
-        'Federal', 'Winchester', 'Remington', 'Hornady', 'CCI', 'Speer',
-        'Magtech', 'PMC', 'Fiocchi', 'Blazer', 'Wolf', 'Tula', 'TulAmmo',
-        'Aguila', 'Browning', 'Sig Sauer', 'SIG Sauer', 'Prvi Partizan',
-        'Sellier & Bellot', 'American Eagle', 'Norma', 'Lapua',
-        'Black Hills', 'Underwood', 'Liberty', 'Maxxtech', 'Igman', 'Sterling',
-    ]
-    for brand in brands:
-        if brand.lower() in title.lower():
-            return brand
-    return None
 
 def parse_condition(title):
     if 'reman' in title.lower() or 'remanufactured' in title.lower():

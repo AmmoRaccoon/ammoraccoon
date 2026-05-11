@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -84,42 +84,6 @@ def parse_case_material(title):
         return 'Polymer'
     return 'Brass'
 
-
-def parse_brand(title):
-    brands = [
-        'Federal American Eagle', 'American Eagle', 'Federal Champion',
-        'Federal Personal Defense', 'Federal Premium', 'Federal',
-        'Winchester Supreme Elite', 'Winchester USA Forged', 'Winchester',
-        'Remington Golden Saber', 'Remington HTP', 'Remington',
-        'Hornady Critical Duty', 'Hornady Critical Defense', 'Hornady',
-        'CCI Blazer', 'CCI', 'Speer Gold Dot', 'Speer',
-        'Magtech', 'PMC', 'Fiocchi', 'Blazer', 'Wolf', 'Tula', 'TulAmmo',
-        'Aguila', 'Browning', 'Sig Sauer', 'SIG Sauer', 'Prvi Partizan',
-        'Sellier and Bellot', 'Sellier & Bellot', 'Seller & Bellot',
-        'Norma', 'Lapua', 'Black Hills', 'Underwood', 'Liberty', 'Maxxtech',
-        'Igman', 'Sterling', 'Barnes', 'Precision One', 'Armscor', 'Colt',
-        'Corbon', 'Barnaul', 'Silver Bear', 'Brown Bear', 'Red Army',
-    ]
-    title_lower = title.lower()
-    for brand in brands:
-        if brand.lower() in title_lower:
-            if brand in ('Sellier & Bellot', 'Seller & Bellot'):
-                return 'Sellier and Bellot'
-            if brand in ('Federal American Eagle', 'American Eagle', 'Federal Champion',
-                         'Federal Personal Defense', 'Federal Premium'):
-                return 'Federal'
-            if brand == 'CCI Blazer':
-                return 'CCI'
-            if brand in ('Winchester Supreme Elite', 'Winchester USA Forged'):
-                return 'Winchester'
-            if brand in ('Remington Golden Saber', 'Remington HTP'):
-                return 'Remington'
-            if brand in ('Hornady Critical Duty', 'Hornady Critical Defense'):
-                return 'Hornady'
-            if brand == 'Speer Gold Dot':
-                return 'Speer'
-            return brand
-    return None
 
 def parse_condition(title):
     t = title.lower()

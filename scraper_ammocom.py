@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -85,31 +85,6 @@ def parse_case_material(title):
         return 'Polymer'
     return 'Brass'
 
-
-def parse_brand(title):
-    brands = [
-        'Federal American Eagle', 'American Eagle', 'Federal Champion', 'Federal',
-        'Winchester USA Forged', 'Winchester', 'Remington', 'Hornady',
-        'CCI Blazer', 'CCI', 'Speer', 'Magtech', 'PMC', 'Fiocchi', 'Blazer',
-        'Wolf', 'Tula', 'TulAmmo', 'Aguila', 'Browning', 'Sig Sauer', 'SIG Sauer',
-        'Prvi Partizan', 'Sellier and Bellot', 'Sellier & Bellot', 'Norma', 'Lapua',
-        'Black Hills', 'Underwood', 'Liberty', 'Maxxtech', 'Igman', 'Sterling',
-        'Barnes', 'Precision One', 'New Republic', 'Paraklese', 'Excalibur',
-        'Barnaul', 'Silver Bear', 'Brown Bear', 'Red Army',
-    ]
-    title_lower = title.lower()
-    for brand in brands:
-        if brand.lower() in title_lower:
-            if brand == 'Sellier & Bellot':
-                return 'Sellier and Bellot'
-            if brand in ('Federal American Eagle', 'American Eagle', 'Federal Champion'):
-                return 'Federal'
-            if brand == 'CCI Blazer':
-                return 'CCI'
-            if brand == 'Winchester USA Forged':
-                return 'Winchester'
-            return brand
-    return None
 
 def parse_condition(title):
     if 'reman' in title.lower() or 'remanufactured' in title.lower():
