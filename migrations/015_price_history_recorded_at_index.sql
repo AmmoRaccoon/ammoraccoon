@@ -1,0 +1,34 @@
+-- 015_price_history_recorded_at_index.sql
+-- Captures an index that was added to production manually by Jon on
+-- 2026-05-10 via the Supabase SQL editor, so the migrations directory
+-- stays the source of truth for schema state. Without this file the
+-- next clean-environment rebuild (fresh database, restored backup, dev
+-- replica, etc.) would silently come up missing the index and inherit
+-- the timeout problem this fixed.
+--
+-- What it supports: the homepage_segment_aggregates() RPC added in
+-- migration 014. That function does a 30-day-window scan of
+-- price_history (range: ph.recorded_at >= p_since). On cold cache, the
+-- first call after function deploy hit a PostgREST 30s statement
+-- timeout (PG error 57014, observed 2026-05-10 during Stage 1 verify)
+-- because the planner was sequential-scanning the whole table to
+-- evaluate the gte() predicate. Three subsequent warm calls succeeded
+-- at ~2.3s each — the planner had cached a usable plan, but cold-start
+-- after every PostgREST connection cycle would regress.
+--
+-- Adding a btree index on (recorded_at) lets the planner range-scan
+-- the in-window rows directly instead of touching the whole table.
+-- That moves the 30-day RPC from "warm-only" to "always under
+-- budget" and keeps the cold-start failure mode from coming back as
+-- price_history grows.
+--
+-- Idempotency: this migration is a no-op anywhere the index already
+-- exists (production, since 2026-05-10). The IF NOT EXISTS guard on
+-- CREATE INDEX is the standard idempotent form — Postgres skips the
+-- create silently rather than raising. Re-running this migration in
+-- production is safe and expected; it exists so that future rebuilds
+-- of clean environments pick the index up the same way production has
+-- it today.
+
+CREATE INDEX IF NOT EXISTS idx_price_history_recorded_at
+    ON price_history (recorded_at);
