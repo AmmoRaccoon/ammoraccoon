@@ -1,0 +1,45 @@
+-- 016_sellier_and_bellot_normalize.sql
+-- One-time backfill to collapse two manufacturer spellings of the
+-- same brand into the canonical form. Closes the data hygiene gap
+-- left by tonight's inline-parse_brand refactor (commit c0bf8be,
+-- 2026-05-10).
+--
+-- What produced the inconsistency: 5 of the 6 scrapers refactored
+-- in c0bf8be carried inline parse_brand functions whose 'Sellier &
+-- Bellot' branch hardcoded `return 'Sellier and Bellot'` (with the
+-- word "and"). Those 5 scrapers — Rivertown (id 12), Ammo.com (id
+-- 13), BulkAmmo (id 14), Natchez (id 16), and Wideners (id 17) —
+-- wrote 101 rows with the "and" spelling between the time the
+-- inline functions were authored and tonight's refactor. The 6th
+-- refactored scraper (AE Ammo, id 11) returned 'Sellier & Bellot'
+-- directly from its brand list, so its rows already match canonical.
+--
+-- Canonical form, defined by scraper_lib._BRAND_ALIASES and produced
+-- by scraper_lib.parse_brand for every alias including 'sellier and
+-- bellot' / 'sellier & bellot' / 's&b' / 'sellier bellot':
+--
+--     'Sellier & Bellot'   (with ampersand)
+--
+-- Without this backfill the frontend manufacturer filter renders two
+-- buckets for the same brand — 'Sellier & Bellot' (503 rows from
+-- canonical-using scrapers) and 'Sellier and Bellot' (101 rows from
+-- the 5 retailers above) — which fragments brand selection and
+-- understates each variant's count.
+--
+-- Scope: every row in listings with the legacy spelling, irrespective
+-- of retailer. The legacy spelling is unambiguous — there is no
+-- legitimate brand named 'Sellier and Bellot'; it's the same company
+-- as 'Sellier & Bellot' (the Czech ammunition manufacturer Sellier &
+-- Bellot a.s.).
+--
+-- Idempotency: the WHERE clause filters on the legacy spelling, so a
+-- second run matches zero rows and is a no-op. Postgres reports
+-- "UPDATE 0" the second time. Safe to re-apply across environments.
+-- The audit_2026-05-10 typo variants 'Seller & Bellot' / 'Seller and
+-- Bellot' are absent from production today (verified pre-migration);
+-- if they appear later they should be folded into a separate
+-- migration with the same shape rather than tacked on here.
+
+UPDATE listings
+   SET manufacturer = 'Sellier & Bellot'
+ WHERE manufacturer = 'Sellier and Bellot';
