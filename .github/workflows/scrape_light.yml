@@ -1,7 +1,7 @@
 name: AmmoRaccoon Scraper - Light
 
-# Light-tier retailers: 22 fast scrapers (the SGAmmo through
-# Georgia Arms block plus Black Basin), totalling ~35 minutes per
+# Light-tier retailers: 23 fast scrapers (the SGAmmo through
+# Georgia Arms block plus Black Basin), totalling ~37 minutes per
 # run. Health check + caliber audit run here (with if: always())
 # since this workflow is the lightest and most reliable per cron
 # tick. Every scraper step is continue-on-error so one bad parse
@@ -229,6 +229,22 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_georgiaarms.py
+
+      # Enabled 2026-05-10 — closes a long-standing scheduling gap.
+      # Scraper file existed (scraper_ammodeport.py, retailer
+      # 'ammunition-depot' / id=1) but was never wired into any
+      # workflow, so /status showed 20 days of stale data even though
+      # is_active=true. Surfaced by tonight's inactive-retailer audit
+      # and last_scraped_at wiring. Standard light-tier shape: 10
+      # calibers, Playwright, 8s/caliber crawl delay, ~1.5-2 min total
+      # added wall time. Bumps retailers.last_scraped_at on success
+      # via the mark_retailer_scraped wiring shipped same night.
+      - name: Run Ammunition Depot scraper
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_ammodeport.py
 
       - name: Scraper health check
         if: always()
