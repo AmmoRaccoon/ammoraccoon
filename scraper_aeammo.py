@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type as _shared_bullet_type, parse_brand, mark_retailer_scraped
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type as _shared_bullet_type, parse_brand, mark_retailer_scraped, normalize_caliber
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -14,23 +14,26 @@ RETAILER_ID = 11
 SITE_BASE = "https://aeammo.com"
 
 # AE Ammo (BigCommerce) restructured the storefront on or before
-# 2026-05-09. Sitemap (xmlsitemap.php?type=categories) is the
-# source of truth. Of the original 10 caliber paths, 7 had drifted
-# to 404; 5 are recoverable here via slug rename. Two calibers no
-# longer have a dedicated category page and are dropped:
+# 2026-05-09. Sitemap (xmlsitemap.php?type=categories) was the
+# source of truth at audit time (currently also 404). Of the
+# original 10 caliber paths, 7 had drifted to 404; 5 are
+# recoverable here via slug rename. One caliber remains dropped:
 #   - 40sw: real product-line absence (no slug, no sitemap entry,
-#     no filter facet on /Ammo/Handgun-Ammo)
-#   - 22lr: merged into parent /Ammo/Rimfire-Ammo; the BigCommerce
-#     filter URL ?Caliber=22LR returns HTTP 403 to bots, so it is
-#     not usable as a scraper handle. (Recovering 22LR via parent
-#     + post-filter is logged as a separate B-priority ticket.)
-# The 5.56 leg of 223-556 is recovered; the .223 Rem leg has no
-# category page either, and is filter-only (also 403).
+#     no filter facet on /Ammo/Handgun-Ammo).
+# 22lr is recovered (2026-05-11) via the parent-URL pattern: the
+# /Ammo/Rimfire-Ammo category lists 22 LR alongside 22 WMR / 22
+# Short / 22 CB. We point CALIBER_PATHS['22lr'] at the parent and
+# let normalize_caliber() in the card loop drop the non-22LR
+# rimfire SKUs. The BigCommerce filter URL ?Caliber=22LR still
+# returns 403 to bots — the category URL above is the only viable
+# handle. The 5.56 leg of 223-556 is recovered; the .223 Rem leg
+# has no category page either, and is filter-only (also 403).
 CALIBER_PATHS = {
     '9mm':     ['/Ammo/Handgun-Ammo/9mm-Ammo'],
     '380acp':  ['/Ammo/Handgun-Ammo/380-Acp-Ammo'],
     '38spl':   ['/Ammo/Handgun-Ammo/38-Special-Ammo'],
     '357mag':  ['/Ammo/Handgun-Ammo/357-Magnum-Ammo'],
+    '22lr':    ['/Ammo/Rimfire-Ammo'],
     '223-556': ['/Ammo/Rifle-Ammo/556-Nato-Ammo'],
     '308win':  ['/Ammo/Rifle-Ammo/308-Win-Ammo'],
     '762x39':  ['/Ammo/Rifle-Ammo/7.62x39-Ammo'],
@@ -155,6 +158,18 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     # Skip brand-carousel cards that BigCommerce stencil
                     # sometimes renders inside the product grid wrapper.
                     if link and '/brands/' in link:
+                        continue
+
+                    # Parent-URL bucketing guard. The /Ammo/Rimfire-Ammo
+                    # handle for 22lr lists 22 WMR / 22 Short / 22 CB
+                    # alongside true 22 LR; this filter drops them
+                    # silently. Also a drift safety-net for the other
+                    # caliber-specific handles — if a future AE Ammo
+                    # restructure mixes calibers into one of those
+                    # category pages, off-caliber listings are skipped
+                    # instead of being misbucketed.
+                    _, detected_norm = normalize_caliber(title)
+                    if detected_norm != caliber_norm:
                         continue
 
                     price_el = await card.query_selector('.price--withoutTax')
