@@ -260,6 +260,45 @@ _BRAND_ALIASES = [
     ('global ordnance', 'Global Ordnance'),
     ('rws ', 'RWS'),
     ('century arms', 'Century Arms'),
+    # Tier 3 brand audit (2026-05-11). 20 brands surfaced from the
+    # post-migration-018 Unknown-rows audit (422 Unknowns remaining of
+    # the original 714 / Sunday's 591). Each appeared 3+ times as a
+    # leading slug token across multiple retailers, or once as a
+    # high-volume single-retailer concentration. Substring-collision
+    # risk handled three ways:
+    #   - Trailing-space aliases on short bare tokens ('sk ', 'frontier ')
+    #     force a token boundary so substring matches inside unrelated
+    #     words (skol/skip, frontiersman) can't false-positive.
+    #   - Multi-word phrase aliases ('american munitions',
+    #     'american sniper', 'black sheep', 'ventura tactical',
+    #     'super vel', 'ten ring', 'bitterroot valley') are unambiguous
+    #     by construction; longest-match keeps 'american eagle' →
+    #     Federal intact (split into the two distinct brands).
+    #   - Streak maps to Ammo Inc (Streak Visual is their tracer line,
+    #     mirrors the Frontier→Hornady sub-brand pattern). Frontier
+    #     extends the existing 'frontier cartridge' / 'frontier ammo'
+    #     entries with a trailing-space bare form to cover slugs like
+    #     'frontier-556nato-75gr-bthp' that don't carry the tail word.
+    ('sk ', 'SK'),
+    ('gorilla', 'Gorilla'),
+    ('american munitions', 'American Munitions'),
+    ('american sniper', 'American Sniper'),
+    ('scorpion', 'Scorpion'),
+    ('frontier ', 'Hornady'),  # Hornady's economy sub-brand bare form
+    ('black sheep', 'Black Sheep'),
+    ('streak', 'Ammo Inc'),  # Streak Visual is Ammo Inc's tracer line
+    ('zsr', 'ZSR'),
+    ('ventura tactical', 'Ventura Tactical'),
+    ('super vel', 'Super Vel'),
+    ('ten ring', 'Ten Ring'),
+    ('saltech', 'Saltech'),
+    ('sako', 'Sako'),
+    ('ggg', 'GGG'),
+    ('telaammo', 'Tela Ammo'),
+    ('bitterroot valley', 'Bitterroot Valley'),
+    ('badlands', 'Badlands'),
+    ('bps', 'BPS'),
+    ('drt', 'DRT'),
 ]
 
 

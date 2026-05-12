@@ -8,7 +8,7 @@ from supabase import create_client
 
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
-    parse_brand, sanity_check_ppr, parse_bullet_type,
+    parse_brand_with_url, sanity_check_ppr, parse_bullet_type,
     mark_retailer_scraped,
 )
 
@@ -285,7 +285,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             case_material = parse_case_material(name)
             bullet_type = parse_bullet_type(name)
             country = parse_country(name)
-            manufacturer = parse_brand(name) or "Unknown"
+            manufacturer = parse_brand_with_url(name, product_url) or "Unknown"
 
             # We're sitting on the product page after the variant
             # fetch, so read stock + purchase-limit hints directly
