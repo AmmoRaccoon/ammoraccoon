@@ -230,21 +230,19 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_georgiaarms.py
 
-      # Enabled 2026-05-10 — closes a long-standing scheduling gap.
-      # Scraper file existed (scraper_ammodeport.py, retailer
-      # 'ammunition-depot' / id=1) but was never wired into any
-      # workflow, so /status showed 20 days of stale data even though
-      # is_active=true. Surfaced by tonight's inactive-retailer audit
-      # and last_scraped_at wiring. Standard light-tier shape: 10
-      # calibers, Playwright, 8s/caliber crawl delay, ~1.5-2 min total
-      # added wall time. Bumps retailers.last_scraped_at on success
-      # via the mark_retailer_scraped wiring shipped same night.
-      - name: Run Ammunition Depot scraper
-        continue-on-error: true
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python scraper_ammodeport.py
+      # Ammunition Depot DE-WIRED 2026-05-15. Reason: Cloudflare
+      # managed-challenge wall blocks plain headless Playwright; the
+      # fresh-context-per-caliber dry-run still returned 403 on every
+      # caliber (see ammoraccoon-web/reports/scraper-investigation-2026-05-15.md).
+      # Per the parked-retailer pattern documented alongside MidwayUSA,
+      # 6 listings + active misleading-stock risk + an open-ended
+      # Cloudflare arms race isn't a battle worth fighting for the
+      # current operator. Retailer marked is_active=false in DB; 6
+      # listings + 17 price_history rows evicted same day.
+      # scraper_ammodeport.py kept in repo as dead code, matching the
+      # convention used for scraper_academy / scraper_bereli /
+      # scraper_bulkmunitions. Re-wire only if Cloudflare config
+      # softens or a different scrape strategy lands.
 
       - name: Scraper health check
         if: always()
