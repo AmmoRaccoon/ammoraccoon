@@ -99,12 +99,24 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_natchez.py
 
-      - name: Run Wideners scraper
-        continue-on-error: true
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python scraper_wideners.py
+      # Wideners DE-WIRED 2026-05-16. Last night's URL-drift fix
+      # (5 caliber slugs corrected per Wideners' own sitemap) was real
+      # and necessary — local dry-run pulled 577 products across all
+      # 10 calibers — but the 4-hour production validation window
+      # committed in DECISIONS.md closed with Wideners still stale at
+      # 24d. Cloudflare IS flagging GH Actions IPs as the original
+      # investigation suspected; URL drift and the wall were
+      # simultaneously true, and the shipped fix addressed only the
+      # cheaper of the two. Per the stopping rule, Wideners joins
+      # MidwayUSA + Ammunition Depot on the parked list — DB:
+      # is_active=false, 95 listings evicted (0 price_history rows
+      # were attached, suggesting the scraper had been failing past
+      # the price_history insert path for some time). scraper_wideners.py
+      # kept in repo as dead code matching the convention used for
+      # scraper_academy / scraper_bereli / scraper_bulkmunitions /
+      # scraper_ammodeport. Re-wire only if Cloudflare config softens
+      # or a different scrape strategy (residential proxies, 2026-era
+      # anti-detection libs) lands.
 
       - name: Run Freedom Munitions scraper
         continue-on-error: true
