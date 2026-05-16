@@ -901,7 +901,7 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
-def mark_retailer_scraped(supabase, retailer_id):
+def mark_retailer_scraped(supabase, retailer_id, *, had_success=True):
     """Bump retailers.last_scraped_at to NOW() for the given retailer_id.
 
     Call from the END of a scraper's scrape()/main() — AFTER the upsert
@@ -920,11 +920,24 @@ def mark_retailer_scraped(supabase, retailer_id):
     drift detection is the explicit "do not silently succeed"
     guardrail and should NOT be hidden by a fresh-looking timestamp.
 
+    `had_success` (added 2026-05-15) — when False, skip the update.
+    Surfaced by the Friday scraper-health investigation: a
+    Cloudflare-walled scraper that 403s every caliber URL returns
+    normally with total_saved=0 and otherwise looks identical to a
+    "healthy but empty" scrape, falsely bumping last_scraped_at. Wall-
+    aware scrapers (Ammunition Depot, Wideners, future Cloudflare
+    retrofits) pass had_success=(total_saved > 0) so the column only
+    advances when at least one fetch actually returned product data.
+    Default True preserves backward compatibility — every existing
+    caller's behavior is unchanged.
+
     Wired into 34 active-retailer listings scrapers as of 2026-05-10.
     Out of scope for non-listings scrapers (rebates, ballistics,
     components — no retailer concept) and inactive-retailer scrapers
     (academy, bereli, bulkmunitions).
     """
+    if not had_success:
+        return
     supabase.table('retailers').update({
         'last_scraped_at': now_iso(),
     }).eq('id', retailer_id).execute()
