@@ -92,6 +92,8 @@ SOURCES = {
             'https://www.federalpremium.com/handgun/american-eagle/american-eagle-handgun/11-AE9AP.html',
             'https://www.federalpremium.com/handgun/american-eagle/american-eagle-handgun/11-AE9FP.html',
             'https://www.federalpremium.com/handgun/american-eagle/american-eagle-handgun/11-AE9DP100.html',
+            'https://www.federalpremium.com/handgun/syntech-defense/syntech-defense/11-S9SJT1.html',  # 9mm 138gr Syntech Defense SJHP, 20-count (audit row #14 was wrong about phantom Punch 138gr — real product is Syntech Defense)
+            'https://www.federalpremium.com/handgun/syntech-defense/syntech-defense/11-S9SJT2.html',  # 9mm 138gr Syntech Defense SJHP, 50-count
         ],
     },
     'remington': {
