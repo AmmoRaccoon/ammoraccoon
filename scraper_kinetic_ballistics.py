@@ -1,9 +1,21 @@
-"""scraper_kinetic_ballistics.py — manufacturer ballistics scraper for The Kinetic Group brands.
+"""scraper_kinetic_ballistics.py — manufacturer ballistics scraper for SFCC/Demandware-backed brands.
 
-Federal, Remington, CCI, and Speer all publish their consumer catalog on the
-same Salesforce Commerce Cloud (Demandware) backend, so a single template
-parses all four. This module starts with Federal only — extend SOURCES with
-the other three brands once their URL bases are confirmed.
+Originally written for The Kinetic Group brands (Federal, Remington, CCI,
+Speer) which all publish their consumer catalog on the same Salesforce
+Commerce Cloud (Demandware) backend. Subsequently extended to Fiocchi USA
+on 2026-05-17 — separate corporate parent (Fiocchi is unrelated to Vista's
+Kinetic Group), same SFCC backend, identical parser shape. **This file
+groups by backend signature, not by corporate parent.**
+
+Any future SFCC-backed manufacturer can be added with just a new SOURCES
+entry; no parser changes needed. Compatibility checklist on a candidate
+product page:
+  - JSON-LD <script type="application/ld+json"> with @type:Product whose
+    `name` field follows "<line>, <caliber>, <grain> Grain, <bullet>, ... fps".
+  - A spec <table> with rows like <td>Muzzle Velocity</td><td>1200</td>.
+  - <script id="chart-data-velocity"> and <script id="chart-data-energy">
+    with points arrays like [[1200,1138,1086,1043,1007]].
+If a candidate site has all three, this parser handles it as-is.
 
 Each product page exposes ballistics in three structurally distinct places,
 in order of preference:
@@ -112,6 +124,19 @@ SOURCES = {
             'https://www.speer.com/ammunition/lawman/lawman-handgun-training/19-53661.html',
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23614GD.html',
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23618GD.html',
+        ],
+    },
+    # Fiocchi USA runs on the same Salesforce Commerce Cloud backend as the
+    # Kinetic Group brands above (separate company, same SFCC signature).
+    # Added 2026-05-17 for the 9mm coverage epic Sub-task 2. URL shape is
+    # /centerfire-pistol/<line-slug>/33-<sku>.html — the "33-" prefix is
+    # Fiocchi's Demandware master-style code.
+    'fiocchi': {
+        'brand': 'Fiocchi',
+        'base_url': 'https://fiocchiusa.com',
+        'seed_urls': [
+            'https://fiocchiusa.com/centerfire-pistol/range-dynamics/33-9AP.html',       # 115gr FMJ
+            'https://fiocchiusa.com/centerfire-pistol/defense-dynamics/33-9APDHP.html',  # 147gr JHP
         ],
     },
 }
