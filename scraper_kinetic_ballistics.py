@@ -126,6 +126,7 @@ SOURCES = {
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23614GD.html',
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23618GD.html',
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23619GD.html',  # 9mm 147gr Gold Dot JHP (audit row #17)
+            'https://www.speer.com/ammunition/lawman/lawman-handgun-training/19-53650.html',  # 9mm 115gr Lawman TMJ (audit row #24, corrected from broken audit URL 19-53615 — recovered via 2026-05-17 spec-table fallback after Demandware template drift broke JSON-LD name regex)
         ],
     },
     # Fiocchi USA runs on the same Salesforce Commerce Cloud backend as the
@@ -249,6 +250,34 @@ def _chart_points(soup, chart_id: str) -> list:
     return points[0] if points and isinstance(points[0], list) else []
 
 
+def _product_line_from_url(url: str) -> Optional[str]:
+    """Extract product line from the URL path segment immediately before
+    the SKU filename. Used as a fallback when the JSON-LD name's
+    first-comma-segment doesn't produce a clean line (canonical case:
+    Speer Lawman 53650's refreshed Demandware template dropped the
+    comma-tuple shape from the name field).
+
+    Examples:
+      /ammunition/lawman/lawman-handgun-training/19-53650.html
+        -> "Lawman Handgun Training"
+      /handgun/blazer/blazer-brass/6-5200.html -> "Blazer Brass"
+      /centerfire-pistol/range-dynamics/33-9AP.html -> "Range Dynamics"
+
+    Title-cases naively from the hyphenated slug. Brands with uppercase
+    acronyms in their line names (e.g. "Personal Defense HST") would
+    render here as "Personal Defense Hst" — cosmetic only since the
+    matcher doesn't use product_line. Existing comma-tuple SKUs are
+    unaffected because the JSON-LD name path runs first and produces
+    canonical capitalization."""
+    parts = url.rstrip('/').split('/')
+    if len(parts) < 2:
+        return None
+    slug = parts[-2]
+    if not slug or '/' in slug:
+        return None
+    return ' '.join(word.capitalize() for word in slug.split('-') if word)
+
+
 def parse_product_page(html: str, source_url: str) -> ParsedBallistics:
     soup = BeautifulSoup(html, 'html.parser')
 
@@ -276,10 +305,17 @@ def parse_product_page(html: str, source_url: str) -> ParsedBallistics:
     if bullet_match:
         bullet_text = bullet_match.group(1).strip()
 
+    # Extract product_line from the JSON-LD name's first comma-separated
+    # segment, IF the name has the comma-tuple shape. Names without
+    # commas (e.g. Speer 53650's refreshed Demandware template that
+    # ships the name as "Lawman Handgun Training 9mm Luger Caliber Ammo
+    # - 50 Rounds of 115 Grain Weight Ammunition (53650)") fall through
+    # to the URL-slug fallback below.
     product_line = None
-    line_match = re.match(r'^([^,]+)', name)
-    if line_match:
-        product_line = line_match.group(1).strip()
+    if ',' in name:
+        line_match = re.match(r'^([^,]+),', name)
+        if line_match:
+            product_line = line_match.group(1).strip()
 
     # Title-tag fallbacks for grain + velocity.
     title_tag = soup.find('title')
@@ -288,6 +324,29 @@ def parse_product_page(html: str, source_url: str) -> ParsedBallistics:
         m = re.search(r'(\d+)\s*Grain', title_text, re.IGNORECASE)
         if m:
             grain = int(m.group(1))
+
+    # Spec-table fallback for caliber / grain / bullet when the JSON-LD
+    # name regex fails. Salesforce Commerce templates refreshed mid-2026
+    # to ship product names without the comma-separated tuple shape that
+    # parse-from-name relied on (canonical case: Speer Lawman 53650 — see
+    # web repo TASKS "Speer Lawman 53650 Demandware template drift").
+    # The <table class="table"> spec block on SFCC product pages exposes
+    # the same fields under stable labels (Caliber / Grain Weight /
+    # Bullet Style) and is a safer extraction surface across future
+    # template revisions. Only fires when the primary regex returns
+    # None, so existing comma-tuple SKUs produce byte-identical output.
+    if caliber_text is None:
+        caliber_text = _spec_table_value(soup, 'Caliber')
+    if grain is None:
+        weight_text = _spec_table_value(soup, 'Grain Weight')
+        if weight_text:
+            m = re.search(r'(\d+)', weight_text)
+            if m:
+                grain = int(m.group(1))
+    if bullet_text is None:
+        bullet_text = _spec_table_value(soup, 'Bullet Style')
+    if product_line is None:
+        product_line = _product_line_from_url(source_url)
 
     # Muzzle velocity: prefer the spec table (a bare integer with no fps suffix
     # makes for the cleanest extraction); fall back to title regex.
