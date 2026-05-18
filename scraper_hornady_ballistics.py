@@ -108,6 +108,7 @@ SOURCES = {
             'https://www.hornady.com/ammunition/handgun/9mm-luger-124-gr-xtp',
             'https://www.hornady.com/ammunition/handgun/9mm-luger-147-gr-xtp-subsonic',
             'https://www.hornady.com/ammunition/handgun/9mm-135-gr-flexlock-critical-duty',
+            'https://www.hornady.com/ammunition/handgun/9mm-luger-100-gr-ftx-critical-defense-lite',  # 100gr FTX (audit row #23)
         ],
     },
 }

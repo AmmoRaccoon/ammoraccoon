@@ -113,6 +113,7 @@ SOURCES = {
             'https://www.cci-ammunition.com/handgun/blazer/blazer-brass-hp/6-5239.html',
             'https://www.cci-ammunition.com/handgun/blazer/blazer-brass/6-5201.html',
             'https://www.cci-ammunition.com/handgun/blazer/blazer-aluminum/6-3509.html',
+            'https://www.cci-ammunition.com/handgun/blazer/blazer-brass/6-5203.html',  # 9mm 147gr FMJ (audit row #16, corrected from audit's wrong SKU 5202 which is .380 95gr)
         ],
     },
     'speer': {
@@ -124,6 +125,7 @@ SOURCES = {
             'https://www.speer.com/ammunition/lawman/lawman-handgun-training/19-53661.html',
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23614GD.html',
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23618GD.html',
+            'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23619GD.html',  # 9mm 147gr Gold Dot JHP (audit row #17)
         ],
     },
     # Fiocchi USA runs on the same Salesforce Commerce Cloud backend as the
