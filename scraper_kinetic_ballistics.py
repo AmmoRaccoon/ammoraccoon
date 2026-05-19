@@ -94,6 +94,8 @@ SOURCES = {
             'https://www.federalpremium.com/handgun/american-eagle/american-eagle-handgun/11-AE9DP100.html',
             'https://www.federalpremium.com/handgun/syntech-defense/syntech-defense/11-S9SJT1.html',  # 9mm 138gr Syntech Defense SJHP, 20-count (audit row #14 was wrong about phantom Punch 138gr — real product is Syntech Defense)
             'https://www.federalpremium.com/handgun/syntech-defense/syntech-defense/11-S9SJT2.html',  # 9mm 138gr Syntech Defense SJHP, 50-count
+            'https://www.federalpremium.com/handgun/personal-defense-hst/11-P9HST2S.html',  # 9mm 147gr HST JHP (audit row #1 MEDIUM, audit URL was LE variant /personal-defense-hst/personal-defense-hst/11-P9HST2.html which 500'd; this is the Personal Defense variant suffix)
+            'https://www.federalpremium.com/handgun/hydra-shok-deep/hydra-shok-deep/11-P9HSD1.html',  # 9mm 135gr Hydra-Shok Deep JHP (audit row #63 MEDIUM, audit URL verified correct)
         ],
     },
     'remington': {
@@ -105,6 +107,7 @@ SOURCES = {
             'https://www.remington.com/handgun/umc-handgun/29-23718.html',
             'https://www.remington.com/handgun/remington-range/29-R27778.html',
             'https://www.remington.com/handgun/high-terminal-performance/29-28288.html',
+            'https://www.remington.com/handgun/golden-saber-defense/29-27604.html',  # 9mm 147gr Golden Saber Defense JHP, internal SKU GS9MMC (audit row #22 MEDIUM, audit URL /handgun/golden-saber-defense/29-GS9MMC.html 404'd — Remington uses numeric IDs in URLs not SKU strings)
         ],
     },
     'cci': {
@@ -129,6 +132,7 @@ SOURCES = {
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23618GD.html',
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23619GD.html',  # 9mm 147gr Gold Dot JHP (audit row #17)
             'https://www.speer.com/ammunition/lawman/lawman-handgun-training/19-53650.html',  # 9mm 115gr Lawman TMJ (audit row #24, corrected from broken audit URL 19-53615 — recovered via 2026-05-17 spec-table fallback after Demandware template drift broke JSON-LD name regex)
+            'https://www.speer.com/ammunition/gold-dot/gold-dot-carry-gun/19-24260.html',  # 9mm 135gr Gold Dot Carry Gun JHP (audit row #55 MEDIUM, audit SKU 23922GD was wrong — real SKU 24260)
         ],
     },
     # Fiocchi USA runs on the same Salesforce Commerce Cloud backend as the
