@@ -80,15 +80,38 @@ CALIBER_NORMALIZE = {
 # Sorted by needle length descending so the most specific phrase wins.
 # Mirrors scraper_kinetic_ballistics.py — see comment there for the
 # "hollow point" -> JHP rationale.
+#
+# Winchester labels ~41% of its catalog with marketing names rather than
+# generic bullet types ("Silvertip JHP", "WinClean", "Power-Point",
+# "Extreme Point", "Match BTHP", etc.). The marketing-name aliases below
+# map each to its closest match in the matcher vocabulary
+# (FMJ/JHP/TMJ/HP/LRN/SP/FP). Investigation 2026-05-18.
 _BULLET_TYPE_LOOKUP = [
+    ('fragmenting polymer tip', 'JHP'),  # Ballistic Silvertip 223
     ('jacketed hollow point', 'JHP'),
+    ('brass enclosed base', 'FMJ'),      # WinClean alt phrasing
     ('total metal jacket', 'TMJ'),
+    ('bonded solid base', 'SP'),         # Defender 223 (bonded SP)
     ('full metal jacket', 'FMJ'),
+    ('rapid expansion', 'JHP'),          # Varmint X Lead Free "Zinc Core ... Rapid Expansion"
     ('open tip match', 'OTM'),
+    ('lead flat nose', 'FP'),            # Cowboy Action 38spl
+    ('extreme point', 'JHP'),            # Deer Season XP, Copper Impact
+    ('defense tip', 'JHP'),              # Silvertip Centerfire rifle "Defense Tip NPJ"
     ('hollow point', 'JHP'),
+    ('polymer tip', 'JHP'),              # Varmint X, Ballistic Silvertip variants
+    ('power-point', 'SP'),               # Power-Point rifle hunting (exposed-lead SP)
+    ('power point', 'SP'),               # alt spelling
     ('soft point', 'SP'),
     ('round nose', 'LRN'),
     ('flat point', 'FP'),
+    ('segmenting', 'JHP'),               # Varmint HE "3-1 Segmenting Expansion"
+    ('silvertip', 'JHP'),                # Silvertip handgun + Silvertip Centerfire rifle
+    ('dynapoint', 'JHP'),                # Wildcat rimfire HP variant
+    ('open tip', 'JHP'),                 # USA Ready, Super Suppressed, USA VALOR
+    ('hex-vent', 'JHP'),                 # USA Ready Defense handgun "Hex-Vent™ JHP"
+    ('accubond', 'JHP'),                 # Expedition Big Game "AccuBond CT/LR"
+    ('bthp', 'JHP'),                     # Match line "Match BTHP"
 ]
 
 SOURCES = {
