@@ -3,9 +3,13 @@
 For every row in manufacturer_ballistics, finds listings where ALL of the
 following are equal on both sides:
     listings.manufacturer       == manufacturer_ballistics.brand
+        (or a registered BRAND_ALIASES variant — e.g., 'Blazer' listings
+         connect to 'CCI' ballistics because Blazer is CCI's training line)
     listings.caliber_normalized == manufacturer_ballistics.caliber_normalized
     listings.grain              == manufacturer_ballistics.grain
     listings.bullet_type        == manufacturer_ballistics.bullet_type
+        (or a BULLET_TYPE_ALIASES variant — e.g., 'HP' listings connect
+         to 'JHP' ballistics rows)
 …and records the match in manufacturer_ballistics_listing_matches.
 Frontend reads from that table to render velocity / energy / downrange
 on individual listing pages.
@@ -56,6 +60,16 @@ BULLET_TYPE_ALIASES = {
     'JHP': ['JHP', 'HP'],
 }
 
+# When a ballistics row carries brand='CCI', also accept listings whose
+# manufacturer='Blazer'. CCI's Blazer training-line products (Blazer Brass,
+# Blazer Aluminum, Blazer Brass HP) ship from CCI's plant under CCI-published
+# specs, but retailers tag the listings 'Blazer' (the consumer brand) rather
+# than 'CCI' (the corporate parent). The 4-column equi-join (caliber + grain
+# + bullet_type) prevents false matches to non-Blazer CCI ammo.
+BRAND_ALIASES = {
+    'CCI': ['CCI', 'Blazer'],
+}
+
 
 def fetch_ballistics(sb):
     rows = []
@@ -85,7 +99,7 @@ def find_matching_listings(sb, brand, caliber, grain, bullet):
         batch = (
             sb.table('listings')
             .select('id,manufacturer,caliber_normalized,grain,bullet_type')
-            .eq('manufacturer', brand)
+            .in_('manufacturer', BRAND_ALIASES.get(brand, [brand]))
             .eq('caliber_normalized', caliber)
             .eq('grain', grain)
             .in_('bullet_type', BULLET_TYPE_ALIASES.get(bullet, [bullet]))
