@@ -549,8 +549,23 @@ _BULLET_PATTERNS = [
     (re.compile(r'\blrx\b'), 'HP'),          # Barnes LRX — long-range expanding
     (re.compile(r'\bhst\b'), 'JHP'),         # Federal HST — bonded self-defense JHP
 
+    # Brand-line additions 2026-05-22 — each verified against the
+    # manufacturer's own product documentation. Polymer-tip-only lines
+    # (AccuBond, Scirocco II, Extreme Point, Trophy Bonded Tip, EcoStrike,
+    # Silvertip rifle, GMX, Wilson Combat TME) were intentionally NOT
+    # added — they fail the never-prey-on-the-ignorant test because the
+    # schema has no PolymerTip canonical category and HP would mis-class.
+    # Track that schema decision separately.
+    (re.compile(r'\bcritical\s+duty\b'), 'JHP'),  # Hornady Critical Duty — Hornady calls FlexLock a "jacketed hollow point projectile"
+    (re.compile(r'\btac[\s-]?tx\b'), 'HP'),       # Barnes TAC-TX — TSX-family solid copper hollow point, no polymer tip
+    (re.compile(r'\bdpx\b'), 'HP'),                # Corbon DPX — built on Barnes XPB solid copper hollow point
+    (re.compile(r'\bsinterfire\b'), 'Frangible'), # SinterFire — entire brand line is lead-free copper/tin frangible by design
+
     # Compound abbreviations (longer/more-specific first within group)
     (re.compile(r'\bbthp\b|\bhpbt\b'), 'HP'),
+    (re.compile(r'\bhpfb\b'), 'HP'),               # Hollow Point Flat Base — Nosler Varmageddon HP variant + bench-rest match
+    (re.compile(r'\botfb\b'), 'OTM'),              # Open Tip Flat Base — Remington UMC subsonic; open tip is manufacturing artifact, semantically OTM not HP
+    (re.compile(r'\bthp\b'), 'HP'),                # Target Hollow Point — Federal Subsonic P308SUB1, true HP for match accuracy
     (re.compile(r'\bfmjbt\b|\bfmjfn\b|\bfmjfb\b'), 'FMJ'),
     (re.compile(r'\bsjsp\b'), 'SP'),
     (re.compile(r'\bsjhp\b'), 'JHP'),
