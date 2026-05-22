@@ -27,6 +27,7 @@ Usage:
 """
 import argparse
 import os
+import re
 import sys
 from collections import defaultdict, Counter
 from dotenv import load_dotenv
@@ -40,6 +41,20 @@ load_dotenv()
 sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
 SKIP_RETAILER_IDS = {29}  # Gorilla — source data has no bullet-type info.
+
+# Polymer-tip skip guard added 2026-05-22. The existing parser maps
+# `\bpolymer\s+tip(?:ped)?\b` and `\bballistic\s+tip\b` to HP, which
+# conflates polymer-tip bullets (AccuBond, Scirocco, Extreme Point,
+# Trophy Bonded Tip, EcoStrike, Ballistic Silvertip rifle, etc.) with
+# true hollow points. Per never-prey-on-the-ignorant: these stay NULL
+# until a PolymerTip canonical category is added. Backfill drops any
+# row whose only parser match is the polymer-tip / ballistic-tip rule.
+# See TASKS.md "Add 'PolymerTip' canonical bullet type" for the
+# follow-up schema project.
+POLYMER_TIP_RE = re.compile(
+    r'\b(polymer[\s-]+tip(?:ped)?|ballistic[\s-]+tip)\b',
+    re.IGNORECASE,
+)
 
 
 def fetch_all(table, select, **filters):
@@ -79,6 +94,7 @@ def collect_listings_candidates():
     skip_no_url = 0
     skip_excluded = 0
     skip_no_match = 0
+    skip_polymer_tip = 0
     for r in null_rows:
         if r['retailer_id'] in SKIP_RETAILER_IDS:
             skip_excluded += 1
@@ -91,10 +107,25 @@ def collect_listings_candidates():
         if bt is None or bt not in BULLET_TYPES:
             skip_no_match += 1
             continue
+        # Polymer-tip skip guard. If the URL contains a polymer-tip /
+        # ballistic-tip token, strip those tokens and re-run the parser
+        # against the cleaned URL. When the only thing that matched was
+        # the polymer-tip / ballistic-tip rule (no other pattern fires
+        # after stripping), the row stays NULL per the schema-gap
+        # doctrine. When a non-polymer pattern matches after stripping,
+        # use that result instead.
+        if POLYMER_TIP_RE.search(url):
+            stripped = POLYMER_TIP_RE.sub(' ', url)
+            bt_alt = parse_bullet_type(stripped)
+            if bt_alt is None or bt_alt not in BULLET_TYPES:
+                skip_polymer_tip += 1
+                continue
+            bt = bt_alt
         candidates.append((r['id'], r['retailer_id'], url, bt))
 
     print(f'  {len(candidates)} listings would update')
     print(f'  {skip_no_match} no parser match (slug ambiguous)')
+    print(f'  {skip_polymer_tip} polymer-tip / ballistic-tip skip-guard (would only have matched the polymer-tip rule)')
     print(f'  {skip_no_url} no product_url')
     print(f'  {skip_excluded} excluded retailer (Gorilla)')
     return candidates
