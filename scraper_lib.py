@@ -958,14 +958,153 @@ def mark_retailer_scraped(supabase, retailer_id, *, had_success=True):
     }).eq('id', retailer_id).execute()
 
 
+# ---------------------------------------------------------------------------
+# Reloading-component classifier.
+#
+# KEEP IN SYNC with isLikelyComponent in
+# ammoraccoon-web/lib/listingHelpers.js — this is a faithful, rule-for-rule
+# port (same inputs, same order, same regexes, including the 2026-05-26
+# black-ammo / interlock->Hornady / Sierra->manufacturer patches). Any change
+# to one MUST be mirrored in the other; scripts/parity_is_component.py enforces
+# it against the live catalog and fails on drift.
+#
+# Used by with_stock_fields() below to set listing['is_component'] at write
+# time, so reloading components (bullets / empty brass) are flagged at the
+# source and never re-contaminate the floor/avg reducers (web repo
+# DECISIONS.md 2026-05-24, Option B; migrations 028/029).
+# ---------------------------------------------------------------------------
+LOADED_AMMO_MARKERS = (
+    'american-gunner', 'american-whitetail', 'critical-defense', 'critical-duty',
+    '-hornady-custom', 'custom-lite', 'eld-match', 'frontier',
+    'full-boar', 'leverevolution', 'outfitter', 'precision-hunter',
+    'subsonic', 'superformance', 'varmint-express', 'hornady-black',
+    'black-ammo',
+    'vor-tx', 'vortx', 'pioneer-357', 'pioneer-revolver',
+    'precision-match', 'range-ar', 'tac-xpd', 'tac-xp-lead',
+    'trophy-grade', 'match-grade', 'assured-stopping-power', 'nosler-defense',
+    'gold-medal', 'american-eagle', 'hydra-shok', '-hst-', 'champion',
+    'power-shok', 'syntech', '-punch-', 'premium-hunting', 'fusion',
+    'service-grade', 'super-x', 'usa-forged', 'white-box', 'whitebox',
+    '-ranger-', 'defender', 'pdx1', 'super-suppressed',
+    '-supreme-', 'ppu-supreme', 'black-hills-gold', 'honeybadger',
+    'outdoor-master', 'pistol-master', 'sports-master',
+    'gold-dot', 'lawman', 'tnt-green',
+    'hyperformance', 'm118-long-range',
+    'rounds-of-', '-ammo-by-', '/handgun/', '/rifle/',
+    'centerfire-pistol-ammo', 'centerfire-rifle-ammo',
+    'pistol-ammo', '-rifle-ammo',
+    'ammunition-from-', '-ammo-for-',
+    '-fps-', '-fps/',
+    'reman-ammunition', 'remanufactured', '-reman-',
+    'wolf-military', 'wolf-polyformance', 'wolf-brass-plated', 'wolf-classic',
+    'cci-blazer', 'cci-independence', '-independence-', 'super-vel',
+    '-bulk-pack-', '-loose-bulk-', 'bulk-9mm-ammo', 'bulk-223-ammo', 'bulk-308-ammo',
+    'ammunition-', '-grain-',
+)
+
+_HORNADY_35_RE    = re.compile(r'hornady[-/_]?35\d{3,4}')
+_NOSLER_SKU_RE    = re.compile(r'\bnos-\d{4,6}')
+_CASING_LOADED_RE = re.compile(r'-grain-|-fmj-|-jhp-|full-metal-jacket|hollow-point')
+_NOSLER_BULLET_RE = re.compile(r'ballistic-tip-|accubond-|partition-|e-tip|etip-|custom-competition-|rdf-|varmageddon-')
+_SIERRA_BULLET_RE = re.compile(r'matchking|tipped-matchking|gameking|pro-hunter|blitzking|gamechanger|sports-master|pistol-master')
+
+
+def _component_rounds(total_rounds):
+    """Mirror JS Number() for the count gates: non-numeric -> NaN so the
+    >=100 / >=50 comparisons evaluate False exactly as they do in JS (NaN
+    comparisons are False in both languages). total_rounds only feeds those
+    two comparisons, so 0-vs-NaN edges never change the result."""
+    try:
+        return float(total_rounds)
+    except (TypeError, ValueError):
+        return float('nan')
+
+
+def has_loaded_ammo_marker(url):
+    if not url:
+        return False
+    lower = url.lower()
+    return any(m in lower for m in LOADED_AMMO_MARKERS)
+
+
+def is_likely_component(product_url, total_rounds, manufacturer):
+    """True when the row is a reloading component (bullet / empty brass), not
+    loaded ammo. Faithful port of isLikelyComponent (web repo). None-safe on
+    all three inputs (bereli can pass manufacturer=None)."""
+    url = (product_url or '').lower()
+    if not url:
+        return False
+    # Global veto: any loaded-ammo URL marker disqualifies the row regardless
+    # of bullet-line names.
+    if has_loaded_ammo_marker(url):
+        return False
+
+    rounds = _component_rounds(total_rounds)
+    mfr = (manufacturer or '').lower()
+
+    # Hornady bullets
+    if '-hap-' in url:
+        return True
+    if '-xtp-' in url and rounds >= 100:
+        return True
+    if _HORNADY_35_RE.search(url):
+        return True
+    # InterLock is a Hornady trademark — a non-Hornady "interlock" in a URL is
+    # loaded ammo naming the projectile, not a bullet component (patch C).
+    if 'interlock' in url and rounds >= 100 and mfr == 'hornady':
+        return True
+
+    # Empty brass casings (absent standard loaded-ammo bullet descriptors)
+    if ('-casing' in url or '-casings' in url) and not _CASING_LOADED_RE.search(url):
+        return True
+
+    # Nosler bullets
+    if 'sporting-handgun' in url:
+        return True
+    is_nosler = ('nosler' in url) or bool(_NOSLER_SKU_RE.search(url)) or (mfr == 'nosler')
+    if is_nosler and rounds >= 50 and _NOSLER_BULLET_RE.search(url):
+        return True
+
+    # Barnes bullets URL path (JS `/barnes-bullets-` || `barnes-bullets-`)
+    if 'barnes-bullets-' in url:
+        return True
+
+    # Berger
+    if 'berger-bullets-' in url:
+        return True
+    if ('berger' in url or mfr == 'berger') and rounds >= 50:
+        return True
+
+    # Sierra — manufacturer must actually be Sierra; a URL merely naming a
+    # Sierra projectile (e.g. HSM match ammo) is loaded ammo (patch B).
+    if 'sierra-bullets-' in url:
+        return True
+    if mfr == 'sierra' and rounds >= 50 and _SIERRA_BULLET_RE.search(url):
+        return True
+
+    return False
+
+
 def with_stock_fields(listing, in_stock, now=None):
-    """Add in_stock / stock_level / last_seen_in_stock to a listing dict.
+    """Add in_stock / stock_level / last_seen_in_stock to a listing dict, and
+    classify is_component at write time.
 
     last_seen_in_stock is only set when in_stock is True so that
     out-of-stock cycles don't overwrite the previous good timestamp.
+
+    is_component is derived from is_likely_component() over the dict's own
+    product_url / total_rounds / manufacturer. All 37 listings scrapers set
+    those three keys before calling this and never mutate them afterward
+    (verified 2026-05-26), so this is the single write-time chokepoint that
+    keeps the is_component column from re-contaminating going forward.
     """
     listing['in_stock'] = bool(in_stock)
     listing['stock_level'] = 'In Stock' if in_stock else 'Out of Stock'
     if in_stock:
         listing['last_seen_in_stock'] = now or now_iso()
+    listing['is_component'] = is_likely_component(
+        listing.get('product_url'),
+        listing.get('total_rounds'),
+        listing.get('manufacturer'),
+    )
     return listing

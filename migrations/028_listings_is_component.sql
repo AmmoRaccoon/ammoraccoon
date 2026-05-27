@@ -1,0 +1,31 @@
+-- 028_listings_is_component.sql
+-- Adds the is_component flag to the listings table — the source-of-truth
+-- column for "this row is a reloading component (bullet / empty brass / etc.),
+-- not loaded ammo" (Option B; see ammoraccoon-web DECISIONS.md 2026-05-24).
+--
+-- STEP 1 of the staged is_component rollout:
+--   1. (this file) add the column, DEFAULT false   ← invisible; nothing reads it yet
+--   2. one-time backfill via the real isLikelyComponent() heuristic (web repo)
+--   3. point reducers/RPCs at it (WHERE NOT is_component)
+--   4. scrapers set it on write (this repo)
+--
+-- WHY a stored column instead of per-surface runtime filtering: every surface
+-- that reads `listings` (homepage_segment_aggregates and other floor/avg
+-- reducers, the listings table, the hero, the ticker, /ammo, /rebates) can
+-- filter WHERE NOT is_component at the source — no per-load classification
+-- fetch, and no risk of the heuristic drifting between surfaces.
+--
+-- SAFETY / LOCKING:
+--   * ADD COLUMN ... DEFAULT false uses a NON-VOLATILE constant default, so on
+--     PG 11+ (Supabase) this is a metadata-only change — NO full table rewrite,
+--     regardless of row count (~18k here). The ACCESS EXCLUSIVE lock is held
+--     only for the brief catalog update, not for a table scan. Effectively
+--     instant.
+--   * NOT NULL is satisfied for every existing row by the non-null default via
+--     that same fast-default path — no validation scan.
+--   * Idempotent: ADD COLUMN IF NOT EXISTS is a no-op if re-run.
+--   * Zero behavior change on its own — nothing reads is_component yet and
+--     every row gets false, so no query result changes until step 3.
+
+ALTER TABLE listings
+  ADD COLUMN IF NOT EXISTS is_component boolean NOT NULL DEFAULT false;
