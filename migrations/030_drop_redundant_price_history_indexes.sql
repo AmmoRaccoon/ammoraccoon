@@ -1,0 +1,58 @@
+-- 030_drop_redundant_price_history_indexes.sql
+-- Captures two index DROPs Jon applied to production on 2026-05-26 via the
+-- Supabase dashboard (DROP INDEX CONCURRENTLY), so the migrations directory
+-- stays the source of truth for schema state. ALREADY APPLIED TO PROD — this
+-- file records what was done; do not expect it to "do" anything new in prod.
+--
+-- WHY: the database crossed the Supabase free-tier 500 MB cap (measured
+-- 511.65 MB, dashboard "exceeding quota"). Read-only diagnosis showed it was
+-- INDEX bloat on price_history, NOT data growth — two listing-prefixed indexes
+-- were redundant with the covering index from migration 026. Dropping both
+-- freed ~163 MB (511.65 MB -> ~348 MB, back under cap) with ZERO data touched.
+--
+-- Both are subsumed by idx_price_history_listing_recorded_cpr (migration 026):
+--     (listing_id, recorded_at DESC) INCLUDE (price_per_round)
+-- which shares their leading key columns and therefore serves every lookup the
+-- two dropped indexes did. (A btree can scan either direction, so ascending vs
+-- DESC doesn't matter for the seek; the INCLUDE payload only ADDS index-only-
+-- scan capability — it never reduces what the key can serve.)
+--
+--   1) idx_price_history_listing_recorded  (89 MB) = (listing_id, recorded_at DESC)
+--      Created by migration 024. Migrations 024 AND 026 already documented it as
+--      "now-redundant ... a future migration drops it." THIS is that migration.
+--
+--   2) idx_price_history_listing           (74 MB) = (listing_id, recorded_at)
+--      Created ad-hoc in the dashboard at some earlier point and NEVER tracked
+--      in this migrations directory (absent from every prior migration). A
+--      prefix of 026's key, so equally redundant. Recorded here for the first
+--      time — as a drop.
+--
+-- KEPT (do NOT drop — load-bearing, not redundant):
+--   * idx_price_history_listing_recorded_cpr (026) — the covering superset both
+--     dropped indexes folded into; makes segment_daily_floor index-only.
+--   * idx_price_history_recorded_at (015) — serves recorded_at-only range scans
+--     (homepage_segment_aggregates 30-day window, fetchPriceHistorySince); a
+--     listing-led index cannot serve those.
+--   * price_history_pkey — primary key.
+--
+-- ROLLBACK (re-create exactly what was dropped; CONCURRENTLY to avoid locking
+-- scraper writes — note CONCURRENTLY cannot run inside a transaction):
+--     CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_price_history_listing_recorded
+--         ON price_history (listing_id, recorded_at DESC);
+--     CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_price_history_listing
+--         ON price_history (listing_id, recorded_at);
+--   (Neither is worth recreating unless a (listing_id, recorded_at) lookup is
+--    shown to regress without it — 026 serves those today.)
+--
+-- CONCURRENTLY: the production drops used DROP INDEX CONCURRENTLY so scraper
+-- writes weren't blocked. CONCURRENTLY cannot run inside a transaction block —
+-- run each statement on its own, not wrapped in BEGIN/COMMIT.
+--
+-- Idempotency / clean-rebuild correctness: IF EXISTS makes re-running a no-op.
+-- On a fresh rebuild from migrations, 024 creates idx_price_history_listing_recorded
+-- and this migration drops it (net absent — matches prod); idx_price_history_listing
+-- was never created by a migration, so its DROP ... IF EXISTS is a harmless no-op.
+
+-- migrate:no-transaction
+DROP INDEX CONCURRENTLY IF EXISTS idx_price_history_listing_recorded;
+DROP INDEX CONCURRENTLY IF EXISTS idx_price_history_listing;
