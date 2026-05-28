@@ -153,6 +153,15 @@ SOURCES = {
             'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23619GD.html',  # 9mm 147gr Gold Dot JHP (audit row #17)
             'https://www.speer.com/ammunition/lawman/lawman-handgun-training/19-53650.html',  # 9mm 115gr Lawman TMJ (audit row #24, corrected from broken audit URL 19-53615 — recovered via 2026-05-17 spec-table fallback after Demandware template drift broke JSON-LD name regex)
             'https://www.speer.com/ammunition/gold-dot/gold-dot-carry-gun/19-24260.html',  # 9mm 135gr Gold Dot Carry Gun JHP (audit row #55 MEDIUM, audit SKU 23922GD was wrong — real SKU 24260)
+            # .40 S&W — Tier 1 + 165gr JHP (2026-05-27): Lawman 180 TMJ + Gold Dot 165 JHP.
+            # 180 TMJ: Lawman standard + Clean-Fire variant both 1000 fps (zero spread).
+            # 165 JHP: Gold Dot Personal Protection + Carry Gun both 1150 fps (zero spread,
+            # same convergent-velocity logic as the approved Remington 165 JHP). Held lines:
+            # 180gr JHP (PP 1025 / G2 1015 / Short Barrel 950 = 75 fps spread, short-barrel
+            # buyers need the right number) and 165gr TMJ (Lawman 1150 vs Clean-Fire 1050 =
+            # 100 fps spread) — see TASKS matcher-line-awareness.
+            'https://www.speer.com/ammunition/lawman/lawman-handgun-training/19-53652.html',  # .40 S&W 180gr TMJ, 1000 fps (verified live)
+            'https://www.speer.com/ammunition/gold-dot/gold-dot-handgun-personal-protection/19-23970GD.html',  # .40 S&W 165gr JHP, 1150 fps (verified live)
         ],
     },
     # Fiocchi USA runs on the same Salesforce Commerce Cloud backend as the
