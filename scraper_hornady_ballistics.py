@@ -111,6 +111,21 @@ SOURCES = {
             'https://www.hornady.com/ammunition/handgun/9mm-luger-100-gr-ftx-critical-defense-lite',  # 100gr FTX (audit row #23)
         ],
     },
+    'hornady_handgun_40sw': {
+        'brand': BRAND,
+        # .40 S&W seeds (2026-05-27): single-line for 3 grains + convergent for 180. All
+        # Hornady .40 lines we carry either map to one load per grain (155 Custom XTP, 165
+        # Critical Defense FTX, 175 Critical Duty FlexLock — unique grain) OR the multi-
+        # line grain (180 JHP) has all three lines spec'd to identical 950 fps (American
+        # Gunner / XTP Subsonic / Hornady BLACK). NOTHING held — no within-grain MV spread.
+        # Run via --source hornady_handgun_40sw (or --source all alongside 9mm).
+        'seed_urls': [
+            'https://www.hornady.com/ammunition/handgun/40-s-w-155-gr-xtp',  # .40 S&W 155gr Custom XTP, 1180 fps (verified live)
+            'https://www.hornady.com/ammunition/handgun/40-s-w-165-gr-ftx-critical-defense',  # .40 S&W 165gr Critical Defense FTX, 1045 fps (verified live)
+            'https://www.hornady.com/ammunition/handgun/40-s-w-175-gr-flexlock-critical-duty',  # .40 S&W 175gr Critical Duty FlexLock, 1010 fps (verified live)
+            'https://www.hornady.com/ammunition/handgun/40-s-w-180-gr-xtp-american-gunner',  # .40 S&W 180gr American Gunner XTP, 950 fps (verified live; Subsonic + Hornady BLACK 180 also 950 fps — convergent, no spread)
+        ],
+    },
 }
 
 
