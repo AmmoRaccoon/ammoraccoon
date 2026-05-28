@@ -96,6 +96,15 @@ SOURCES = {
             'https://www.federalpremium.com/handgun/syntech-defense/syntech-defense/11-S9SJT2.html',  # 9mm 138gr Syntech Defense SJHP, 50-count
             'https://www.federalpremium.com/handgun/personal-defense-hst/11-P9HST2S.html',  # 9mm 147gr HST JHP (audit row #1 MEDIUM, audit URL was LE variant /personal-defense-hst/personal-defense-hst/11-P9HST2.html which 500'd; this is the Personal Defense variant suffix)
             'https://www.federalpremium.com/handgun/hydra-shok-deep/hydra-shok-deep/11-P9HSD1.html',  # 9mm 135gr Hydra-Shok Deep JHP (audit row #63 MEDIUM, audit URL verified correct)
+            # .40 S&W — Tier 1 (2026-05-27): training FMJ + flagship HST. FMJ velocity is
+            # consistent across Federal .40 FMJ lines, so the displayed number is honest
+            # regardless of which FMJ line a listing actually is. The 165gr JHP group is
+            # deliberately HELD (Hydra-Shok/Punch/Hydra-Shok Deep share 165gr JHP, ~150fps
+            # spread, and the matcher is line-blind) — see TASKS matcher-line-awareness.
+            'https://www.federalpremium.com/handgun/american-eagle/american-eagle-handgun/11-AE40R1.html',  # .40 S&W 180gr FMJ, 1000 fps (verified live)
+            'https://www.federalpremium.com/handgun/american-eagle/american-eagle-handgun/11-AE40R3.html',  # .40 S&W 165gr FMJ, 1130 fps
+            'https://www.federalpremium.com/handgun/american-eagle/american-eagle-handgun/11-AE40R2.html',  # .40 S&W 155gr FMJ, 1160 fps
+            'https://www.federalpremium.com/handgun/premium-personal-defense/personal-defense-hst/11-P40HST1S.html',  # .40 S&W 180gr HST JHP, 1010 fps (verified live)
         ],
     },
     'remington': {
