@@ -117,6 +117,17 @@ SOURCES = {
             'https://www.remington.com/handgun/remington-range/29-R27778.html',
             'https://www.remington.com/handgun/high-terminal-performance/29-28288.html',
             'https://www.remington.com/handgun/golden-saber-defense/29-27604.html',  # 9mm 147gr Golden Saber Defense JHP, internal SKU GS9MMC (audit row #22 MEDIUM, audit URL /handgun/golden-saber-defense/29-GS9MMC.html 404'd — Remington uses numeric IDs in URLs not SKU strings)
+            # .40 S&W — Tier 1 + 165gr JHP (2026-05-27): UMC training FMJ + HTP 155gr JHP
+            # (sole 155gr line) + Golden Saber Defense 165gr JHP. The 165gr JHP is safe to
+            # stamp one row across all 18 listings because Remington spec'd ALL its .40
+            # 165gr defense lines (Golden Saber Defense/Bonded + Ultimate Defense) to the
+            # SAME 1150 fps — zero velocity spread (HTP makes no 165gr .40). The 180gr JHP
+            # group is HELD: Golden Saber Compact's 785 fps vs standard 1015 fps is a
+            # 230fps within-grain collision — see TASKS matcher-line-awareness.
+            'https://www.remington.com/handgun/umc-handgun/29-23742.html',  # .40 S&W 180gr FMJ, 990 fps (verified live)
+            'https://www.remington.com/handgun/umc-handgun/29-23746.html',  # .40 S&W 165gr FMJ, 1150 fps (verified live)
+            'https://www.remington.com/handgun/high-terminal-performance/29-22306.html',  # .40 S&W 155gr JHP, 1205 fps (sole 155gr line)
+            'https://www.remington.com/handgun/golden-saber-defense/29-27607.html',  # .40 S&W 165gr JHP, 1150 fps (all 165gr defense lines = 1150)
         ],
     },
     'cci': {
