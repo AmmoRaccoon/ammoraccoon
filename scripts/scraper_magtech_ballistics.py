@@ -106,6 +106,18 @@ SOURCES = {
             'https://magtechammunition.com/products/ammunition/9mm-luger-124gr-fmj/',
         ],
     },
+    'magtech_handgun_40sw': {
+        'brand': BRAND,
+        # .40 S&W (2026-05-28): each (grain,bullet) is a single convergent-velocity line
+        # (180 JHP standard + Guardian Gold both 990, zero spread) -> all three Tier 1.
+        # NOTE: site spec "Bullet Type" reads "FMJ Flat" which the normalizer nulls; the
+        # H1-title fallback rescues it to FMJ (must be proven at dry-run before ingest).
+        'seed_urls': [
+            'https://magtechammunition.com/products/ammunition/40-sw-180gr-fmj-flat/',  # 180gr FMJ, 990 fps (40B)
+            'https://magtechammunition.com/products/ammunition/40-sw-165gr-fmj-flat/',  # 165gr FMJ, 1050 fps (40G)
+            'https://magtechammunition.com/products/ammunition/40-sw-180gr-jhp/',       # 180gr JHP, 990 fps (40A)
+        ],
+    },
 }
 
 
