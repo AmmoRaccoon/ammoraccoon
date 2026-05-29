@@ -110,6 +110,18 @@ SOURCES = {
             'https://www.sellierbellot.us/products/pistol-and-revolver-ammunition/pistol-and-revolver-cartridges/detail/284/',   # SB9SUBA 140gr FMJ subsonic (audit row #59)
         ],
     },
+    'sb_handgun_40sw': {
+        'brand': BRAND,
+        # .40 S&W (2026-05-28): full S&B US .40 handgun catalog, all Tier 1 (single
+        # convergent line per grain+bullet). H1 is clean ("40 S&W FMJ 180 GRS SB40B"),
+        # so caliber resolves 40sw + bullet FMJ/JHP. Opaque numeric detail IDs
+        # (no SKU->ID rule); IDs verified live 2026-05-28. SB40G 165 = 0 current (future-proof).
+        'seed_urls': [
+            'https://www.sellierbellot.us/products/pistol-and-revolver-ammunition/pistol-and-revolver-cartridges/detail/270/',   # SB40B 180gr FMJ, 968 fps
+            'https://www.sellierbellot.us/products/pistol-and-revolver-ammunition/pistol-and-revolver-cartridges/detail/304/',   # SB40C 180gr JHP, 974 fps
+            'https://www.sellierbellot.us/products/pistol-and-revolver-ammunition/pistol-and-revolver-cartridges/detail/488/',   # SB40G 165gr FMJ, 1027 fps (0 current, future-proof)
+        ],
+    },
 }
 
 
