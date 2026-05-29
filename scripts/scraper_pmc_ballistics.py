@@ -111,7 +111,7 @@ _BULLET_TYPE_LOOKUP = [
 _PMC_BULLET_CODES = {
     'fmj': 'FMJ', 'jhp': 'JHP', 'jsp': 'JSP', 'tmj': 'TMJ',
     'sp':  'SP',  'hp':  'JHP', 'lrn': 'LRN', 'fp': 'FP',
-    'sfhp': 'JHP',
+    'sfhp': 'JHP', 'fmj-fp': 'FMJ',   # PMC .40 Bronze flat-point = FMJ (listings already tag it FMJ)
 }
 
 SOURCES = {
@@ -126,6 +126,18 @@ SOURCES = {
             'https://pmcammo.com/product/bronze-9h/',       # 147gr FMJ
             'https://pmcammo.com/product/9sfx/',            # 124gr StarFire JHP
             'https://pmcammo.com/product/9sfx-147gr/',      # 147gr StarFire JHP
+        ],
+    },
+    'pmc_handgun_40sw': {
+        'brand': BRAND,
+        # PMC's full .40 S&W catalog — three Bronze loads, one per grain,
+        # single load per (grain, bullet): zero within-grain velocity
+        # collision, so all three ship Tier 1 (no holds). Catalog confirmed
+        # complete at three SKUs 2026-05-28.
+        'seed_urls': [
+            'https://pmcammo.com/product/bronze-40d/',      # 165gr FMJ, 989 fps
+            'https://pmcammo.com/product/bronze-40e/',      # 180gr FMJ, 985 fps
+            'https://pmcammo.com/product/bronze-40b/',      # 165gr JHP, 1040 fps
         ],
     },
 }
