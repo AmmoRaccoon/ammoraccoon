@@ -139,6 +139,19 @@ SOURCES = {
             'https://www.cci-ammunition.com/handgun/blazer/blazer-brass/6-5201.html',
             'https://www.cci-ammunition.com/handgun/blazer/blazer-aluminum/6-3509.html',
             'https://www.cci-ammunition.com/handgun/blazer/blazer-brass/6-5203.html',  # 9mm 147gr FMJ (audit row #16, corrected from audit's wrong SKU 5202 which is .380 95gr)
+            # .40 S&W — Tier 1 brass (2026-05-28): single-line clean per (grain,bullet), zero
+            # within-grain collision on the brass side. Matches Blazer-tagged listings via
+            # BRAND_ALIASES CCI<-Blazer. ~61 in-stock .40 listings.
+            'https://www.cci-ammunition.com/handgun/blazer/blazer-brass/6-5210.html',     # .40 165gr FMJ, 1050 fps
+            'https://www.cci-ammunition.com/handgun/blazer/blazer-brass/6-5220.html',     # .40 180gr FMJ, 985 fps
+            'https://www.cci-ammunition.com/handgun/blazer/blazer-brass-hp/6-5241.html',  # .40 180gr JHP, 1015 fps
+            # Blazer Aluminum 3589/3591 evaluated 2026-05-28 and DROPPED: CCI labels aluminum
+            # "Full Metal Jacket" so the parser emits FMJ (not TMJ), which cannot reach the
+            # TMJ-tagged listings and would collide 50fps with brass 5210 at 165gr. Zero gain.
+            # Clean-Fire 3477 — KEPT (2026-05-28): CCI labels it "Total Metal Jacket" so the
+            # parser emits TMJ; sole TMJ-180 source (no collision), recovers 6 TMJ-tagged .40
+            # listings. The 3 165gr-TMJ listings have no CCI .40 product (permanently unmatched).
+            'https://www.cci-ammunition.com/handgun/blazer/blazer-clean-fire/6-3477.html',  # .40 180gr TMJ, 1000 fps
         ],
     },
     'speer': {
