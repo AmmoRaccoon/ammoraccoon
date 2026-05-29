@@ -188,6 +188,15 @@ SOURCES = {
         'seed_urls': [
             'https://fiocchiusa.com/centerfire-pistol/range-dynamics/33-9AP.html',       # 115gr FMJ
             'https://fiocchiusa.com/centerfire-pistol/defense-dynamics/33-9APDHP.html',  # 147gr JHP
+            # .40 S&W (2026-05-28): Range Dynamics FMJTC ("Full Metal Jacket Truncated Cone"
+            # spelled out -> parser substring reads FMJ) + Defense Dynamics JHP. Single line
+            # per (grain,bullet) -> all Tier 1. Seeding Defense Dynamics 180 JHP (40SWE) only,
+            # NOT Extrema XTP 180, to avoid a 2nd 180-JHP row (both ~1000 anyway).
+            'https://fiocchiusa.com/centerfire-pistol/range-dynamics-handgun/33-40SWF.html',     # .40 165gr FMJTC, 1020 fps
+            'https://fiocchiusa.com/centerfire-pistol/range-dynamics-handgun/33-40SWAFOA.html',  # .40 170gr FMJTC, 1020 fps
+            'https://fiocchiusa.com/centerfire-pistol/range-dynamics-handgun/33-40SWD.html',     # .40 180gr FMJTC, 1000 fps
+            'https://fiocchiusa.com/centerfire-pistol/defense-dynamics/33-40SWC.html',           # .40 165gr JHP, 1100 fps
+            'https://fiocchiusa.com/centerfire-pistol/defense-dynamics/33-40SWE.html',           # .40 180gr JHP, 1000 fps
         ],
     },
 }
