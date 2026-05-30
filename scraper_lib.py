@@ -484,6 +484,17 @@ _BULLET_PATTERNS = [
     (re.compile(r'\bsemi[\s-]?jacketed\s+soft\s+point\b'), 'SP'),
     (re.compile(r'\bfull\s+metal\s+jacket\b'), 'FMJ'),
     (re.compile(r'\btotal\s+metal\s+jacket\b'), 'TMJ'),
+    # FMJ-forcing patterns (added 2026-05-29) — placed ABOVE the flat-point/
+    # flat-nose lines so an "FMJ flat nose"/"FMJ flat point" reads as FMJ, not
+    # FP/FN. An enclosed/jacketed flat-profile bullet is still FMJ. These fix
+    # the .40 retags (Magtech FMJ-Flat, Winchester FMJ-Flat-Nose, Fiocchi
+    # FMJTC) and correctly improve the same shapes in other calibers.
+    (re.compile(r'\bfmj\s+flat(?:\s+nose|\s+point)?\b'), 'FMJ'),
+    (re.compile(r'\bfmjtc\b'), 'FMJ'),               # FMJ Truncated Cone (Fiocchi Shooting Dynamics)
+    (re.compile(r'\bfmc\b'), 'FMJ'),                 # Full Metal Case = FMJ (Magtech/Aguila)
+    (re.compile(r'\bmetal\s+case\b'), 'FMJ'),        # Remington UMC "Metal Case" = FMJ
+    (re.compile(r'\bl40sw[34]'), 'FMJ'),             # Remington UMC .40 FMJ SKUs L40SW3/L40SW4 ONLY (L40SW2 is JHP)
+    (re.compile(r'\bassured\s+stopping\s+power\b'), 'JHP'),  # Nosler ASP = bonded JHP
     (re.compile(r'\bopen\s+tip\s+match\b'), 'OTM'),
     (re.compile(r'\blead\s+round\s+nose\b'), 'LRN'),
     (re.compile(r'\broundn?\s*nose\s+flat\s+point\b'), 'FP'),
@@ -591,6 +602,13 @@ _BULLET_PATTERNS = [
     (re.compile(r'\bsp\b'), 'SP'),
     (re.compile(r'\bfp\b'), 'FP'),
     (re.compile(r'\bwc\b'), 'WC'),
+
+    # Last-resort brand-line fallbacks (added 2026-05-29). Placed at the very
+    # end so they fire ONLY when no other bullet token matched — they never
+    # override an explicit fmj/jhp/tmj token. `rht` is ABOVE `lawman` so a
+    # Speer Lawman RHT (a frangible) resolves to Frangible, not TMJ.
+    (re.compile(r'\brht\b'), 'Frangible'),  # Reduced Hazard Training = frangible (Speer/Federal/CCI)
+    (re.compile(r'\blawman\b'), 'TMJ'),     # Speer Lawman = TMJ (training); last-resort only
 ]
 
 
