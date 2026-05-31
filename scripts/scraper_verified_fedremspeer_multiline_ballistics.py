@@ -41,6 +41,10 @@ SEED = [
     # Federal 9mm 124 JHP (collision 1120/1150/1200; HST std + +P)
     ['federal','Federal','9mm',124,'JHP','Personal Defense HST','P9HST1S',1150,'https://www.federalpremium.com/handgun/personal-defense-hst/11-P9HST1S.html'],
     ['federal','Federal','9mm',124,'JHP','Personal Defense HST','P9HST3S',1200,'https://www.federalpremium.com/handgun/personal-defense-hst/11-P9HST3S.html'],
+    # LE-SKU aliases (Bucket A): listings carry the LE sku P9HST1/P9HST3 (no trailing S);
+    # same load/velocity as consumer (verified on Vista LE portal: P9HST1 1150, P9HST3 1200).
+    ['federal','Federal','9mm',124,'JHP','Personal Defense HST','P9HST1',1150,'https://le.vistaoutdoor.com/ammunition/federal/handgun/details.aspx?id=579'],
+    ['federal','Federal','9mm',124,'JHP','Personal Defense HST','P9HST3',1200,'https://le.vistaoutdoor.com/ammunition/federal/handgun/details.aspx?id=675'],
     ['federal','Federal','9mm',124,'JHP','Personal Defense Hydra-Shok','P9HS1',1120,'https://www.federalpremium.com/handgun/personal-defense-hydra-shok/11-P9HS1.html'],
     ['federal','Federal','9mm',124,'JHP','Personal Defense Punch','PD9P1',1150,'https://www.federalpremium.com/handgun/personal-defense-punch/11-PD9P1.html'],
     # Federal 9mm 115 JHP (single velocity 1180 - Hi-Shok; LE portal source)
