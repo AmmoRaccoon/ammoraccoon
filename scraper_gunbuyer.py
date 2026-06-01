@@ -312,7 +312,7 @@ def scrape_facet(browser, caliber_norm, caliber_display, facet_path, retailer_id
                         'price': base_price,
                         'price_per_round': price_per_round,
                         'in_stock': in_stock,
-                    }).execute()
+                    }, returning="minimal").execute()
 
                     saved += 1
                     new_on_page += 1

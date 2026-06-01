@@ -307,7 +307,7 @@ def scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts):
                     'price': base_price,
                     'price_per_round': price_per_round,
                     'in_stock': in_stock,
-                }).execute()
+                }, returning="minimal").execute()
 
                 saved += 1
                 new_on_page += 1

@@ -400,7 +400,7 @@ def walk_listing_root(
                         'price': row['base_price'],
                         'price_per_round': row['price_per_round'],
                         'in_stock': row['in_stock'],
-                    }).execute()
+                    }, returning="minimal").execute()
                     saved += 1
                     per_source_counts.setdefault(source_label, Counter())[cal_norm] += 1
                     print(

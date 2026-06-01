@@ -251,7 +251,7 @@ def scrape_type_page(page, type_path, retailer_id, seen_ids):
                     'price': base_price,
                     'price_per_round': price_per_round,
                     'in_stock': in_stock,
-                }).execute()
+                }, returning="minimal").execute()
 
                 saved += 1
                 new_on_page += 1

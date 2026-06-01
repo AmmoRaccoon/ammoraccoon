@@ -259,7 +259,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                 'price': base_price,
                 'price_per_round': price_per_round,
                 'in_stock': in_stock,
-            }).execute()
+            }, returning="minimal").execute()
 
             saved += 1
             print(f"  Saved [{caliber_norm}]: {name[:55]} | ${base_price} | {price_per_round}/rd")

@@ -392,7 +392,7 @@ def main() -> int:
                         'price': row['base_price'],
                         'price_per_round': row['price_per_round'],
                         'in_stock': row['in_stock'],
-                    }).execute()
+                    }, returning="minimal").execute()
                     saved_total += 1
                     print(
                         f"  Saved pid={row['pid']:>9} cal={cal_norm:<8} "

@@ -309,7 +309,7 @@ async def scrape():
                         'price_per_round': product['price_per_round'],
                         'in_stock': product['in_stock'],
                         'recorded_at': now,
-                    }).execute()
+                    }, returning="minimal").execute()
                     upserted += 1
 
             except Exception as e:

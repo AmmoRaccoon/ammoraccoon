@@ -383,7 +383,7 @@ def scrape_product(page, product_url, retailer_id, seen_ids, counts):
         'price': base_price,
         'price_per_round': price_per_round,
         'in_stock': in_stock,
-    }).execute()
+    }, returning="minimal").execute()
 
     counts[cal_norm] = counts.get(cal_norm, 0) + 1
     print(f"  Saved [{cal_norm}]: {name[:55]} | ${base_price} | {price_per_round}/rd")

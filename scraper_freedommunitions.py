@@ -285,7 +285,7 @@ def scrape():
                     'price_per_round': row['price_per_round'],
                     'in_stock': row['in_stock'],
                     'recorded_at': now,
-                }).execute()
+                }, returning="minimal").execute()
 
         except Exception as e:
             print(f"  DB error for {row.get('manufacturer','?')}: {e}")
