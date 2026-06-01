@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 from supabase import create_client
 
 from scraper_lib import (
-    CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
+    CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
     parse_bullet_type_with_url_fallback,
     mark_retailer_scraped,
@@ -37,6 +37,23 @@ CALIBER_PATHS = {
     '762x39':  '/ammo/rifle-ammo/7-62x39/',
     '300blk':  '/ammo/rifle-ammo/300-blackout/',
 }
+
+
+def _title_names_caliber(name, norm):
+    """True when the product title INDEPENDENTLY names normalized caliber
+    `norm`. Used only by the category-vs-title caliber override's dual-caliber
+    honesty guard (below). Explicit token checks for the .38 Special / .357
+    Magnum cross-fit pair — the only cartridges CF cross-lists on a shared
+    category page. Tokens mirror scraper_lib.normalize_caliber (lines for
+    38spl/357mag); this does NOT modify normalize_caliber."""
+    t = (name or '').lower()
+    if norm == '38spl':
+        return any(s in t for s in ('38 special', '.38 special', '38 spl',
+                                    '.38 spl', '38special'))
+    if norm == '357mag':
+        return any(s in t for s in ('357 mag', '.357 mag', '357 magnum',
+                                    '.357 magnum', '357mag'))
+    return normalize_caliber(name)[1] == norm
 
 # Cap pagination defensively — 9mm had ~285 facet-counted listings on
 # probe day, which at 24/page is ~12 pages. 20 leaves headroom for
@@ -290,12 +307,31 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                     continue
                 seen_ids.add(product_id)
 
+                # Caliber comes from the category page being crawled, but CF
+                # cross-lists .38 Special on its /357/ page (.38 Spl chambers in
+                # .357 revolvers), so those rows get mis-tagged 357mag. Re-derive
+                # caliber from the title and prefer it — but SCOPED to the .38 /
+                # .357 pair only (the one documented cross-listing), so nothing
+                # on any other category page can ever be re-tagged (e.g. a .40
+                # row carrying a stale 9mm URL is untouched). normalize_caliber
+                # already ranks .38 Special above .357. HONESTY GUARD: never flip
+                # a genuinely dual-caliber item whose title names BOTH calibers
+                # (e.g. a CCI Big-4 revolver shotshell) — keep its category tag.
+                eff_display, eff_norm = caliber_display, caliber_norm
+                if caliber_norm in ('357mag', '38spl'):
+                    title_disp, title_norm = normalize_caliber(name)
+                    if title_norm in ('357mag', '38spl') and title_norm != caliber_norm:
+                        names_both = (_title_names_caliber(name, '38spl')
+                                      and _title_names_caliber(name, '357mag'))
+                        if not names_both:
+                            eff_display, eff_norm = title_disp, title_norm
+
                 listing = {
                     'retailer_id': retailer_id,
                     'retailer_product_id': product_id,
                     'product_url': product_url,
-                    'caliber': caliber_display,
-                    'caliber_normalized': caliber_norm,
+                    'caliber': eff_display,
+                    'caliber_normalized': eff_norm,
                     'grain': grain,
                     'bullet_type': bullet_type,
                     'case_material': case_material,
