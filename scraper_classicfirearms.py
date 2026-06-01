@@ -9,6 +9,7 @@ from supabase import create_client
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
+    parse_bullet_type_with_url_fallback,
     mark_retailer_scraped,
 )
 
@@ -278,7 +279,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
                 grain = parse_grain(name)
                 case_material = parse_case_material(name)
-                bullet_type = parse_bullet_type(name)
+                bullet_type = parse_bullet_type_with_url_fallback(name, product_url)
                 country = parse_country(name)
                 manufacturer = parse_brand(name) or "Unknown"
                 # CF product URLs end in a slug like

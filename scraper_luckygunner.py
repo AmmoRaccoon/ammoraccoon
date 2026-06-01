@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, parse_bullet_type_with_url_fallback, mark_retailer_scraped
 
 load_dotenv()
 
@@ -184,7 +184,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
 
                 grain = parse_grain(name)
                 case_material = parse_case_material(name)
-                bullet_type = parse_bullet_type(name)
+                bullet_type = parse_bullet_type_with_url_fallback(name, product_url)
                 country = parse_country(name)
                 manufacturer = parse_brand(name) or "Unknown"
                 product_id = product_url.split('/')[-1] if product_url else name[:50]

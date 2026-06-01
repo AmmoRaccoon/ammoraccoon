@@ -609,6 +609,39 @@ _BULLET_PATTERNS = [
     # Speer Lawman RHT (a frangible) resolves to Frangible, not TMJ.
     (re.compile(r'\brht\b'), 'Frangible'),  # Reduced Hazard Training = frangible (Speer/Federal/CCI)
     (re.compile(r'\blawman\b'), 'TMJ'),     # Speer Lawman = TMJ (training); last-resort only
+
+    # ---- Null-recovery pattern-gaps (2026-05-31, trap-checked honest tokens) ----
+    # APPENDED AT THE VERY END so they fire ONLY when every pattern above
+    # returned nothing — purely additive, they can never override an existing
+    # match (zero-reclassification by construction). Each mapping was verified
+    # honest against live slugs from the 5 high-NULL retailers (Bud's, Gunbuyer,
+    # Lucky Gunner, Black Basin, Classic Firearms). Multi-word phrases first,
+    # then bare tokens, then context-scoped lookaheads. NOTE: the deliberately
+    # NULL set (loose-pack/mixed, shotshell/birdshot, brass casing, and
+    # polymer-tip-only lines per the 2026-05-22 schema policy) is intentionally
+    # NOT covered here — those must stay NULL (never prey on the ignorant).
+    (re.compile(r'\bxtreme\s+(?:defense|defender|penetrator)\b'), 'Solid'),  # Lehigh/Underwood solid-copper monolithic
+    (re.compile(r'\bbarnes\s+expander\b'), 'HP'),     # Federal/Barnes solid-copper expanding HP
+    (re.compile(r'\bcritical\s+defense\b'), 'JHP'),   # Hornady Critical Defense = FTX (jacketed HP)
+    (re.compile(r'\bcrit\s+def(?:ense)?\b'), 'JHP'),  # abbreviated "crit def"
+    (re.compile(r'\bcrt\s+dfnse\b'), 'JHP'),          # Gunbuyer's "crt dfnse" abbreviation
+    (re.compile(r'\bcrit\s+duty\b'), 'JHP'),          # abbreviated "crit duty" (full "critical duty" above)
+    (re.compile(r'\bbrass\s+enclosed\b'), 'FMJ'),     # Winchester WinClean Brass Enclosed Base = jacketed
+    (re.compile(r'\bwinclean\b'), 'FMJ'),             # Winchester WinClean line
+    (re.compile(r'\bpspbt\b'), 'SP'),                 # Pointed Soft Point Boat Tail
+    (re.compile(r'\bbtsp\b'), 'SP'),                  # Boat Tail Soft Point
+    (re.compile(r'\bpsp\b'), 'SP'),                   # Pointed Soft Point (Rem Core-Lokt/PMC/Fiocchi/Armscor)
+    (re.compile(r'\bsbt\b'), 'SP'),                   # Spitzer Boat Tail
+    (re.compile(r'\bcprn\b'), 'RN'),                  # Copper Plated Round Nose (.22LR)
+    (re.compile(r'\bhshk\b'), 'JHP'),                 # Federal Hydra-Shok
+    (re.compile(r'\blhp\b'), 'HP'),                   # Lead Hollow Point (.22LR)
+    (re.compile(r'\blfn\b'), 'FN'),                   # Lead Flat Nose
+    (re.compile(r'\blwc\b'), 'WC'),                   # Lead WadCutter
+    (re.compile(r'\bblanks\b'), 'Blank'),             # plural (singular \bblank\b handled above)
+    # Context-scoped (zero-width lookaheads — BOTH tokens must be present, so a
+    # bare ambiguous code never maps on its own):
+    (re.compile(r'(?=.*\bmc\b)(?=.*\b(?:umc|remington)\b)'), 'FMJ'),  # "MC" = Metal Case, Remington/UMC only
+    (re.compile(r'(?=.*\bcx(?:tm)?\b)(?=.*\bhornady\b)'), 'HP'),      # Hornady CX copper-expanding only
 ]
 
 

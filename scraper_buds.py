@@ -49,7 +49,7 @@ from supabase import create_client
 from scraper_lib import (
     normalize_caliber, now_iso, with_stock_fields,
     parse_purchase_limit, parse_brand, sanity_check_ppr, clean_title,
-    parse_bullet_type,
+    parse_bullet_type, parse_bullet_type_with_url_fallback,
     mark_retailer_scraped,
 )
 
@@ -354,7 +354,7 @@ def walk_listing_root(
             seen_pids.add(row['pid'])
 
             grain = parse_grain(row['title'])
-            bullet_type = parse_bullet_type(row['title'])
+            bullet_type = parse_bullet_type_with_url_fallback(row['title'], row['url'])
             case_material = parse_case_material(row['title'])
             country = parse_country(row['title'])
             manufacturer = parse_brand(row['title']) or 'Unknown'

@@ -11,6 +11,7 @@ from supabase import create_client
 from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
+    parse_bullet_type_with_url_fallback,
     mark_retailer_scraped,
 )
 
@@ -242,7 +243,7 @@ def scrape_caliber(caliber_norm, caliber_display, retailer_id, seen_ids, counts)
                 in_stock = bool(v_chosen.get('available'))
                 grain = parse_grain(title)
                 case_material = parse_case_material(title)
-                bullet_type = parse_bullet_type(title)
+                bullet_type = parse_bullet_type_with_url_fallback(title, product_url)
                 country = parse_country(title)
                 # Vendor on every Black Basin product is the storefront
                 # name "Black Basin" — useless for manufacturer. Always
