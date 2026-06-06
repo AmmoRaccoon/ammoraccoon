@@ -1159,3 +1159,195 @@ def with_stock_fields(listing, in_stock, now=None):
         listing.get('manufacturer'),
     )
     return listing
+
+
+# ---------------------------------------------------------------------------
+# Shared product-page stock re-check.
+#
+# Used by scraper_recheck.py to re-confirm the stock status of listings we
+# already track by fetching their stored product_url directly — independent of
+# whether they still appear on the retailer's category page. This is the fix
+# for the "frozen in_stock=true" problem (web repo investigation 2026-06-05/06):
+# category-crawl scrapers never revisit a listing once it rotates off the
+# category page, so an item that goes OOS or is delisted stays in_stock=true in
+# the DB forever.
+#
+# Generalized from scraper_ammoman.py's extract_product_jsonld / parse_pdp
+# (Magento JSON-LD reader). Plain HTTP only (requests) — no headless browser.
+#
+# CRITICAL design rule (do NOT relax): a listing flips to OUT OF STOCK ONLY on
+# an explicit schema.org OutOfStock/SoldOut/Discontinued signal OR a 404/410
+# dead page. Everything else — anti-bot 403/429, 5xx, network error, or a 200
+# page with no parseable Product JSON-LD — is UNDETERMINED, and the caller
+# leaves the row as-is. A 200-with-no-JSON-LD page is NOT treated as OOS: a
+# missing schema block is not a reliable OOS signal (proven on Brownells
+# in-stock PDPs whose availability lives outside JSON-LD, 2026-06-06). Better
+# to leave a listing as-is than to wrongly flip it.
+# ---------------------------------------------------------------------------
+
+RECHECK_USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+)
+
+_RECHECK_LDJSON_RE = re.compile(
+    r'<script[^>]*type=[\'"]application/ld\+json[\'"][^>]*>(.*?)</script>',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _iter_jsonld_objects(html):
+    """Yield every JSON object found in the page's ld+json blocks, flattening
+    @graph arrays and top-level lists. Tolerant of malformed blocks."""
+    import json  # lazy: keep scraper_lib import-light for the 34 card scrapers
+    for raw in _RECHECK_LDJSON_RE.findall(html or ''):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        stack = [data]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, list):
+                stack.extend(node)
+            elif isinstance(node, dict):
+                graph = node.get('@graph')
+                if isinstance(graph, list):
+                    stack.extend(graph)
+                yield node
+
+
+def _is_product_type(node):
+    t = node.get('@type')
+    if isinstance(t, list):
+        return any(str(x).lower() == 'product' for x in t)
+    return str(t).lower() == 'product'
+
+
+def extract_product_offer(html):
+    """Return the first Offer dict from a page's Product JSON-LD, or None.
+
+    Prefers the `offers` of an @type=Product node (first one if a list). Falls
+    back to a standalone @type=Offer/AggregateOffer node only when no Product
+    node carries offers. None means 'no schema.org offer on the page'.
+    """
+    standalone_offer = None
+    for node in _iter_jsonld_objects(html):
+        if _is_product_type(node):
+            offers = node.get('offers')
+            if isinstance(offers, list):
+                if offers:
+                    return offers[0]
+            elif isinstance(offers, dict):
+                return offers
+        t = str(node.get('@type', '')).lower()
+        if standalone_offer is None and t in ('offer', 'aggregateoffer'):
+            standalone_offer = node
+    return standalone_offer
+
+
+def availability_to_in_stock(availability):
+    """Map a schema.org availability string to True / False / None.
+
+    True  = InStock / LimitedAvailability (purchasable now)
+    False = OutOfStock / SoldOut / Discontinued
+    None  = anything else (PreOrder, BackOrder, unknown) -> undetermined, so
+            the caller never flips on an ambiguous signal.
+    """
+    if not availability:
+        return None
+    a = str(availability).lower()
+    if 'outofstock' in a or 'soldout' in a or 'discontinued' in a:
+        return False
+    if 'instock' in a or 'limitedavailability' in a:
+        return True
+    return None
+
+
+def _offer_price(offer):
+    if not isinstance(offer, dict):
+        return None
+    for key in ('price', 'lowPrice', 'highPrice'):
+        v = offer.get(key)
+        if v not in (None, ''):
+            try:
+                return float(str(v).replace(',', '').replace('$', ''))
+            except (TypeError, ValueError):
+                pass
+    spec = offer.get('priceSpecification')
+    if isinstance(spec, dict):
+        return _offer_price(spec)
+    if isinstance(spec, list) and spec:
+        return _offer_price(spec[0])
+    return None
+
+
+def recheck_product_stock(url, *, timeout=20,
+                          user_agent=RECHECK_USER_AGENT, session=None):
+    """Re-fetch a known product URL and decide its current stock state.
+
+    Returns a dict:
+      determinable : bool      -- True only when the result is safe to act on
+      in_stock     : bool|None
+      price        : float|None
+      status       : int|None  -- HTTP status (None on network error)
+      reason       : str       -- audit string for logging
+
+    Decision table (see module note above):
+      network error / timeout            -> determinable=False (leave as-is)
+      403 / 429 / >=500                  -> determinable=False (blocked/server)
+      404 / 410                          -> in_stock=False     (page gone)
+      200 + schema availability          -> map InStock/OOS    (trust schema)
+      200 + no parseable Product JSON-LD -> determinable=False (leave as-is)
+
+    Safer policy (2026-06-06): a 200 page with no parseable Product JSON-LD is
+    ALWAYS undetermined for EVERY retailer — a missing schema block does not
+    reliably mean OOS (e.g. Brownells in-stock PDPs whose availability lives
+    outside JSON-LD). Only explicit schema OOS or a 404/410 flips a listing.
+    """
+    import requests  # lazy: scraper_lib stays importable without requests
+    if not url:
+        return {'determinable': False, 'in_stock': None, 'price': None,
+                'status': None, 'reason': 'no-url'}
+    try:
+        get = session.get if session is not None else requests.get
+        resp = get(url, headers={
+            'User-Agent': user_agent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }, timeout=timeout, allow_redirects=True)
+    except Exception as e:
+        return {'determinable': False, 'in_stock': None, 'price': None,
+                'status': None, 'reason': f'fetch-error:{type(e).__name__}'}
+
+    status = resp.status_code
+    if status in (404, 410):
+        return {'determinable': True, 'in_stock': False, 'price': None,
+                'status': status, 'reason': f'http-{status}-gone'}
+    if status in (403, 429) or status >= 500:
+        return {'determinable': False, 'in_stock': None, 'price': None,
+                'status': status, 'reason': f'http-{status}-blocked-or-server'}
+    if status != 200:
+        return {'determinable': False, 'in_stock': None, 'price': None,
+                'status': status, 'reason': f'http-{status}-unexpected'}
+
+    offer = extract_product_offer(resp.text)
+    if isinstance(offer, dict):
+        avail = offer.get('availability')
+        in_stock = availability_to_in_stock(avail)
+        price = _offer_price(offer)
+        if in_stock is None:
+            return {'determinable': False, 'in_stock': None, 'price': price,
+                    'status': status, 'reason': f'schema-ambiguous:{avail}'}
+        return {'determinable': True, 'in_stock': in_stock, 'price': price,
+                'status': status, 'reason': f'schema:{avail}'}
+
+    # 200 with no parseable Product JSON-LD offer on the page -> we cannot tell.
+    # NEVER treat this as OOS (a missing schema block is not a reliable OOS
+    # signal). Leave the listing as-is; only explicit schema OOS or a 404/410
+    # flips it.
+    return {'determinable': False, 'in_stock': None, 'price': None,
+            'status': status, 'reason': 'no-jsonld-undetermined'}
