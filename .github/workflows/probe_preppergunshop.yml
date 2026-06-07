@@ -1,0 +1,33 @@
+name: PROBE - Prepper Gun Shop dry-run (throwaway, no DB)
+
+# Throwaway probe (2026-06-06): proves preppergunshop.com serves clean
+# pages to GitHub Actions datacenter IPs (the Wideners failure mode
+# check) by running the FULL scraper dry-run end-to-end from a runner.
+# No secrets are provided, so even a bug cannot reach the database.
+# Lives only on the probe/preppergunshop-dryrun branch — delete the
+# branch after the verdict is recorded; never merge to main.
+
+on:
+  push:
+    branches: [probe/preppergunshop-dryrun]
+  workflow_dispatch:
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies (no supabase — dry-run only)
+        run: pip install requests python-dotenv
+
+      - name: Full dry-run (writes nothing, no secrets in env)
+        run: python scraper_preppergunshop.py --dry-run
