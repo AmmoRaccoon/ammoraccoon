@@ -50,6 +50,7 @@ from dotenv import load_dotenv
 from supabase import create_client
 
 from scraper_lib import (
+    insert_price_history,
     normalize_caliber, now_iso, with_stock_fields,
     parse_purchase_limit, parse_brand, sanity_check_ppr, clean_title,
     parse_bullet_type,
@@ -392,12 +393,12 @@ def main() -> int:
                 result = supabase.table('listings').upsert(
                     listing, on_conflict='retailer_id,retailer_product_id',
                 ).execute()
-                supabase.table('price_history').insert({
+                insert_price_history(supabase, {
                     'listing_id': result.data[0]['id'],
                     'price': row['base_price'],
                     'price_per_round': row['price_per_round'],
                     'in_stock': row['in_stock'],
-                }, returning="minimal").execute()
+                })
                 saved_total += 1
                 print(
                     f"  [{i:>4}/{len(urls)}] cal={cal_norm:<8} "

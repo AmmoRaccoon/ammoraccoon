@@ -9,6 +9,7 @@ from playwright_stealth import Stealth
 from supabase import create_client
 
 from scraper_lib import (
+    insert_price_history,
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, normalize_caliber, parse_bullet_type,
     mark_retailer_scraped,
@@ -302,12 +303,12 @@ def scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts):
                     on_conflict='retailer_id,retailer_product_id'
                 ).execute()
 
-                supabase.table('price_history').insert({
+                insert_price_history(supabase, {
                     'listing_id': result.data[0]['id'],
                     'price': base_price,
                     'price_per_round': price_per_round,
                     'in_stock': in_stock,
-                }, returning="minimal").execute()
+                })
 
                 saved += 1
                 new_on_page += 1

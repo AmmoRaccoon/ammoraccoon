@@ -1351,3 +1351,129 @@ def recheck_product_stock(url, *, timeout=20,
     # flips it.
     return {'determinable': False, 'in_stock': None, 'price': None,
             'status': status, 'reason': 'no-jsonld-undetermined'}
+
+
+# ---------------------------------------------------------------------------
+# price_history store-on-change writer (2026-06-10)
+#
+# Why: the fleet writes a price_history row for every listing on every cron
+# cycle (~12/day since GitHub Actions started delivering the 2-hourly
+# schedule reliably on 2026-05-19), and a measured 92% of those rows repeat
+# the previous (price, in_stock) observation exactly. The resulting pileup
+# (~2.5M rows in the 30-day window) pushed homepage_segment_aggregates past
+# the anon statement_timeout — PriceDelta badges dark site-wide.
+#
+# Policy (approved 2026-06-10):
+#   * ALWAYS write when the listing has no price_history row yet today
+#     (UTC) — the daily heartbeat. The /history daily-floor chart bins by
+#     UTC day and needs one observation per listing per day; the heartbeat
+#     guarantees it on every day the scraper actually sees the listing.
+#   * ALWAYS write when (price, price_per_round, in_stock) differs from the
+#     listing's latest row today — every real change is recorded the cycle
+#     it is seen. (price_per_round is compared as well as price so a
+#     total_rounds repack at an unchanged box price still records.)
+#   * SKIP the insert otherwise — the same observation is already on file
+#     for today.
+#
+# The comparison baseline is the latest row TODAY (UTC), not all-time: when
+# a listing has no row today the heartbeat fires unconditionally, so older
+# rows never need to be consulted.
+#
+# FAIL-OPEN: if the once-per-run prefetch of today's rows fails for any
+# reason, every row is written exactly as before this helper existed. A
+# duplicate row is harmless; a silently dropped price change is not.
+#
+# Cost: ONE retailer-scoped paginated query per scraper run (the retailer
+# is resolved lazily from the first listing_id seen), then O(1) in-memory
+# decisions per listing. The cache is keyed by UTC day, so a run that
+# straddles midnight rebuilds its baseline on the first insert after
+# 00:00 UTC; a heartbeat suppressed in the final minutes of a day is
+# written by the next cycle (the fleet runs ~8-12 cycles/day, so every
+# scraped listing still gets at least one row every UTC day).
+# ---------------------------------------------------------------------------
+
+_PH_CACHE = {'day': None, 'retailer_id': None, 'ok': False, 'latest': {}}
+
+
+def _ph_today_utc():
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+
+def _ph_num_eq(a, b, tol):
+    if a is None and b is None:
+        return True
+    if a is None or b is None:
+        return False
+    try:
+        return abs(float(a) - float(b)) < tol
+    except (TypeError, ValueError):
+        return False
+
+
+def _ph_same(prev, new):
+    """(price, price_per_round, in_stock) equality, cent-safe tolerances so
+    a float that round-trips through PostgREST JSON still compares equal."""
+    return (_ph_num_eq(prev[0], new[0], 0.005)
+            and _ph_num_eq(prev[1], new[1], 0.00005)
+            and bool(prev[2]) == bool(new[2]))
+
+
+def _ph_prefetch_today(supabase, retailer_id, today):
+    """Latest (price, price_per_round, in_stock) per listing among TODAY's
+    (UTC) price_history rows for one retailer. One paginated query per run;
+    rows arrive ordered (listing_id, recorded_at) ascending so the dict
+    naturally ends holding each listing's most recent observation."""
+    latest = {}
+    start = 0
+    while True:
+        batch = (supabase.table('price_history')
+                 .select('listing_id, price, price_per_round, in_stock, '
+                         'recorded_at, listings!inner(retailer_id)')
+                 .eq('listings.retailer_id', retailer_id)
+                 .gte('recorded_at', f'{today}T00:00:00+00:00')
+                 .order('listing_id')
+                 .order('recorded_at')
+                 .range(start, start + 999)
+                 .execute().data) or []
+        for r in batch:
+            latest[r['listing_id']] = (r.get('price'),
+                                       r.get('price_per_round'),
+                                       r.get('in_stock'))
+        if len(batch) < 1000:
+            break
+        start += 1000
+    return latest
+
+
+def insert_price_history(supabase, row):
+    """Insert a price_history observation under the store-on-change +
+    daily-heartbeat policy above. Drop-in replacement for the old
+    unconditional supabase.table('price_history').insert(...,
+    returning='minimal').execute() call every scraper carried.
+
+    Returns True when a row was written, False when skipped as a duplicate
+    of an observation already recorded today.
+    """
+    lid = row.get('listing_id')
+    today = _ph_today_utc()
+    if _PH_CACHE['day'] != today:
+        try:
+            rid = (supabase.table('listings').select('retailer_id')
+                   .eq('id', lid).limit(1).execute().data[0]['retailer_id'])
+            _PH_CACHE.update(day=today, retailer_id=rid, ok=True,
+                             latest=_ph_prefetch_today(supabase, rid, today))
+        except Exception as e:
+            # Fail open: with no baseline, write every row (the pre-helper
+            # behavior). The dedupe layer must never drop a price change.
+            print(f"  [price-history] prefetch failed "
+                  f"({type(e).__name__}: {e}) — writing all rows this run")
+            _PH_CACHE.update(day=today, retailer_id=None, ok=False, latest={})
+    new = (row.get('price'), row.get('price_per_round'), row.get('in_stock'))
+    if _PH_CACHE['ok']:
+        prev = _PH_CACHE['latest'].get(lid)
+        if prev is not None and _ph_same(prev, new):
+            return False
+    supabase.table('price_history').insert(row, returning='minimal').execute()
+    if _PH_CACHE['ok']:
+        _PH_CACHE['latest'][lid] = new
+    return True

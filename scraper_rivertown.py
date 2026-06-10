@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -297,13 +297,13 @@ async def scrape():
 
                 if result.data:
                     listing_id = result.data[0]['id']
-                    supabase.table('price_history').insert({
+                    insert_price_history(supabase, {
                         'listing_id': listing_id,
                         'price': product['base_price'],
                         'price_per_round': product['price_per_round'],
                         'in_stock': product['in_stock'],
                         'recorded_at': now,
-                    }, returning="minimal").execute()
+                    })
 
             except Exception as e:
                 print(f"  DB error for {product.get('manufacturer','?')}: {e}")

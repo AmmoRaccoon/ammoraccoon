@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history
 
 load_dotenv()
 
@@ -231,12 +231,12 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                     on_conflict='retailer_id,retailer_product_id'
                 ).execute()
 
-                supabase.table('price_history').insert({
+                insert_price_history(supabase, {
                     'listing_id': result.data[0]['id'],
                     'price': base_price,
                     'price_per_round': price_per_round,
                     'in_stock': in_stock,
-                }, returning="minimal").execute()
+                })
 
                 saved += 1
                 print(f"  Saved [{caliber_norm}]: {name[:55]} | ${base_price} | {price_per_round}/rd")

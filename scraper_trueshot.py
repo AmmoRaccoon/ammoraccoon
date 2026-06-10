@@ -6,7 +6,7 @@ import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -253,13 +253,13 @@ def scrape():
 
             if result.data:
                 listing_id = result.data[0]['id']
-                supabase.table('price_history').insert({
+                insert_price_history(supabase, {
                     'listing_id': listing_id,
                     'price': row['base_price'],
                     'price_per_round': row['price_per_round'],
                     'in_stock': row['in_stock'],
                     'recorded_at': now,
-                }, returning="minimal").execute()
+                })
 
         except Exception as e:
             print(f"  DB error for {row.get('manufacturer','?')}: {e}")

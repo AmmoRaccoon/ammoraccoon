@@ -7,6 +7,7 @@ from playwright.sync_api import sync_playwright
 from supabase import create_client
 
 from scraper_lib import (
+    insert_price_history,
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand_with_url, sanity_check_ppr, clean_title, normalize_caliber,
     parse_bullet_type_with_url_fallback,
@@ -310,12 +311,12 @@ def scrape_parent(page, parent_path, retailer_id, seen_ids, counts):
                     on_conflict='retailer_id,retailer_product_id'
                 ).execute()
 
-                supabase.table('price_history').insert({
+                insert_price_history(supabase, {
                     'listing_id': result.data[0]['id'],
                     'price': base_price,
                     'price_per_round': price_per_round,
                     'in_stock': in_stock,
-                }, returning="minimal").execute()
+                })
 
                 saved += 1
                 counts[caliber_norm] = counts.get(caliber_norm, 0) + 1
