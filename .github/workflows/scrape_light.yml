@@ -271,3 +271,17 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python scripts/caliber_audit.py
+
+      # Rebuild the homepage_segment_aggregates_cache precompute table
+      # (migration 031) after this tick's scrapes land, so the homepage
+      # PriceDelta "vs 30-day floor" badges read a <200ms table instead of
+      # calling the ~3s live RPC on every page load. Stale-by-one-cycle is
+      # by design — these are 30-day baselines, not live prices. The web
+      # falls back to the live RPC if this step fails repeatedly (>24h).
+      - name: Refresh homepage segment aggregates cache
+        if: always()
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scripts/refresh_segment_aggregates_cache.py
