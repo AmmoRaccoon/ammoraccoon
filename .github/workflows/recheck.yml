@@ -1,0 +1,56 @@
+name: AmmoRaccoon Stock Re-check
+
+# Shared listing stock re-check (scraper_recheck.py): re-fetches the
+# product_url of stale in-stock listings (in_stock=true AND last_updated
+# older than 2 days) and fixes their stock status directly, independent
+# of the category crawls. Category-crawl scrapers never revisit a listing
+# once it rotates off the category page, so without this job the frozen
+# in_stock=true tail regrows — the 2026-06-06 manual run fixed ~800
+# frozen listings in one pass.
+#
+# Safer policy (as committed in e6a23ba): a listing flips to OOS ONLY on
+# an explicit schema.org OutOfStock/SoldOut/Discontinued signal or a
+# 404/410 dead page. Anti-bot 403/429, 5xx, network errors, and 200 pages
+# without parseable Product JSON-LD are all left as-is; walled or
+# schema-less retailers are excluded inside the script. Never wrongly
+# flips an in-stock listing.
+#
+# 07:00 UTC = 02:00 America/Chicago during CDT — same early-morning
+# quiet-window logic as the component scrape. An odd hour, so it never
+# shares a cron tick with the 2-hourly scrapes (light/medium/heavy fire
+# at even hours), and it's clear of components (09:00 UTC daily),
+# rebates (13:00 UTC daily), condense (Sun 00:00) and ballistics
+# (Sun 06:00).
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  recheck:
+    runs-on: ubuntu-latest
+    # The 2026-06-06 manual commit run took ~12 min for 2,016 stale
+    # listings; 60 minutes is ~5x headroom for a regrown tail while
+    # still cutting off a hung run well before the runner's hard cap.
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # No Playwright install — the re-check is requests-only (shared
+      # schema.org JSON-LD reader in scraper_lib; retailers that need a
+      # browser are excluded inside the script).
+      - name: Install dependencies
+        run: pip install requests python-dotenv "supabase==2.15.0"
+
+      - name: Run stock re-check (live commit)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper_recheck.py --commit
