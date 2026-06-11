@@ -11,6 +11,16 @@ on:
     - cron: '0 */2 * * *'
   workflow_dispatch:
 
+# Mirror of scrape_heavy's overlap guard (2026-06-10 scale review): the
+# tier currently runs ~40-56 min, but GitHub cron delays plus tier growth
+# can push a run past the next 2h tick — without this group the next tick
+# would start IN PARALLEL and double-scrape every retailer (double
+# price_history writes, double load on retailer sites). cancel-in-progress
+# false keeps the in-flight run alive; the new tick waits instead.
+concurrency:
+  group: scrape-light
+  cancel-in-progress: false
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -262,6 +272,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          # Optional ops-channel mirror for alerts (incl. the badge-cache
+          # age check) — empty until the repo secret is added; the script
+          # skips Discord gracefully and email still fires.
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python scripts/health_check.py
 
       - name: Caliber pricing audit

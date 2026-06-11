@@ -10,6 +10,14 @@ on:
     - cron: '0 */2 * * *'
   workflow_dispatch:
 
+# Mirror of scrape_heavy's overlap guard (2026-06-10 scale review): runs
+# have hit 66 min already; if tier growth or cron delay ever pushes one
+# past the next 2h tick, this prevents the parallel double-scrape
+# (double price_history writes, double retailer load).
+concurrency:
+  group: scrape-medium
+  cancel-in-progress: false
+
 jobs:
   scrape:
     runs-on: ubuntu-latest

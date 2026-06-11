@@ -14,6 +14,12 @@ Retailers with no previous baseline (e.g. never-scraped, or intentionally disabl
 like Bereli) self-mute -they produce no alerts because we have nothing to compare
 against.
 
+Also checks the homepage badge cache (homepage_segment_aggregates_cache):
+if its newest refreshed_at is older than CACHE_MAX_AGE_HOURS the refresh
+job has been failing for ~3 consecutive ticks — alert BEFORE the web's
+24h fallback silently kicks in (2026-06-10: the refresh failed green for
+19h under continue-on-error before anyone noticed).
+
 Required env:
   SUPABASE_URL, SUPABASE_KEY
   GMAIL_APP_PASSWORD   Gmail app password for the sender account. If unset, the
@@ -22,12 +28,17 @@ Required env:
 Optional env:
   GMAIL_USER           Sender address. Default: gbmcoffice@gmail.com
   ALERT_RECIPIENT      Recipient address. Default: gbmcoffice@gmail.com
+  DISCORD_WEBHOOK_URL  Ops-channel webhook. If set, alerts ALSO post to
+                       Discord; if unset, Discord is skipped with a printed
+                       note (email path unaffected).
   FORCE_ALERT          If "1", treat every retailer as alerting (preview formatting).
 """
 
+import json
 import os
 import smtplib
 import sys
+import urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -42,6 +53,7 @@ SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 GMAIL_USER = os.environ.get("GMAIL_USER", "gbmcoffice@gmail.com")
 ALERT_RECIPIENT = os.environ.get("ALERT_RECIPIENT", "gbmcoffice@gmail.com")
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 FORCE_ALERT = os.environ.get("FORCE_ALERT") == "1"
 
 CURRENT_WINDOW_HOURS = 3
@@ -49,6 +61,9 @@ PREVIOUS_WINDOW_HOURS = 3
 DROP_THRESHOLD = 0.5
 MIN_BASELINE = 5
 PAGE_SIZE = 1000
+# Badge cache refreshes on every scrape_light tick (~2h as delivered);
+# 6h = ~3 missed refreshes, well before the web's 24h slow-RPC fallback.
+CACHE_MAX_AGE_HOURS = 6
 
 
 def fetch_retailers(sb):
@@ -138,6 +153,60 @@ def evaluate(retailers, current_counts, previous_counts):
     return alerts
 
 
+def check_cache_age(sb):
+    """Alert if the homepage badge cache has stopped refreshing.
+
+    Returns a list in the same (severity, name, detail) shape evaluate()
+    uses. Never raises — a failed check degrades to a WARN alert rather
+    than killing the retailer health check it rides along with.
+    """
+    try:
+        rows = (
+            sb.table("homepage_segment_aggregates_cache")
+            .select("refreshed_at")
+            .order("refreshed_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if not rows:
+            return [("CRITICAL", "Badge cache",
+                     "homepage_segment_aggregates_cache is EMPTY - homepage "
+                     "badges are running on the slow live RPC")]
+        newest = datetime.fromisoformat(rows[0]["refreshed_at"])
+        age_h = (datetime.now(timezone.utc) - newest).total_seconds() / 3600
+        if age_h > CACHE_MAX_AGE_HOURS:
+            return [("CRITICAL", "Badge cache",
+                     f"newest refreshed_at is {age_h:.1f}h old (threshold "
+                     f"{CACHE_MAX_AGE_HOURS}h) - the refresh step is failing; "
+                     "at 24h the homepage silently falls back to the slow live RPC")]
+        return []
+    except Exception as e:  # noqa: BLE001 - degrade, never crash the health check
+        return [("WARN", "Badge cache",
+                 f"cache age check itself failed ({type(e).__name__}: {e})")]
+
+
+def post_discord(message):
+    if not DISCORD_WEBHOOK_URL:
+        print("DISCORD_WEBHOOK_URL not set - skipping Discord post.")
+        return
+    req = urllib.request.Request(
+        DISCORD_WEBHOOK_URL,
+        data=json.dumps({"content": message[:2000]}).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            # Discord's edge 403s the default Python-urllib agent.
+            "User-Agent": "AmmoRaccoon-health-check/1.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15):
+            pass
+        print("Alert posted to Discord.")
+    except Exception as e:  # noqa: BLE001 - Discord down must not fail the run
+        print(f"Discord post failed ({type(e).__name__}: {e}) - email path unaffected.")
+
+
 def format_body(alerts, retailers, current_counts, previous_counts, windows):
     cur_start, cur_end, prev_start, prev_end = windows
     lines = ["AmmoRaccoon scraper health alert", ""]
@@ -205,6 +274,7 @@ def main():
             print(f"  [{rid:>2}] {name}: {cur} / {prev}")
 
     alerts = evaluate(retailers, current, previous)
+    alerts += check_cache_age(sb)
     if not alerts:
         print("\nAll scrapers healthy -no alert sent.")
         return 0
@@ -216,6 +286,9 @@ def main():
     subject = f"[AmmoRaccoon] {len(alerts)} scraper alert(s)"
     body = format_body(alerts, retailers, current, previous, (cur_start, now, prev_start, prev_end))
     send_email(subject, body)
+    post_discord(
+        "\n".join([f"[{sev}] {name} - {detail}" for sev, name, detail in alerts])
+    )
     return 0
 
 
