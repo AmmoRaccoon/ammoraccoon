@@ -1383,9 +1383,10 @@ def recheck_product_stock(url, *, timeout=20,
 # reason, every row is written exactly as before this helper existed. A
 # duplicate row is harmless; a silently dropped price change is not.
 #
-# Cost: ONE retailer-scoped paginated query per scraper run (the retailer
-# is resolved lazily from the first listing_id seen), then O(1) in-memory
-# decisions per listing. The cache is keyed by UTC day, so a run that
+# Cost: one listings-id query plus a handful of small chunked
+# price_history queries per scraper run (the retailer is resolved lazily
+# from the first listing_id seen), then O(1) in-memory decisions per
+# listing. The cache is keyed by UTC day, so a run that
 # straddles midnight rebuilds its baseline on the first insert after
 # 00:00 UTC; a heartbeat suppressed in the final minutes of a day is
 # written by the next cycle (the fleet runs ~8-12 cycles/day, so every
@@ -1420,28 +1421,54 @@ def _ph_same(prev, new):
 
 def _ph_prefetch_today(supabase, retailer_id, today):
     """Latest (price, price_per_round, in_stock) per listing among TODAY's
-    (UTC) price_history rows for one retailer. One paginated query per run;
+    (UTC) price_history rows for one retailer.
+
+    Two lean steps instead of one joined query: (1) the retailer's listing
+    ids from the ~17k-row listings table, (2) today's rows chunked
+    listing_id=in.(...) so every statement is a bounded seek on
+    idx_price_history_listing_recorded_cpr. The original single query
+    (price_history INNER JOIN listings ON retailer_id, ordered, OFFSET-
+    paginated) planned pathologically for some retailer ids and blew the
+    8s statement timeout — 10 fail-opens across the 2026-06-10 light+
+    medium runs; reproduced same-day by scripts/_probe_prefetch_timing.py
+    (SGAmmo/Lucky Gunner: OLD timed out at 8.2s, NEW 2.4s/0.8s, results
+    identical on every retailer where OLD completed). Within each chunk
     rows arrive ordered (listing_id, recorded_at) ascending so the dict
     naturally ends holding each listing's most recent observation."""
-    latest = {}
+    ids = []
     start = 0
     while True:
-        batch = (supabase.table('price_history')
-                 .select('listing_id, price, price_per_round, in_stock, '
-                         'recorded_at, listings!inner(retailer_id)')
-                 .eq('listings.retailer_id', retailer_id)
-                 .gte('recorded_at', f'{today}T00:00:00+00:00')
-                 .order('listing_id')
-                 .order('recorded_at')
+        batch = (supabase.table('listings').select('id')
+                 .eq('retailer_id', retailer_id)
+                 .order('id')
                  .range(start, start + 999)
                  .execute().data) or []
-        for r in batch:
-            latest[r['listing_id']] = (r.get('price'),
-                                       r.get('price_per_round'),
-                                       r.get('in_stock'))
+        ids.extend(r['id'] for r in batch)
         if len(batch) < 1000:
             break
         start += 1000
+    latest = {}
+    CHUNK = 200
+    for i in range(0, len(ids), CHUNK):
+        chunk = ids[i:i + CHUNK]
+        cstart = 0
+        while True:
+            batch = (supabase.table('price_history')
+                     .select('listing_id, price, price_per_round, '
+                             'in_stock, recorded_at')
+                     .in_('listing_id', chunk)
+                     .gte('recorded_at', f'{today}T00:00:00+00:00')
+                     .order('listing_id')
+                     .order('recorded_at')
+                     .range(cstart, cstart + 999)
+                     .execute().data) or []
+            for r in batch:
+                latest[r['listing_id']] = (r.get('price'),
+                                           r.get('price_per_round'),
+                                           r.get('in_stock'))
+            if len(batch) < 1000:
+                break
+            cstart += 1000
     return latest
 
 
