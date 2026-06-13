@@ -17,17 +17,33 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "target-sports"
 SITE_BASE = "https://www.targetsportsusa.com"
 
+# Category IDs re-harvested from TSUSA's own sitemap 2026-06-12
+# (product-categories-sitemap.xml, via robots.txt) after the site
+# renumbered its categories. The old IDs 301'd to WRONG calibers with
+# HTTP 200 — the .223 URL landed on .44 Rem Mag, the .22 LR URL on
+# .44 Special — so the strict caliber gate silently saved zero and
+# 9 of 10 calibers went dark. Only 9mm (c-51) kept its old ID.
+# Each URL below was dry-run verified before wiring: 200, no redirect,
+# page title names the caliber, 95-100% of product cards pass the gate
+# (scripts/_probe_tsusa_dryrun.py).
+#
+# Values are LISTS because TSUSA split two of our combined calibers
+# into separate category pages: .223 Rem vs 5.56 NATO, and .308 Win
+# vs 7.62x51 NATO. normalize_caliber buckets both halves into the
+# same normalized caliber, and seen_ids dedups any cross-listed SKU.
 CALIBER_PATHS = {
-    '9mm':     '/9mm-luger-ammo-c-51.aspx?pp=240&SortOrder=PriceAscending',
-    '380acp':  '/380-acp-ammo-c-49.aspx?pp=240&SortOrder=PriceAscending',
-    '40sw':    '/40-sw-ammo-c-52.aspx?pp=240&SortOrder=PriceAscending',
-    '38spl':   '/38-special-ammo-c-48.aspx?pp=240&SortOrder=PriceAscending',
-    '357mag':  '/357-magnum-ammo-c-47.aspx?pp=240&SortOrder=PriceAscending',
-    '22lr':    '/22-lr-ammo-c-65.aspx?pp=240&SortOrder=PriceAscending',
-    '223-556': '/223-rem-5-56-nato-ammo-c-66.aspx?pp=240&SortOrder=PriceAscending',
-    '308win':  '/308-win-7-62x51-ammo-c-67.aspx?pp=240&SortOrder=PriceAscending',
-    '762x39':  '/7-62x39-ammo-c-71.aspx?pp=240&SortOrder=PriceAscending',
-    '300blk':  '/300-aac-blackout-ammo-c-69.aspx?pp=240&SortOrder=PriceAscending',
+    '9mm':     ['/9mm-luger-ammo-c-51.aspx?pp=240&SortOrder=PriceAscending'],
+    '380acp':  ['/380-acp-auto-ammo-c-50.aspx?pp=240&SortOrder=PriceAscending'],
+    '40sw':    ['/40-sw-ammo-c-59.aspx?pp=240&SortOrder=PriceAscending'],
+    '38spl':   ['/38-special-ammo-c-56.aspx?pp=240&SortOrder=PriceAscending'],
+    '357mag':  ['/357-magnum-ammo-c-57.aspx?pp=240&SortOrder=PriceAscending'],
+    '22lr':    ['/22-long-rifle-ammo-c-202.aspx?pp=240&SortOrder=PriceAscending'],
+    '223-556': ['/223-remington-ammo-c-83.aspx?pp=240&SortOrder=PriceAscending',
+                '/556mm-nato-ammo-c-2719.aspx?pp=240&SortOrder=PriceAscending'],
+    '308win':  ['/308-winchester-ammo-c-101.aspx?pp=240&SortOrder=PriceAscending',
+                '/762x51mm-nato-ammo-c-2720.aspx?pp=240&SortOrder=PriceAscending'],
+    '762x39':  ['/762x39mm-ammo-c-108.aspx?pp=240&SortOrder=PriceAscending'],
+    '300blk':  ['/300-aac-blackout-ammo-c-969.aspx?pp=240&SortOrder=PriceAscending'],
 }
 
 def get_retailer_id():
@@ -87,7 +103,17 @@ def parse_country(text):
     return None
 
 def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    url = SITE_BASE + CALIBER_PATHS[caliber_norm]
+    saved = 0
+    skipped = 0
+    for path in CALIBER_PATHS[caliber_norm]:
+        s, k = scrape_category_page(page, SITE_BASE + path, caliber_norm,
+                                    caliber_display, retailer_id, seen_ids)
+        saved += s
+        skipped += k
+    return saved, skipped
+
+
+def scrape_category_page(page, url, caliber_norm, caliber_display, retailer_id, seen_ids):
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
@@ -96,6 +122,17 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         return 0, 0
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
+        return 0, 0
+    # Redirect guard — 2026-06 incident: TSUSA renumbered its category
+    # IDs and the old URLs 301'd to OTHER calibers' pages with a 200,
+    # so the caliber gate silently saved zero for 9 of 10 calibers.
+    # A category URL that navigates anywhere but itself is the wrong
+    # page; skip loudly so the failure shows up in the run log.
+    requested_path = url.split('?')[0].lower()
+    landed_path = page.url.split('?')[0].lower()
+    if landed_path != requested_path:
+        print(f"  REDIRECTED to {page.url} - category ID likely renumbered "
+              f"again; skipping this page instead of scraping wrong ammo.")
         return 0, 0
     print("  Waiting for products to load...")
     time.sleep(20)
