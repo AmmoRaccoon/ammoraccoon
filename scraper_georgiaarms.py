@@ -25,18 +25,35 @@ SITE_BASE = "https://www.georgia-arms.com"
 # BigCommerce. Slugs use trailing -1 disambiguators on most categories
 # (Georgia Arms re-imported their catalog at some point and the legacy
 # slugs collided). Verified 2026-04-25 against the live homepage nav:
-# .22 LR is /22-long-rifle/ (was /22-lr/ — 404), and 7.62x39 sits at
-# /7-62x39-1/ but currently has zero in-stock product.
+# .22 LR is /22-long-rifle/ (was /22-lr/ — 404).
+#
+# PARKED 2026-06-12 (first catches of the per-caliber zero-coverage
+# alert; probes: scripts/_probe_aeammo_ga_triage.py +
+# _probe_ga_22lr_skus.py):
+#   '762x39':  '/7-62x39-1/',      # category alive but EMPTY — zero
+#                                  # products since at least 2026-04-25.
+#   '22lr':    '/22-long-rifle/',  # category holds exactly 2 CCI
+#                                  # resell SKUs, and BOTH carry no
+#                                  # round-count signal anywhere: zero
+#                                  # variant labels on their product
+#                                  # pages, nothing the title parser
+#                                  # matches ("525/ct (Bulk)" and a
+#                                  # count-less title). The skip is the
+#                                  # honest no-guessed-CPR rule working;
+#                                  # parking stops the standing alert.
+#                                  # Possible future lever: a '/ct'
+#                                  # title pattern would recover exactly
+#                                  # the one Blazer bulk SKU — needs its
+#                                  # own approval, parser change.
+# Re-add either when GA restocks parseable product.
 CALIBER_PATHS = {
     '9mm':     '/9mm-luger-1/',
     '380acp':  '/380-acp-1/',
     '40sw':    '/40-s-w-1/',
     '38spl':   '/38-special-1/',
     '357mag':  '/357-mag-1/',
-    '22lr':    '/22-long-rifle/',
     '223-556': '/223-rem-1/',
     '308win':  '/308-win-1/',
-    '762x39':  '/7-62x39-1/',
     '300blk':  '/300-blackout/',
 }
 

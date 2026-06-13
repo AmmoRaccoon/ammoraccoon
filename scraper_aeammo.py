@@ -28,6 +28,16 @@ SITE_BASE = "https://aeammo.com"
 # returns 403 to bots — the category URL above is the only viable
 # handle. The 5.56 leg of 223-556 is recovered; the .223 Rem leg
 # has no category page either, and is filter-only (also 403).
+# PARKED 2026-06-12 — genuine catalog absence, not URL drift (first
+# catches of the new per-caliber zero-coverage alert; probe:
+# scripts/_probe_aeammo_ga_triage.py). Both category pages are alive
+# (200, no redirect, correct titles, still linked from the rifle nav)
+# but render ZERO product cards, and the /Ammo/Rifle-Ammo caliber
+# facet panel — which BigCommerce only populates for calibers with
+# >= 1 product — lists neither cartridge. AE simply has no .308 Win
+# or 7.62x39 product right now. Re-add when the facet reappears:
+#   '308win':  ['/Ammo/Rifle-Ammo/308-Win-Ammo'],
+#   '762x39':  ['/Ammo/Rifle-Ammo/7.62x39-Ammo'],
 CALIBER_PATHS = {
     '9mm':     ['/Ammo/Handgun-Ammo/9mm-Ammo'],
     '380acp':  ['/Ammo/Handgun-Ammo/380-Acp-Ammo'],
@@ -35,8 +45,6 @@ CALIBER_PATHS = {
     '357mag':  ['/Ammo/Handgun-Ammo/357-Magnum-Ammo'],
     '22lr':    ['/Ammo/Rimfire-Ammo'],
     '223-556': ['/Ammo/Rifle-Ammo/556-Nato-Ammo'],
-    '308win':  ['/Ammo/Rifle-Ammo/308-Win-Ammo'],
-    '762x39':  ['/Ammo/Rifle-Ammo/7.62x39-Ammo'],
     '300blk':  ['/Ammo/Rifle-Ammo/300-Blackout'],
 }
 
