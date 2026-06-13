@@ -64,22 +64,15 @@ USER_AGENT = (
 )
 
 # Caliber-name → caliber_normalized (matches listings.caliber_normalized).
-# Mirrors the values in scraper_lib but kept local so this module doesn't
-# pull in scraper_lib's playwright import path.
-CALIBER_NORMALIZE = {
-    '9mm luger': '9mm',
-    '9mm': '9mm',
-    '380 acp': '380acp', '.380 acp': '380acp', '.380 auto': '380acp',
-    '38 special': '38spl', '.38 special': '38spl', '38 spl': '38spl',
-    '357 magnum': '357mag', '.357 magnum': '357mag', '357 mag': '357mag',
-    '40 s&w': '40sw', '.40 s&w': '40sw', '.40 smith & wesson': '40sw',
-    '22 lr': '22lr', '.22 lr': '22lr', '.22 long rifle': '22lr',
-    '223 remington': '223-556', '.223 remington': '223-556', '5.56 nato': '223-556',
-    '5.56x45mm nato': '223-556', '5.56': '223-556',
-    '308 winchester': '308win', '.308 winchester': '308win', '.308 win': '308win',
-    '7.62x39mm': '762x39', '7.62x39': '762x39',
-    '300 blackout': '300blk', '300 aac blackout': '300blk', '.300 blackout': '300blk',
-}
+# Phase B step 4 (2026-06-12): re-exported from the shared union map in
+# caliber_registry_gen (BALLISTICS_CALIBER_NORMALIZE, emitted from
+# calibers.json). D2: the union is a deliberate SUPERSET of the old per-source
+# maps; the fresh live replay showed Kinetic's crawl gains no rows and
+# changes/removes nothing (scripts/_replay_ballistics_maps.py). The old note
+# about keeping the map local to avoid scraper_lib's playwright import still
+# holds — caliber_registry_gen is dependency-light (re only) and sits beside
+# this file in the repo root.
+from caliber_registry_gen import BALLISTICS_CALIBER_NORMALIZE as CALIBER_NORMALIZE
 
 SOURCES = {
     'federal': {

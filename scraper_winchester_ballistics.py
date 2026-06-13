@@ -60,22 +60,16 @@ SOURCE = 'winchester'
 BRAND = 'Winchester'
 
 # Cartridge-text → caliber_normalized. Winchester's tiles spell the cartridge
-# name out long-form ("9mm Luger", "25 Automatic"), so this map is broader
-# than Kinetic's because it covers every cartridge family on the catalog page,
-# not just the ones we want — products whose cartridge isn't here drop out.
-CALIBER_NORMALIZE = {
-    '9mm luger': '9mm', '9mm luger +p': '9mm', '9mm nato': '9mm',
-    '380 auto': '380acp', '.380 auto': '380acp', '380 acp': '380acp',
-    '380 automatic': '380acp',
-    '38 special': '38spl', '38 special +p': '38spl',
-    '357 magnum': '357mag',
-    '40 s&w': '40sw', '40 smith & wesson': '40sw',
-    '22 long rifle': '22lr',
-    '223 remington': '223-556', '5.56x45mm nato': '223-556', '5.56mm': '223-556',
-    '308 winchester': '308win',
-    '7.62x39mm': '762x39', '7.62 x 39mm': '762x39',
-    '300 blackout': '300blk', '300 aac blackout': '300blk',
-}
+# name out long-form ("9mm Luger", "25 Automatic"); products whose cartridge
+# isn't recognized drop out.
+# Phase B step 4 (2026-06-12): re-exported from the shared union map in
+# caliber_registry_gen (BALLISTICS_CALIBER_NORMALIZE, emitted from
+# calibers.json). D2: the union is a deliberate SUPERSET of the old per-source
+# maps; the fresh live replay showed Winchester's crawl gains exactly its
+# .45 ACP rows (a verified spec its own map dropped) and changes/removes
+# nothing (scripts/_replay_ballistics_maps.py). caliber_registry_gen.py sits
+# beside this file in the repo root.
+from caliber_registry_gen import BALLISTICS_CALIBER_NORMALIZE as CALIBER_NORMALIZE
 
 # Sorted by needle length descending so the most specific phrase wins.
 # Mirrors scraper_kinetic_ballistics.py — see comment there for the

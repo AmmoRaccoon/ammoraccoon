@@ -63,19 +63,16 @@ BRAND = 'Sellier & Bellot'
 
 # Caliber-name → caliber_normalized. S&B H1 uses lowercase-spaced format
 # like "9 mm LUGER"; the lookup keys are lowercase, whitespace-normalized.
-CALIBER_NORMALIZE = {
-    '9 mm luger': '9mm', '9mm luger': '9mm', '9mm': '9mm',
-    '380 auto': '380acp', '.380 auto': '380acp', '380 acp': '380acp',
-    '38 special': '38spl', '.38 special': '38spl',
-    '357 magnum': '357mag', '.357 magnum': '357mag',
-    '40 s&w': '40sw', '.40 s&w': '40sw',
-    '45 auto': '45acp', '.45 auto': '45acp', '45 acp': '45acp',
-    '223 rem': '223-556', '.223 rem': '223-556',
-    '5.56 nato': '223-556',
-    '308 win': '308win', '.308 win': '308win',
-    '7.62x39': '762x39',
-    '300 blk': '300blk', '300 blackout': '300blk',
-}
+# Phase B step 4 (2026-06-12): re-exported from the shared union map in
+# caliber_registry_gen (BALLISTICS_CALIBER_NORMALIZE, emitted from
+# calibers.json — which includes S&B's '9 mm luger' spacing variant). D2: the
+# union is a deliberate SUPERSET of the old per-source maps; the fresh live
+# replay showed S&B's crawl gains no rows and changes/removes nothing
+# (scripts/_replay_ballistics_maps.py). This module runs as
+# `python scripts/scraper_sb_ballistics.py`, so add the repo root (where
+# caliber_registry_gen.py lives) to sys.path before importing it.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from caliber_registry_gen import BALLISTICS_CALIBER_NORMALIZE as CALIBER_NORMALIZE  # noqa: E402
 
 # Bullet-type lookup, mirrors the other ballistics scrapers.
 _BULLET_TYPE_LOOKUP = [
