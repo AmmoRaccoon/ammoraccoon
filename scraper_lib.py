@@ -33,45 +33,18 @@ from caliber_registry_gen import (
 )
 
 
-def normalize_caliber(text):
-    """Detect a caliber from product text. Returns (display, normalized) or (None, None)."""
-    if not text:
-        return (None, None)
-    t = text.lower()
-    if '5.56' in t or '5.56x45' in t or '5.56nato' in t or '5.56 nato' in t \
-            or re.search(r'\b\.?223\b', t) or '223 rem' in t or '.223 rem' in t:
-        return ('.223 / 5.56 NATO', '223-556')
-    if re.search(r'\b22\s*lr\b', t) or '22 long rifle' in t or '.22lr' in t \
-            or re.search(r'\b\.22\s*lr\b', t):
-        return ('.22 LR', '22lr')
-    if '380 acp' in t or '.380 acp' in t or '380auto' in t or '380 auto' in t \
-            or re.search(r'\b\.?380\b', t):
-        return ('.380 ACP', '380acp')
-    if '40 s&w' in t or '40s&w' in t or '.40 s&w' in t or '.40sw' in t \
-            or '40 smith' in t or re.search(r'\b\.?40\s*sw\b', t):
-        return ('.40 S&W', '40sw')
-    if '308 win' in t or '.308 win' in t or '7.62x51' in t or '7.62 x 51' in t \
-            or re.search(r'\b\.?308\b', t):
-        return ('.308 Winchester', '308win')
-    if '7.62x39' in t or '7.62 x 39' in t or '762x39' in t:
-        return ('7.62x39', '762x39')
-    if '300 blackout' in t or '.300 blackout' in t or '300 blk' in t \
-            or '.300 blk' in t or '300 aac' in t or '.300 aac' in t:
-        return ('.300 AAC Blackout', '300blk')
-    if '38 special' in t or '.38 special' in t or '38 spl' in t or '.38 spl' in t \
-            or '38special' in t:
-        return ('.38 Special', '38spl')
-    if '357 mag' in t or '.357 mag' in t or '357 magnum' in t or '.357 magnum' in t \
-            or '357mag' in t:
-        return ('.357 Magnum', '357mag')
-    # Word-boundary regex on `\b9mm\b` so a title containing
-    # "5.45x39mm" (Russian 5.45) doesn't false-match the bare "9mm"
-    # substring inside "39mm". Sportsman's Guide surfaced this bug
-    # 2026-04-26 — Hornady Black 5.45x39mm got bucketed as 9mm.
-    if re.search(r'\b9mm\b', t) or '9 mm' in t or '9x19' in t \
-            or '9 x 19' in t or '9 luger' in t:
-        return ('9mm Luger', '9mm')
-    return (None, None)
+# normalize_caliber: Phase B step 3 (2026-06-12) cutover — the FIRST
+# behavior-bearing swap. The hand-written if/elif detection branches that
+# lived here are replaced by the registry-driven loop in caliber_registry_gen
+# (NORMALIZE_PRIORITY branch order + per-caliber detect_py specs, emitted from
+# calibers.json). The branch order is load-bearing (e.g. 223-556 must beat a
+# bare 9mm match, and the `\b9mm\b` word-boundary rule that stopped
+# 5.45x39mm from bucketing as 9mm is preserved as a detect_py 're' spec).
+# Proven verdict-identical to the old branches by a fresh full-corpus replay
+# over every live listing (old hand vs registry loop, ZERO verdict changes —
+# scripts/_replay_normalize_caliber.py) plus the Phase A replay. Re-exported,
+# so every `from scraper_lib import normalize_caliber` caller is unchanged.
+from caliber_registry_gen import normalize_caliber_gen as normalize_caliber  # noqa: E402
 
 
 _LIMIT_PATTERNS = [
