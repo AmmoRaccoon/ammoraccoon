@@ -74,6 +74,17 @@ def ast_assignments(path, names):
     return out
 
 
+def ast_import_aliases(path, module):
+    """Map {local_name: imported_name} for `from <module> import a as local`."""
+    tree = ast.parse(Path(path).read_text(encoding='utf-8'))
+    out = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == module:
+            for alias in node.names:
+                out[alias.asname or alias.name] = alias.name
+    return out
+
+
 # --- scraper_lib tables ------------------------------------------------------
 check('CALIBERS', scraper_lib.CALIBERS, gen.CALIBERS)
 check('CALIBER_PRICE_FLOORS', scraper_lib.CALIBER_PRICE_FLOORS, gen.CALIBER_PRICE_FLOORS)
@@ -82,11 +93,30 @@ check('CALIBER_TO_FLOOR_KEY', scraper_lib._CALIBER_TO_FLOOR_KEY, gen.CALIBER_TO_
 check('CALIBER_PRICE_CEILINGS', scraper_lib.CALIBER_PRICE_CEILINGS, gen.CALIBER_PRICE_CEILINGS)
 check('DEFAULT_CEILING', scraper_lib.DEFAULT_CEILING, gen.DEFAULT_CEILING)
 
-# --- caliber_audit ranges (AST — module reads env at import) ----------------
-audit = ast_assignments(ROOT / 'scripts' / 'caliber_audit.py',
-                        {'EXPECTED_RANGES', 'DEFAULT_RANGE'})
-check('AUDIT_EXPECTED_RANGES', audit['EXPECTED_RANGES'], gen.AUDIT_EXPECTED_RANGES)
-check('AUDIT_DEFAULT_RANGE', audit['DEFAULT_RANGE'], gen.AUDIT_DEFAULT_RANGE)
+# --- caliber_audit ranges ----------------------------------------------------
+# Cutover-aware (Phase B). Pre-cutover (Phase A): caliber_audit held hand
+# literals EXPECTED_RANGES/DEFAULT_RANGE — AST-extract and compare value-for-
+# value against gen. Post-cutover (Phase B step 1, 2026-06-12): caliber_audit
+# does `from caliber_registry_gen import AUDIT_EXPECTED_RANGES as
+# EXPECTED_RANGES, AUDIT_DEFAULT_RANGE as DEFAULT_RANGE`, so the literal is
+# gone and the value IS the gen value by construction — verify the WIRING
+# (the import binds the right gen name to the right local) instead of a
+# vacuous self-compare. Missing both a literal AND the import is a real
+# failure: the consumer lost its ranges. (AST, not import — caliber_audit
+# reads SUPABASE_URL at module load.)
+audit_path = ROOT / 'scripts' / 'caliber_audit.py'
+audit_lits = ast_assignments(audit_path, {'EXPECTED_RANGES', 'DEFAULT_RANGE'})
+if 'EXPECTED_RANGES' in audit_lits or 'DEFAULT_RANGE' in audit_lits:
+    check('AUDIT_EXPECTED_RANGES (hand literal == gen)',
+          audit_lits.get('EXPECTED_RANGES'), gen.AUDIT_EXPECTED_RANGES)
+    check('AUDIT_DEFAULT_RANGE (hand literal == gen)',
+          audit_lits.get('DEFAULT_RANGE'), gen.AUDIT_DEFAULT_RANGE)
+else:
+    aliases = ast_import_aliases(audit_path, 'caliber_registry_gen')
+    check('caliber_audit cut over: EXPECTED_RANGES <- gen.AUDIT_EXPECTED_RANGES',
+          aliases.get('EXPECTED_RANGES'), 'AUDIT_EXPECTED_RANGES')
+    check('caliber_audit cut over: DEFAULT_RANGE <- gen.AUDIT_DEFAULT_RANGE',
+          aliases.get('DEFAULT_RANGE'), 'AUDIT_DEFAULT_RANGE')
 
 # --- rebate matcher tuples (AST — module builds a client at import) ---------
 rebate = ast_assignments(ROOT / 'scripts' / 'match_manufacturer_rebates_to_listings.py',
