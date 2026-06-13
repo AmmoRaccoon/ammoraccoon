@@ -13,18 +13,24 @@ from datetime import datetime, timezone
 import re
 from urllib.parse import urlparse
 
-CALIBERS = {
-    '9mm': '9mm Luger',
-    '223-556': '.223 / 5.56 NATO',
-    '22lr': '.22 LR',
-    '380acp': '.380 ACP',
-    '40sw': '.40 S&W',
-    '308win': '.308 Winchester',
-    '762x39': '7.62x39',
-    '300blk': '.300 AAC Blackout',
-    '38spl': '.38 Special',
-    '357mag': '.357 Magnum',
-}
+# Phase B step 2 (2026-06-12): six per-caliber data tables — display names,
+# scrape-time price floors/ceilings + the canonical->loose-key map — now
+# re-export from the generated caliber registry (caliber_registry_gen.py,
+# emitted from calibers.json) instead of hand-written literals, so a new
+# caliber's values come from one source of truth. Values are byte-identical
+# to the prior literals (proven by scripts/check_caliber_registry.py); zero
+# behavior change. normalize_caliber below is NOT yet cut over (step 3). The
+# rationale comments for the floor/ceiling tables stay at their original
+# locations further down. caliber_registry_gen.py sits beside this file in
+# the repo root, so a bare import resolves wherever scraper_lib is importable.
+from caliber_registry_gen import (
+    CALIBERS,
+    CALIBER_PRICE_FLOORS,
+    DEFAULT_FLOOR,
+    CALIBER_TO_FLOOR_KEY as _CALIBER_TO_FLOOR_KEY,
+    CALIBER_PRICE_CEILINGS,
+    DEFAULT_CEILING,
+)
 
 
 def normalize_caliber(text):
@@ -709,41 +715,14 @@ PPR_CEILING = 5.00         # $5/rd is premium-defensive territory; above it is a
 # through. Each value is the lowest-plausible per-round price for *new*
 # brass-case range ammo in that caliber as of 2026. Set conservatively
 # below the cheapest seen on the market so an actual sale still passes.
-# Keys here are the loose names the project tracks publicly; the
-# CALIBERS-key normalization below maps the canonical `caliber_normalized`
-# slugs onto these.
-CALIBER_PRICE_FLOORS = {
-    '9mm':    0.15,
-    '22lr':   0.04,
-    '223':    0.20,
-    '556':    0.20,
-    '308':    0.40,
-    '380':    0.18,
-    '40sw':   0.20,
-    '45acp':  0.25,
-    '357mag': 0.25,
-    '38spl':  0.20,
-    '300blk': 0.35,
-    '762x39': 0.15,
-}
-DEFAULT_FLOOR = 0.15
-
-# Map the canonical CALIBERS keys (what scrapers actually emit as
-# caliber_normalized) onto the loose floor keys above. Combined slugs
-# like '223-556' fall back to the .223 floor since the chamber pressure
-# and street price for both rounds are roughly identical.
-_CALIBER_TO_FLOOR_KEY = {
-    '9mm':     '9mm',
-    '22lr':    '22lr',
-    '223-556': '223',
-    '380acp':  '380',
-    '40sw':    '40sw',
-    '38spl':   '38spl',
-    '357mag':  '357mag',
-    '308win':  '308',
-    '762x39':  '762x39',
-    '300blk':  '300blk',
-}
+# Keys are the loose names the project tracks publicly; _CALIBER_TO_FLOOR_KEY
+# maps the canonical `caliber_normalized` slugs onto these. Combined slugs
+# like '223-556' fall back to the .223 floor since chamber pressure and
+# street price for both rounds are roughly identical.
+#
+# CALIBER_PRICE_FLOORS / DEFAULT_FLOOR / _CALIBER_TO_FLOOR_KEY now re-export
+# from caliber_registry_gen (imported at top, Phase B step 2). The loose
+# keys, the '223'/'556' twin, and the 45acp row all live in calibers.json.
 
 
 def floor_for_caliber(caliber):
@@ -767,20 +746,11 @@ def floor_for_caliber(caliber):
 # 2026-04-26 — values reflect the per-caliber ceiling above which a
 # listing is far more likely to be a misparse than a real boutique
 # SKU. Mirrors CALIBER_PRICE_FLOORS / floor_for_caliber.
-CALIBER_PRICE_CEILINGS = {
-    '9mm':    1.50,
-    '22lr':   0.75,
-    '223':    2.50,
-    '556':    2.50,
-    '308':    4.00,
-    '380':    2.00,
-    '40sw':   2.00,
-    '357mag': 3.00,
-    '38spl':  2.50,
-    '300blk': 4.00,
-    '762x39': 2.00,
-}
-DEFAULT_CEILING = 3.00
+#
+# CALIBER_PRICE_CEILINGS / DEFAULT_CEILING now re-export from
+# caliber_registry_gen (imported at top, Phase B step 2). Note 45acp has a
+# floor row but NO ceiling row (DEFAULT_CEILING applies) — preserved exactly
+# from the prior literal. Values live in calibers.json.
 
 
 def ceiling_for_caliber(caliber):
