@@ -289,10 +289,25 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             manufacturer = parse_brand_with_url(name, product_url) or "Unknown"
 
             # We're sitting on the product page after the variant
-            # fetch, so read stock + purchase-limit hints directly
-            # from its body. Category-page card text isn't reliable
-            # here because RGW shows price ranges, not stock badges.
-            page_text = (page.locator('body').inner_text() or '').lower()
+            # fetch. Stock + purchase-limit MUST be read from the
+            # product-detail container, never the whole body: RGW's
+            # "you might also like" carousel renders "Out of Stock"
+            # badges on NEIGHBORING products' cards, and a body-wide
+            # substring match false-flagged the entire catalog OOS
+            # (caught by the 2026-06-11 audit; 5/5 sampled pages had
+            # an enabled Add to Cart while body text matched — probe:
+            # scripts/_probe_rgw_stock.py). Same carousel blind spot
+            # the category-page grid selector works around above.
+            pv = page.query_selector('.productView')
+            if pv:
+                page_text = (pv.inner_text() or '').lower()
+            else:
+                # Off-template page — keep the old body-wide read as
+                # fallback. Its bias is safe (worst case false-OOS,
+                # never false-in-stock), and a template change that
+                # drops .productView would resurface as the same
+                # all-OOS anomaly that exposed this bug.
+                page_text = (page.locator('body').inner_text() or '').lower()
             in_stock = ('out of stock' not in page_text and
                         'sold out' not in page_text and
                         'currently unavailable' not in page_text)
