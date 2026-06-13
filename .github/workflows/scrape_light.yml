@@ -53,12 +53,17 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python scraper_luckygunner.py
 
-      - name: Run PSA scraper
-        continue-on-error: true
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python scraper_psa.py
+      # PSA DE-WIRED 2026-06-12 (Jon-approved retailer-wide park,
+      # Option A). Cloudflare wall: zero saves on ANY caliber since
+      # 2026-05-20 — all 10 category pages 403 ("Just a moment...");
+      # the 2026-06-11 audit's 5-walled/5-working split had already
+      # collapsed to fully walled. Per the parked-retailer pattern
+      # (MidwayUSA / Ammunition Depot / Wideners): DB is_active=false,
+      # 149 listings + 2,132 price_history rows evicted 2026-06-12
+      # (scripts/_park_psa_retailer.py). scraper_psa.py kept in repo
+      # as dead code, matching the academy/bereli/bulkmunitions/
+      # ammodeport/wideners convention. Re-wire only if the wall
+      # softens or a new scrape strategy lands.
 
       - name: Run Target Sports USA scraper
         continue-on-error: true
