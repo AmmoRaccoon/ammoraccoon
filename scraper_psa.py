@@ -17,16 +17,33 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "psa"
 SITE_BASE = "https://palmettostatearmory.com"
 
+# PARKED CALIBERS (2026-06-12, park-don't-chase). The 2026-06-11
+# caliber-scoping audit found Cloudflare 503s on exactly the 5 caliber
+# category pages PSA had zero DB coverage for, while the 5 covered
+# calibers' pages returned 200. Parked rather than fought, per the
+# standing Cloudflare doctrine (MidwayUSA / Ammunition Depot / Wideners):
+#
+#   '380acp':  '/380-auto-ammo.html?product_list_limit=100',
+#   '40sw':    '/40-s-w-ammo.html?product_list_limit=100',
+#   '223-556': '/223-5-56-ammo.html?product_list_limit=100',
+#   '308win':  '/308-7-62x51-ammo.html?product_list_limit=100',
+#   '762x39':  '/7-62x39-ammo.html?product_list_limit=100',
+#
+# DEEPER FINDING while parking (scripts/_probe_psa_walled.py +
+# _probe_psa_freshness.py, 2026-06-12): the wall is wider than the
+# audit's 5/5 split — NO PSA caliber has saved a listing since
+# 2026-05-20 (~23 days; all 149 rows frozen, residential-IP probe gets
+# 403 "Just a moment..." on all 10 pages). The 5 paths below are kept
+# wired so PSA recovers automatically if the wall softens, but a
+# retailer-wide park (is_active=false + eviction, the Ammunition
+# Depot pattern) is logged in ammoraccoon-web/TASKS.md as a decision
+# for Jon. Until then had_success=(total_saved > 0) below keeps the
+# dark runs from bumping last_scraped_at.
 CALIBER_PATHS = {
     '9mm':     '/9mm-ammo.html?product_list_limit=100',
-    '380acp':  '/380-auto-ammo.html?product_list_limit=100',
-    '40sw':    '/40-s-w-ammo.html?product_list_limit=100',
     '38spl':   '/38-special-ammo.html?product_list_limit=100',
     '357mag':  '/357-magnum-ammo.html?product_list_limit=100',
     '22lr':    '/22lr-ammo.html?product_list_limit=100',
-    '223-556': '/223-5-56-ammo.html?product_list_limit=100',
-    '308win':  '/308-7-62x51-ammo.html?product_list_limit=100',
-    '762x39':  '/7-62x39-ammo.html?product_list_limit=100',
     '300blk':  '/300-blackout-ammo.html?product_list_limit=100',
 }
 
@@ -234,7 +251,11 @@ def scrape():
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Wall-aware freshness stamp (the Wideners hardening): a Cloudflare
+    # 403 on every category page returns normally with total_saved=0,
+    # and the default mark call was falsely bumping last_scraped_at —
+    # /status read PSA as fresh through 23 days of zero saves.
+    mark_retailer_scraped(supabase, retailer_id, had_success=total_saved > 0)
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 if __name__ == '__main__':
