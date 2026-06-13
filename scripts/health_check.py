@@ -9,10 +9,28 @@ Alerting rules:
   CRITICAL  retailer had >= MIN_BASELINE listings last run and 0 this run
   WARN      retailer had >= MIN_BASELINE listings last run and dropped more than
             DROP_THRESHOLD fraction this run
+  CRITICAL  zero-coverage: a retailer that finished a run this window and saved
+            listings for SOME calibers saved zero for other calibers its own
+            CALIBER_PATHS config says it covers (one alert line per retailer)
 
 Retailers with no previous baseline (e.g. never-scraped, or intentionally disabled
 like Bereli) self-mute -they produce no alerts because we have nothing to compare
 against.
+
+The zero-coverage check (2026-06-12) closes the silent-failure class the
+caliber-scoping audit caught: Target Sports USA's renumbered category IDs
+left 9 of 10 calibers dark for weeks with NO alert, because 9mm kept saving
+and the retailer-level total never hit zero. Coverage truth comes from the
+scrapers themselves — CALIBER_PATHS keys are AST-parsed out of every scraper
+wired into scrape_light.yml — so parking a caliber in a scraper (PSA's five
+Cloudflare-walled ones) automatically removes it from the expectation; no
+second source of truth to drift. Deliberate boundaries: only light-tier
+scrapers (this check runs at the end of scrape_light; medium/heavy runs can
+straddle the window mid-run and would false-alarm), only retailers whose
+last_scraped_at landed inside the current window (i.e. the run FINISHED),
+and only retailers that saved at least one listing — a fully-dark retailer
+is the existing CRITICAL rule's job at onset, and persistently-dark
+detection is the promoted scale-#5 monitoring item in ammoraccoon-web/TASKS.md.
 
 Also checks the homepage badge cache (homepage_segment_aggregates_cache):
 if its newest refreshed_at is older than CACHE_MAX_AGE_HOURS the refresh
@@ -34,14 +52,17 @@ Optional env:
   FORCE_ALERT          If "1", treat every retailer as alerting (preview formatting).
 """
 
+import ast
 import json
 import os
+import re
 import smtplib
 import sys
 import urllib.request
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+from pathlib import Path
 
 from dotenv import load_dotenv
 from supabase import create_client
@@ -66,19 +87,32 @@ PAGE_SIZE = 1000
 CACHE_MAX_AGE_HOURS = 6
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+LIGHT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scrape_light.yml"
+
+
 def fetch_retailers(sb):
-    rows = sb.table("retailers").select("id,name").eq("is_active", True).execute().data
-    return {r["id"]: r["name"] for r in rows}
+    rows = (
+        sb.table("retailers")
+        .select("id,name,slug,last_scraped_at")
+        .eq("is_active", True)
+        .execute()
+        .data
+    )
+    return {r["id"]: r for r in rows}
 
 
 def count_current(sb, cutoff_iso):
+    """Listings written this window: totals per retailer AND per
+    (retailer, caliber) — the latter feeds the zero-coverage check."""
     counts = defaultdict(int)
+    by_caliber = defaultdict(int)
     start = 0
     while True:
         end = start + PAGE_SIZE - 1
         batch = (
             sb.table("listings")
-            .select("retailer_id")
+            .select("retailer_id,caliber_normalized")
             .gte("last_updated", cutoff_iso)
             .range(start, end)
             .execute()
@@ -88,10 +122,100 @@ def count_current(sb, cutoff_iso):
             break
         for row in batch:
             counts[row["retailer_id"]] += 1
+            by_caliber[(row["retailer_id"], row["caliber_normalized"])] += 1
         if len(batch) < PAGE_SIZE:
             break
         start += PAGE_SIZE
-    return counts
+    return counts, by_caliber
+
+
+def declared_coverage():
+    """Coverage expectations straight from the scraper configs.
+
+    Reads scrape_light.yml for the scraper files actually wired into the
+    light tier, then AST-parses each one (no imports — module level in a
+    scraper builds a Supabase client) for its module-level RETAILER_SLUG /
+    RETAILER_ID and the keys of CALIBER_PATHS. Values may be strings or
+    lists (targetsports holds lists since the 2026-06 category split);
+    only the keys matter here. Scrapers without both names self-exclude.
+
+    Returns a list of (slug_or_None, retailer_id_or_None, frozenset(calibers),
+    filename). Never raises — a parse failure just drops that scraper from
+    the check (and prints, so the gap is visible in the Actions log).
+    """
+    entries = []
+    try:
+        wf_text = LIGHT_WORKFLOW.read_text(encoding="utf-8")
+    except OSError as e:
+        print(f"coverage: cannot read {LIGHT_WORKFLOW} ({e}) - skipping check.")
+        return entries
+    for fname in re.findall(r"run:\s*python\s+(scraper_\w+\.py)", wf_text):
+        path = REPO_ROOT / fname
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError) as e:
+            print(f"coverage: cannot parse {fname} ({e}) - excluded.")
+            continue
+        slug = rid = calibers = None
+        for node in tree.body:
+            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+                continue
+            target = node.targets[0]
+            if not isinstance(target, ast.Name):
+                continue
+            if target.id == "RETAILER_SLUG" and isinstance(node.value, ast.Constant):
+                slug = node.value.value
+            elif target.id == "RETAILER_ID" and isinstance(node.value, ast.Constant):
+                rid = node.value.value
+            elif target.id == "CALIBER_PATHS" and isinstance(node.value, ast.Dict):
+                calibers = frozenset(
+                    k.value for k in node.value.keys
+                    if isinstance(k, ast.Constant) and isinstance(k.value, str)
+                )
+        if calibers and (slug or rid):
+            entries.append((slug, rid, calibers, fname))
+    return entries
+
+
+def evaluate_coverage(retailers, coverage_entries, current_counts,
+                      current_by_caliber, cur_start):
+    """Zero-coverage rule: ran-and-finished this window, saved listings,
+    but a config-covered caliber got nothing. One line per retailer."""
+    alerts = []
+    by_slug = {r["slug"]: rid for rid, r in retailers.items() if r.get("slug")}
+    for slug, hard_id, calibers, fname in coverage_entries:
+        rid = by_slug.get(slug) if slug else hard_id
+        if rid is None or rid not in retailers:
+            continue
+        r = retailers[rid]
+        last = r.get("last_scraped_at")
+        if not last:
+            continue
+        try:
+            last_dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if last_dt < cur_start:
+            # No FINISHED run inside this window (mark_retailer_scraped
+            # fires at the very end of a scrape) - mid-run or not-run
+            # retailers would false-alarm on calibers not reached yet.
+            continue
+        total = current_counts.get(rid, 0)
+        if total == 0:
+            # Fully dark is the run-over-run CRITICAL's territory.
+            continue
+        missing = sorted(
+            c for c in calibers if current_by_caliber.get((rid, c), 0) == 0
+        )
+        if missing:
+            alerts.append((
+                "CRITICAL",
+                r["name"],
+                f"zero-coverage: saved {total} listings this run but ZERO for "
+                f"{len(missing)} of {len(calibers)} config-covered calibers: "
+                f"{', '.join(missing)} (config: {fname})",
+            ))
+    return alerts
 
 
 def count_previous(sb, window_start_iso, window_end_iso):
@@ -130,7 +254,8 @@ def count_previous(sb, window_start_iso, window_end_iso):
 
 def evaluate(retailers, current_counts, previous_counts):
     alerts = []
-    for rid, name in retailers.items():
+    for rid, r in retailers.items():
+        name = r["name"]
         cur = current_counts.get(rid, 0)
         prev = previous_counts.get(rid, 0)
 
@@ -219,11 +344,11 @@ def format_body(alerts, retailers, current_counts, previous_counts, windows):
         "",
         "Full breakdown (current / previous):",
     ]
-    for rid, name in sorted(retailers.items(), key=lambda kv: kv[1].lower()):
+    for rid, r in sorted(retailers.items(), key=lambda kv: kv[1]["name"].lower()):
         cur = current_counts.get(rid, 0)
         prev = previous_counts.get(rid, 0)
         if cur or prev:
-            lines.append(f"  {name}: {cur} / {prev}")
+            lines.append(f"  {r['name']}: {cur} / {prev}")
     return "\n".join(lines)
 
 
@@ -261,19 +386,21 @@ def main():
     prev_start = prev_end - timedelta(hours=PREVIOUS_WINDOW_HOURS)
 
     retailers = fetch_retailers(sb)
-    current = count_current(sb, cur_start.isoformat())
+    current, current_by_caliber = count_current(sb, cur_start.isoformat())
     previous = count_previous(sb, prev_start.isoformat(), prev_end.isoformat())
 
     print(f"Current window:  {cur_start.isoformat()} -> {now.isoformat()}")
     print(f"Previous window: {prev_start.isoformat()} -> {prev_end.isoformat()}")
     print("Per-retailer (current / previous):")
-    for rid, name in sorted(retailers.items()):
+    for rid, r in sorted(retailers.items()):
         cur = current.get(rid, 0)
         prev = previous.get(rid, 0)
         if cur or prev:
-            print(f"  [{rid:>2}] {name}: {cur} / {prev}")
+            print(f"  [{rid:>2}] {r['name']}: {cur} / {prev}")
 
     alerts = evaluate(retailers, current, previous)
+    alerts += evaluate_coverage(retailers, declared_coverage(), current,
+                                current_by_caliber, cur_start)
     alerts += check_cache_age(sb)
     if not alerts:
         print("\nAll scrapers healthy -no alert sent.")
