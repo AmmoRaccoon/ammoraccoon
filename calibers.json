@@ -1,0 +1,443 @@
+{
+  "version": 1,
+  "comment": "Single source of truth for supported calibers (expansion #3, Phase A 2026-06-12). Hand-edit THIS file only; run `node ../ammoraccoon-web/scripts/gen-calibers/index.mjs --write` to regenerate derived tables. Values are VERBATIM transcriptions of the hand-maintained tables as of Phase A — including known quirks kept deliberately for byte parity: the duplicate '40sw' input alias (ReloadingCalculator.js), loose floor keys + the '556' twin row (scraper_lib CALIBER_PRICE_FLOORS), and per-surface display variants (display.overrides; D4). JSON has no comments, so transcription provenance lives in calibers.schema.json descriptions and the Phase A design doc.",
+  "detect_priority_py": ["223-556", "22lr", "380acp", "40sw", "308win", "762x39", "300blk", "38spl", "357mag", "9mm"],
+  "detect_priority_js": ["762x39", "300blk", "308win", "223-556", "22lr", "380acp", "40sw", "38spl", "357mag", "9mm"],
+  "market_bounds_order": ["9mm", "22lr", "380acp", "38spl", "357mag", "40sw", "45acp", "223-556", "300blk", "308win", "6.5cm", "762x39", "762x54r", "12ga"],
+  "defaults": {
+    "scrape_floor": 0.15,
+    "scrape_ceiling": 3.0,
+    "market_floor": 0.1,
+    "market_ceiling": 2.0,
+    "audit_range": [0.1, 5.0]
+  },
+  "home_groups": [
+    { "key": "pistol", "name": "Pistol" },
+    { "key": "rifle", "name": "Rifle" },
+    { "key": "rimfire", "name": "Rimfire" },
+    { "key": "shotgun", "name": "Shotgun" }
+  ],
+  "admin_categories": [
+    { "name": "rimfire", "calibers": ["22lr", "22mag"], "floor": 0.03, "ceiling": 1.0 },
+    { "name": "pistol", "calibers": ["9mm", "380acp", "40sw", "45acp", "38spl", "357mag", "44mag", "10mm"], "floor": 0.08, "ceiling": 3.0 },
+    { "name": "rifle-std", "calibers": ["223-556", "762x39", "300blk", "30-30"], "floor": 0.15, "ceiling": 5.0 },
+    { "name": "rifle-prec", "calibers": ["308win", "6.5cm", "300wm", "30-06", "270win", "762x54r"], "floor": 0.4, "ceiling": 8.0 },
+    { "name": "specialty", "calibers": ["338lm", "50bmg", "416barrett", "416rigby"], "floor": 1.0, "ceiling": 20.0 },
+    { "name": "shotgun", "calibers": ["12ga", "20ga", "28ga", "410"], "floor": 0.3, "ceiling": 6.0 }
+  ],
+  "calibers": {
+    "9mm": {
+      "status": "active",
+      "group": "pistol",
+      "admin_category": "pistol",
+      "rebate_firearm_type": "handgun",
+      "display": { "full": "9mm Luger", "short": "9mm" },
+      "order": { "popularity": 1, "home": 1, "history": 1 },
+      "color": "#f97316",
+      "detect_py": [
+        { "kind": "re", "value": "\\b9mm\\b" },
+        { "kind": "sub", "value": "9 mm" },
+        { "kind": "sub", "value": "9x19" },
+        { "kind": "sub", "value": "9 x 19" },
+        { "kind": "sub", "value": "9 luger" }
+      ],
+      "detect_js": ["9\\s*mm", "9x19", "9\\s*luger"],
+      "input_aliases": ["9mm", "9mmluger", "9x19", "9mmpara", "9para"],
+      "ballistics_aliases": ["9mm luger", "9mm", "9mm luger +p", "9mm nato", "9x19mm nato", "9x19", "9x19mm", "9 mm luger"],
+      "floor_key": "9mm",
+      "scrape_floor": 0.15,
+      "scrape_ceiling": 1.5,
+      "market_floor": 0.1,
+      "market_ceiling": 1.0,
+      "audit_range": [0.15, 0.8],
+      "grain_buckets": [
+        { "value": "lt115", "label": "<115gr", "op": "lt", "n": 115 },
+        { "value": "115", "label": "115gr", "op": "eq", "n": 115 },
+        { "value": "124", "label": "124gr", "op": "eq", "n": 124 },
+        { "value": "135", "label": "135gr", "op": "eq", "n": 135 },
+        { "value": "147", "label": "147gr", "op": "eq", "n": 147 },
+        { "value": "gt147", "label": ">147gr", "op": "gt", "n": 147 }
+      ]
+    },
+    "223-556": {
+      "status": "active",
+      "group": "rifle",
+      "admin_category": "rifle-std",
+      "rebate_firearm_type": "rifle",
+      "display": {
+        "full": ".223 / 5.56 NATO",
+        "short": ".223 / 5.56",
+        "overrides": {
+          "history_full": ".223/5.56 NATO",
+          "products_full": ".223/5.56 NATO",
+          "products_short": ".223/5.56"
+        }
+      },
+      "order": { "popularity": 2, "home": 1, "history": 6 },
+      "color": "#3b82f6",
+      "detect_py": [
+        { "kind": "sub", "value": "5.56" },
+        { "kind": "sub", "value": "5.56x45" },
+        { "kind": "sub", "value": "5.56nato" },
+        { "kind": "sub", "value": "5.56 nato" },
+        { "kind": "re", "value": "\\b\\.?223\\b" },
+        { "kind": "sub", "value": "223 rem" },
+        { "kind": "sub", "value": ".223 rem" }
+      ],
+      "detect_js": ["5[.-]?56\\s*(?:nato|x45)?", "\\b\\.?223\\b", "223\\s*rem", "\\.223\\s*rem"],
+      "input_aliases": ["223", "5.56", "556", "223rem", "223-556", "556nato", "5.56nato", "223remington"],
+      "ballistics_aliases": ["223 rem", ".223 rem", "223 remington", ".223 remington", "5.56 nato", "5.56x45 nato", "5.56x45mm nato", "5.56", "5.56mm"],
+      "floor_key": "223",
+      "floor_key_extra": ["556"],
+      "scrape_floor": 0.2,
+      "scrape_ceiling": 2.5,
+      "market_floor": 0.2,
+      "market_ceiling": 1.5,
+      "audit_range": [0.25, 1.5],
+      "grain_buckets": [
+        { "value": "55", "label": "55gr", "op": "eq", "n": 55 },
+        { "value": "62", "label": "62gr", "op": "eq", "n": 62 },
+        { "value": "69", "label": "69gr", "op": "eq", "n": 69 },
+        { "value": "75", "label": "75gr", "op": "eq", "n": 75 },
+        { "value": "77", "label": "77gr", "op": "eq", "n": 77 }
+      ]
+    },
+    "22lr": {
+      "status": "active",
+      "group": "rimfire",
+      "admin_category": "rimfire",
+      "rebate_firearm_type": "rimfire",
+      "display": { "full": ".22 LR", "short": ".22 LR" },
+      "order": { "popularity": 3, "home": 1, "history": 10 },
+      "color": "#22c55e",
+      "detect_py": [
+        { "kind": "re", "value": "\\b22\\s*lr\\b" },
+        { "kind": "sub", "value": "22 long rifle" },
+        { "kind": "sub", "value": ".22lr" },
+        { "kind": "re", "value": "\\b\\.22\\s*lr\\b" }
+      ],
+      "detect_js": ["\\b22\\s*lr\\b", "22\\s*long\\s*rifle", "\\.22\\s*lr"],
+      "input_aliases": ["22", "22lr", "22long", "22longrifle"],
+      "ballistics_aliases": ["22 lr", ".22 lr", ".22 long rifle", "22 long rifle"],
+      "floor_key": "22lr",
+      "scrape_floor": 0.04,
+      "scrape_ceiling": 0.75,
+      "market_floor": 0.03,
+      "market_ceiling": 0.5,
+      "audit_range": [0.05, 0.3],
+      "grain_buckets": [
+        { "value": "36", "label": "36gr", "op": "eq", "n": 36 },
+        { "value": "38", "label": "38gr", "op": "eq", "n": 38 },
+        { "value": "40", "label": "40gr", "op": "eq", "n": 40 },
+        { "value": "42", "label": "42gr", "op": "eq", "n": 42 }
+      ]
+    },
+    "380acp": {
+      "status": "active",
+      "group": "pistol",
+      "admin_category": "pistol",
+      "rebate_firearm_type": "handgun",
+      "display": { "full": ".380 ACP", "short": ".380 ACP" },
+      "order": { "popularity": 4, "home": 4, "history": 2 },
+      "color": "#a855f7",
+      "detect_py": [
+        { "kind": "sub", "value": "380 acp" },
+        { "kind": "sub", "value": ".380 acp" },
+        { "kind": "sub", "value": "380auto" },
+        { "kind": "sub", "value": "380 auto" },
+        { "kind": "re", "value": "\\b\\.?380\\b" }
+      ],
+      "detect_js": ["380\\s*(?:acp|auto)", "\\.380\\b"],
+      "input_aliases": ["380", "380acp", "380auto"],
+      "ballistics_aliases": ["380 auto", ".380 auto", "380 acp", ".380 acp", "380 automatic"],
+      "floor_key": "380",
+      "scrape_floor": 0.18,
+      "scrape_ceiling": 2.0,
+      "market_floor": 0.15,
+      "market_ceiling": 1.2,
+      "audit_range": [0.2, 1.0],
+      "grain_buckets": [
+        { "value": "85", "label": "85gr", "op": "eq", "n": 85 },
+        { "value": "90", "label": "90gr", "op": "eq", "n": 90 },
+        { "value": "95", "label": "95gr", "op": "eq", "n": 95 },
+        { "value": "99", "label": "99gr", "op": "eq", "n": 99 },
+        { "value": "102", "label": "102gr", "op": "eq", "n": 102 }
+      ]
+    },
+    "40sw": {
+      "status": "active",
+      "group": "pistol",
+      "admin_category": "pistol",
+      "rebate_firearm_type": "handgun",
+      "display": { "full": ".40 S&W", "short": ".40 S&W" },
+      "order": { "popularity": 5, "home": 3, "history": 3 },
+      "color": "#ef4444",
+      "detect_py": [
+        { "kind": "sub", "value": "40 s&w" },
+        { "kind": "sub", "value": "40s&w" },
+        { "kind": "sub", "value": ".40 s&w" },
+        { "kind": "sub", "value": ".40sw" },
+        { "kind": "sub", "value": "40 smith" },
+        { "kind": "re", "value": "\\b\\.?40\\s*sw\\b" }
+      ],
+      "detect_js": ["40\\s*s\\s*&?\\s*w", "\\.40\\s*sw", "40sw\\b"],
+      "input_aliases": ["40", "40sw", "40sw", "40cal"],
+      "ballistics_aliases": ["40 s&w", ".40 s&w", ".40 smith & wesson", "40 smith & wesson"],
+      "floor_key": "40sw",
+      "scrape_floor": 0.2,
+      "scrape_ceiling": 2.0,
+      "market_floor": 0.15,
+      "market_ceiling": 1.2,
+      "audit_range": [0.2, 0.9],
+      "grain_buckets": [
+        { "value": "155", "label": "155gr", "op": "eq", "n": 155 },
+        { "value": "165", "label": "165gr", "op": "eq", "n": 165 },
+        { "value": "180", "label": "180gr", "op": "eq", "n": 180 }
+      ]
+    },
+    "308win": {
+      "status": "active",
+      "group": "rifle",
+      "admin_category": "rifle-prec",
+      "rebate_firearm_type": "rifle",
+      "display": { "full": ".308 Winchester", "short": ".308 Win" },
+      "order": { "popularity": 6, "home": 2, "history": 7 },
+      "color": "#eab308",
+      "detect_py": [
+        { "kind": "sub", "value": "308 win" },
+        { "kind": "sub", "value": ".308 win" },
+        { "kind": "sub", "value": "7.62x51" },
+        { "kind": "sub", "value": "7.62 x 51" },
+        { "kind": "re", "value": "\\b\\.?308\\b" }
+      ],
+      "detect_js": ["7[-.\\s]?62\\s*x\\s*51", "\\.308\\b", "308\\s*win"],
+      "input_aliases": ["308", "308win", "308winchester", "7.62nato", "7.62x51", "762nato", "762x51"],
+      "ballistics_aliases": ["308 win", ".308 win", "308 winchester", ".308 winchester"],
+      "floor_key": "308",
+      "scrape_floor": 0.4,
+      "scrape_ceiling": 4.0,
+      "market_floor": 0.2,
+      "market_ceiling": 3.0,
+      "audit_range": [0.5, 3.0],
+      "grain_buckets": [
+        { "value": "147", "label": "147gr", "op": "eq", "n": 147 },
+        { "value": "150", "label": "150gr", "op": "eq", "n": 150 },
+        { "value": "165", "label": "165gr", "op": "eq", "n": 165 },
+        { "value": "168", "label": "168gr", "op": "eq", "n": 168 },
+        { "value": "175", "label": "175gr", "op": "eq", "n": 175 },
+        { "value": "185", "label": "185gr", "op": "eq", "n": 185 }
+      ]
+    },
+    "762x39": {
+      "status": "active",
+      "group": "rifle",
+      "admin_category": "rifle-std",
+      "rebate_firearm_type": "rifle",
+      "display": { "full": "7.62x39", "short": "7.62x39" },
+      "order": { "popularity": 7, "home": 4, "history": 9 },
+      "color": "#06b6d4",
+      "detect_py": [
+        { "kind": "sub", "value": "7.62x39" },
+        { "kind": "sub", "value": "7.62 x 39" },
+        { "kind": "sub", "value": "762x39" }
+      ],
+      "detect_js": ["7[-.\\s]?62\\s*x\\s*39", "762x39"],
+      "input_aliases": ["762x39", "7.62x39"],
+      "ballistics_aliases": ["7.62x39", "7.62x39mm", "7.62 x 39mm"],
+      "floor_key": "762x39",
+      "scrape_floor": 0.15,
+      "scrape_ceiling": 2.0,
+      "market_floor": 0.25,
+      "market_ceiling": 1.2,
+      "audit_range": [0.2, 1.0],
+      "grain_buckets": [
+        { "value": "122", "label": "122gr", "op": "eq", "n": 122 },
+        { "value": "123", "label": "123gr", "op": "eq", "n": 123 },
+        { "value": "124", "label": "124gr", "op": "eq", "n": 124 }
+      ]
+    },
+    "300blk": {
+      "status": "active",
+      "group": "rifle",
+      "admin_category": "rifle-std",
+      "rebate_firearm_type": "rifle",
+      "display": {
+        "full": ".300 AAC Blackout",
+        "short": ".300 BLK",
+        "overrides": {
+          "history_full": ".300 Blackout",
+          "products_full": ".300 Blackout"
+        }
+      },
+      "order": { "popularity": 8, "home": 3, "history": 8 },
+      "color": "#ec4899",
+      "detect_py": [
+        { "kind": "sub", "value": "300 blackout" },
+        { "kind": "sub", "value": ".300 blackout" },
+        { "kind": "sub", "value": "300 blk" },
+        { "kind": "sub", "value": ".300 blk" },
+        { "kind": "sub", "value": "300 aac" },
+        { "kind": "sub", "value": ".300 aac" }
+      ],
+      "detect_js": ["300\\s*(?:aac|blk|blackout)", "\\.300\\s*(?:aac|blk|blackout)"],
+      "input_aliases": ["300", "300blk", "300blackout", "300aac", "300aacblackout"],
+      "ballistics_aliases": ["300 blk", ".300 blk", "300 blackout", ".300 blackout", "300 aac blackout"],
+      "floor_key": "300blk",
+      "scrape_floor": 0.35,
+      "scrape_ceiling": 4.0,
+      "market_floor": 0.25,
+      "market_ceiling": 3.0,
+      "audit_range": [0.5, 2.5],
+      "grain_buckets": [
+        { "value": "110", "label": "110gr", "op": "eq", "n": 110 },
+        { "value": "125", "label": "125gr", "op": "eq", "n": 125 },
+        { "value": "150", "label": "150gr", "op": "eq", "n": 150 },
+        { "value": "220", "label": "220gr", "op": "eq", "n": 220 }
+      ]
+    },
+    "38spl": {
+      "status": "active",
+      "group": "pistol",
+      "admin_category": "pistol",
+      "rebate_firearm_type": "handgun",
+      "display": {
+        "full": ".38 Special",
+        "short": ".38 Spl",
+        "overrides": {
+          "ammo_index": ".38 Special",
+          "reloading": ".38 Special"
+        }
+      },
+      "order": { "popularity": 9, "home": 6, "history": 4 },
+      "color": "#84cc16",
+      "detect_py": [
+        { "kind": "sub", "value": "38 special" },
+        { "kind": "sub", "value": ".38 special" },
+        { "kind": "sub", "value": "38 spl" },
+        { "kind": "sub", "value": ".38 spl" },
+        { "kind": "sub", "value": "38special" }
+      ],
+      "detect_js": ["38\\s*spl", "38\\s*special", "\\.38\\s*spl", "\\.38\\s*special"],
+      "input_aliases": ["38", "38special", "38spl", "38spc"],
+      "ballistics_aliases": ["38 special", ".38 special", "38 spl", "38 special +p"],
+      "floor_key": "38spl",
+      "scrape_floor": 0.2,
+      "scrape_ceiling": 2.5,
+      "market_floor": 0.2,
+      "market_ceiling": 1.5,
+      "audit_range": [0.25, 1.5],
+      "grain_buckets": [
+        { "value": "110", "label": "110gr", "op": "eq", "n": 110 },
+        { "value": "125", "label": "125gr", "op": "eq", "n": 125 },
+        { "value": "130", "label": "130gr", "op": "eq", "n": 130 },
+        { "value": "148", "label": "148gr", "op": "eq", "n": 148 },
+        { "value": "158", "label": "158gr", "op": "eq", "n": 158 }
+      ]
+    },
+    "357mag": {
+      "status": "active",
+      "group": "pistol",
+      "admin_category": "pistol",
+      "rebate_firearm_type": "handgun",
+      "display": {
+        "full": ".357 Magnum",
+        "short": ".357 Mag",
+        "overrides": {
+          "reloading": ".357 Magnum"
+        }
+      },
+      "order": { "popularity": 10, "home": 5, "history": 5 },
+      "color": "#f59e0b",
+      "detect_py": [
+        { "kind": "sub", "value": "357 mag" },
+        { "kind": "sub", "value": ".357 mag" },
+        { "kind": "sub", "value": "357 magnum" },
+        { "kind": "sub", "value": ".357 magnum" },
+        { "kind": "sub", "value": "357mag" }
+      ],
+      "detect_js": ["357\\s*mag", "\\.357\\s*mag", "357\\s*magnum"],
+      "input_aliases": ["357", "357magnum", "357mag"],
+      "ballistics_aliases": ["357 magnum", ".357 magnum", "357 mag", ".357 mag"],
+      "floor_key": "357mag",
+      "scrape_floor": 0.25,
+      "scrape_ceiling": 3.0,
+      "market_floor": 0.2,
+      "market_ceiling": 2.0,
+      "audit_range": [0.3, 1.5],
+      "grain_buckets": [
+        { "value": "110", "label": "110gr", "op": "eq", "n": 110 },
+        { "value": "125", "label": "125gr", "op": "eq", "n": 125 },
+        { "value": "140", "label": "140gr", "op": "eq", "n": 140 },
+        { "value": "158", "label": "158gr", "op": "eq", "n": 158 },
+        { "value": "180", "label": "180gr", "op": "eq", "n": 180 }
+      ]
+    },
+    "45acp": {
+      "status": "staged",
+      "group": "pistol",
+      "admin_category": "pistol",
+      "rebate_firearm_type": "handgun",
+      "display": { "full": ".45 ACP", "short": ".45 ACP" },
+      "order": { "popularity": 11, "home": 2 },
+      "color": null,
+      "surfaces": { "home_picker": true },
+      "detect_py": [
+        { "kind": "sub", "value": "45 acp" },
+        { "kind": "sub", "value": ".45 acp" },
+        { "kind": "sub", "value": "45 auto" },
+        { "kind": "sub", "value": ".45 auto" },
+        { "kind": "re", "value": "\\b\\.?45\\s*acp\\b" }
+      ],
+      "detect_js": ["45\\s*acp", "\\.45\\s*(?:acp|auto)", "45\\s*auto"],
+      "ballistics_aliases": ["45 auto", ".45 auto", "45 acp"],
+      "floor_key": "45acp",
+      "scrape_floor": 0.25,
+      "scrape_ceiling": null,
+      "market_floor": 0.15,
+      "market_ceiling": 1.5,
+      "audit_range": [0.25, 1.2],
+      "grain_buckets": [
+        { "value": "lt185", "label": "<185gr", "op": "lt", "n": 185 },
+        { "value": "185", "label": "185gr", "op": "eq", "n": 185 },
+        { "value": "200", "label": "200gr", "op": "eq", "n": 200 },
+        { "value": "230", "label": "230gr", "op": "eq", "n": 230 },
+        { "value": "gt230", "label": ">230gr", "op": "gt", "n": 230 }
+      ]
+    },
+    "44mag": {
+      "status": "ballistics-only",
+      "group": "pistol",
+      "admin_category": "pistol",
+      "rebate_firearm_type": "handgun",
+      "display": { "full": ".44 Magnum", "short": ".44 Mag" },
+      "ballistics_aliases": ["44 magnum", ".44 magnum", "44 mag"]
+    },
+    "6.5cm": {
+      "status": "planned",
+      "group": "rifle",
+      "admin_category": "rifle-prec",
+      "rebate_firearm_type": "rifle",
+      "display": { "full": "6.5 Creedmoor", "short": "6.5 CM" },
+      "market_floor": 0.4,
+      "market_ceiling": 3.5
+    },
+    "762x54r": {
+      "status": "planned",
+      "group": "rifle",
+      "admin_category": "rifle-prec",
+      "rebate_firearm_type": "rifle",
+      "display": { "full": "7.62x54R", "short": "7.62x54R" },
+      "market_floor": 0.25,
+      "market_ceiling": 2.0
+    },
+    "12ga": {
+      "status": "planned",
+      "group": "shotgun",
+      "admin_category": "shotgun",
+      "rebate_firearm_type": "shotshell",
+      "display": { "full": "12 Gauge", "short": "12ga" },
+      "market_floor": 0.15,
+      "market_ceiling": 2.5
+    }
+  }
+}

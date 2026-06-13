@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ammoraccoon/calibers.schema.json",
+  "title": "AmmoRaccoon caliber registry",
+  "description": "Schema for calibers.json — the single source of truth for what a supported caliber is (expansion #3). The generator (ammoraccoon-web/scripts/gen-calibers) validates against this before emitting any artifact. Phase A values are verbatim transcriptions of the hand-maintained tables, quirks included: the duplicate '40sw' input alias, the loose scraper floor keys ('223'/'380'/'308' + the '556' twin row via floor_key_extra), and the per-surface display variants under display.overrides (accepted deviation D4).",
+  "type": "object",
+  "required": ["version", "detect_priority_py", "detect_priority_js", "market_bounds_order", "defaults", "home_groups", "admin_categories", "calibers"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "comment": { "type": "string" },
+    "detect_priority_py": {
+      "description": "Branch order of scraper_lib.normalize_caliber — first match wins. Differs from the JS order on purpose (accepted deviation D3); do NOT unify without a corpus-proven session.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "detect_priority_js": {
+      "description": "Pattern order of lib/caliberDetect.js CALIBER_PATTERNS — first match wins.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "market_bounds_order": {
+      "description": "Emission order for PER_CALIBER_FLOOR / PER_CALIBER_CEILING and the migration caliber_floors VALUES table — must stay in today's order for byte parity with migration 033.",
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "defaults": {
+      "type": "object",
+      "required": ["scrape_floor", "scrape_ceiling", "market_floor", "market_ceiling", "audit_range"],
+      "additionalProperties": false,
+      "properties": {
+        "scrape_floor": { "type": "number", "description": "scraper_lib DEFAULT_FLOOR" },
+        "scrape_ceiling": { "type": "number", "description": "scraper_lib DEFAULT_CEILING" },
+        "market_floor": { "type": "number", "description": "lib/priceBounds SANE_PRICE_FLOOR (also migration 033 p_price_floor default)" },
+        "market_ceiling": { "type": "number", "description": "lib/priceBounds SANE_PRICE_CEILING" },
+        "audit_range": { "$ref": "#/$defs/range", "description": "caliber_audit DEFAULT_RANGE" }
+      }
+    },
+    "home_groups": {
+      "description": "Hero caliber-picker group order + display names (app/HomeClient.js CALIBER_GROUPS). Groups with zero member calibers still render (disabled) — Shotgun today.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "enum": ["pistol", "rifle", "rimfire", "shotgun"] },
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "admin_categories": {
+      "description": "Admin dashboard anomaly categories (app/admin/.../page.js CALIBER_CATEGORIES) — member lists are kept VERBATIM (they include slugs that have no registry entry yet, e.g. 10mm/50bmg); a generator lint asserts every registry caliber's admin_category appears in the right list.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "calibers", "floor", "ceiling"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "calibers": { "type": "array", "items": { "type": "string" } },
+          "floor": { "type": "number" },
+          "ceiling": { "type": "number" }
+        }
+      }
+    },
+    "calibers": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/caliber" }
+    }
+  },
+  "$defs": {
+    "range": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "detectPySpec": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["re", "sub"] },
+        "value": { "type": "string" }
+      }
+    },
+    "grainBucket": {
+      "type": "object",
+      "required": ["value", "label", "op", "n"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "string" },
+        "label": { "type": "string" },
+        "op": { "enum": ["lt", "eq", "gt"] },
+        "n": { "type": "integer" }
+      }
+    },
+    "caliber": {
+      "type": "object",
+      "required": ["status", "group", "admin_category", "rebate_firearm_type", "display"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": ["active", "staged", "planned", "ballistics-only"],
+          "description": "active: emitted into every table. staged: in the pipeline; emitted only where values/surface flags say (reproduces 45acp's half-seeded reality). planned: floors/admin pre-seeding only. ballistics-only: alias map only (44mag)."
+        },
+        "group": { "enum": ["pistol", "rifle", "rimfire", "shotgun"] },
+        "admin_category": { "type": "string" },
+        "rebate_firearm_type": { "enum": ["handgun", "rifle", "rimfire", "shotshell"] },
+        "display": {
+          "type": "object",
+          "required": ["full", "short"],
+          "additionalProperties": false,
+          "properties": {
+            "full": { "type": "string", "description": "scraper_lib CALIBERS value" },
+            "short": { "type": "string", "description": "home picker / ammo-index / reloading label unless overridden" },
+            "overrides": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Per-surface variants kept verbatim for byte parity (D4). Remove only via an approved copy-unification change.",
+              "properties": {
+                "history_full": { "type": "string", "description": "HistoryClient CALIBER_DISPLAY_NAMES when != full" },
+                "home": { "type": "string", "description": "HomeClient label when != short" },
+                "ammo_index": { "type": "string", "description": "AmmoIndexClient label when != short" },
+                "reloading": { "type": "string", "description": "ReloadingCalculator label when != short" },
+                "products_full": { "type": "string", "description": "generate_product_entries 'full' when != full" },
+                "products_short": { "type": "string", "description": "generate_product_entries 'short' when != short" }
+              }
+            }
+          }
+        },
+        "order": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "popularity": { "type": "integer", "description": "AmmoIndexClient PILL_ORDER rank" },
+            "home": { "type": "integer", "description": "rank within the caliber's home_groups dropdown" },
+            "history": { "type": "integer", "description": "HistoryClient TRACKED_CALIBERS rank" }
+          }
+        },
+        "color": {
+          "type": ["string", "null"],
+          "pattern": "^#[0-9a-f]{6}$",
+          "description": "HistoryClient CALIBER_COLORS. Required non-null when status=active (generator enforces)."
+        },
+        "surfaces": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Staged-status surface flags reproducing today's half-seeded reality (45acp: in the home picker but not /history etc.).",
+          "properties": {
+            "home_picker": { "type": "boolean" },
+            "history": { "type": "boolean" },
+            "ammo_index": { "type": "boolean" },
+            "reloading": { "type": "boolean" }
+          }
+        },
+        "detect_py": { "type": "array", "items": { "$ref": "#/$defs/detectPySpec" } },
+        "detect_js": { "type": "array", "items": { "type": "string" } },
+        "input_aliases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "ReloadingCalculator CALIBER_ALIASES, verbatim — 40sw's duplicate '40sw' entry is intentional (byte parity)."
+        },
+        "ballistics_aliases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "UNION of the six ballistics scrapers' CALIBER_NORMALIZE keys mapping to this slug (accepted deviation D2 — behavior proven by dry-run replay, not byte-identical per-source maps)."
+        },
+        "floor_key": { "type": "string", "description": "Loose key used by scraper_lib CALIBER_PRICE_FLOORS/_CEILINGS ('223', '380', '308'…). Kept verbatim for parity; collapse post-cutover." },
+        "floor_key_extra": { "type": "array", "items": { "type": "string" }, "description": "Extra loose rows sharing this caliber's bounds (the '556' twin)." },
+        "scrape_floor": { "type": ["number", "null"] },
+        "scrape_ceiling": { "type": ["number", "null"], "description": "null = caliber absent from CALIBER_PRICE_CEILINGS (45acp today) — DEFAULT_CEILING applies at runtime." },
+        "market_floor": { "type": ["number", "null"] },
+        "market_ceiling": { "type": ["number", "null"] },
+        "audit_range": { "$ref": "#/$defs/range" },
+        "grain_buckets": { "type": "array", "items": { "$ref": "#/$defs/grainBucket" } }
+      }
+    }
+  }
+}
