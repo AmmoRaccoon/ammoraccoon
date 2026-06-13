@@ -170,6 +170,11 @@
           "items": { "type": "string" },
           "description": "UNION of the six ballistics scrapers' CALIBER_NORMALIZE keys mapping to this slug (accepted deviation D2 — behavior proven by dry-run replay, not byte-identical per-source maps)."
         },
+        "url_aliases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Discovery (expansion #4, Stage 1): URL-fragment forms a retailer category link uses to name this caliber (e.g. '223-rem', '5-56', '556-nato'). Consumed ONLY by the discovery adapters + validation harness; NOT by normalize_caliber/detection, so it cannot change a product-title verdict. Seeded from observed retailer category slugs + the TSUSA sitemap WANT dict. Each entry must be lowercase and globally unique across calibers (generator lint). Optional — calibers with no observed retailer slugs yet (staged/planned) omit it."
+        },
         "floor_key": { "type": "string", "description": "Loose key used by scraper_lib CALIBER_PRICE_FLOORS/_CEILINGS ('223', '380', '308'…). Kept verbatim for parity; collapse post-cutover." },
         "floor_key_extra": { "type": "array", "items": { "type": "string" }, "description": "Extra loose rows sharing this caliber's bounds (the '556' twin)." },
         "scrape_floor": { "type": ["number", "null"] },

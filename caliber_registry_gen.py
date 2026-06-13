@@ -1,7 +1,7 @@
 """GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 
 Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
-Registry sha256: 9257256bf9ec4e5424949216a18730bf37b04b2355622d84d0775b237d379618
+Registry sha256: 7df48e4ae6c0fe36ea73486135a25326614a9864d405b32b982169afae4a8c60
 
 Phase A (2026-06-12): NOTHING imports this module yet. Every table below
 is the registry-derived twin of a hand-maintained table in scraper_lib /
@@ -11,7 +11,7 @@ Parity proof: scripts/check_caliber_registry.py.
 """
 import re as _re
 
-REGISTRY_SHA256 = '9257256bf9ec4e5424949216a18730bf37b04b2355622d84d0775b237d379618'
+REGISTRY_SHA256 = '7df48e4ae6c0fe36ea73486135a25326614a9864d405b32b982169afae4a8c60'
 
 # Twin of scraper_lib.CALIBERS
 CALIBERS = {
@@ -187,6 +187,21 @@ BALLISTICS_CALIBER_NORMALIZE = {
     '44 magnum': '44mag',
     '.44 magnum': '44mag',
     '44 mag': '44mag',
+}
+
+# Discovery url-slug aliases (expansion #4). Used by the discovery
+# adapters + validation harness only; NOT by normalize_caliber.
+CALIBER_URL_ALIASES = {
+    '9mm': ['9mm', '9mm-luger', '9-mm'],
+    '223-556': ['223-rem', '223rem', '223-remington', '223', '223-556', '223-556mm', '223-5-56', '223-5.56', '223-rem-5-56-nato', '5-56', '556-nato', '556mm-nato', '556x45-nato', '5.56x45', '5-56x45mm', '5-56x45mm-nato'],
+    '22lr': ['22-lr', '22lr', '22-long-rifle', '22lr-long-rifle'],
+    '380acp': ['380-acp', '380-auto', '380'],
+    '40sw': ['40-sw', '40-s-w', '40sw', '40-cal', '40-cal-sw'],
+    '308win': ['308-win', '308-winchester', '308', '308-762x51', '308-win-762x51', '308-7-62-nato', '308-7-62x51', '308-7-62x51mm', '308-win-7-62x51', '762x51-nato', '762x51mm-nato', '7-62x51'],
+    '762x39': ['7-62x39', '762x39', '7.62x39', '7-62x39mm', '762x39mm', '7.62x39mm', '7-62-x39', '7-62-x-39', '7-62-x-39mm'],
+    '300blk': ['300-blackout', '300-aac-blackout', '300-aac', '300blk'],
+    '38spl': ['38-special', '38-specials', '38-spl'],
+    '357mag': ['357-magnum', '357-mag', '357'],
 }
 
 # Twins of scripts/match_manufacturer_rebates_to_listings.py caliber sets.
