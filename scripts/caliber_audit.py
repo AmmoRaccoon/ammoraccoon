@@ -35,6 +35,21 @@ from email.message import EmailMessage
 from dotenv import load_dotenv
 from supabase import create_client
 
+# Caliber-level sanity ranges in $/round (min = rock-bottom realistic, max =
+# upper end of a premium-defensive load) used for the 3x-avg sanity check in
+# evaluate(). Phase B step 1 (2026-06-12): these re-export from the generated
+# caliber registry (caliber_registry_gen.py at the repo root, emitted from
+# calibers.json) instead of a hand-written literal, so a new caliber's audit
+# range comes from the single source of truth. Values are byte-identical to
+# the prior literal (proven by scripts/check_caliber_registry.py) — zero
+# behavior change. caliber_audit.py runs as `python scripts/caliber_audit.py`
+# (sys.path[0] = scripts/), so add the repo root where the gen module lives.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from caliber_registry_gen import (  # noqa: E402
+    AUDIT_EXPECTED_RANGES as EXPECTED_RANGES,
+    AUDIT_DEFAULT_RANGE as DEFAULT_RANGE,
+)
+
 load_dotenv()
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
@@ -49,23 +64,7 @@ MIN_COUNT = 5
 MIN_PPR_FLOOR = 0.05
 MAX_PPR_CEILING = 5.00
 AVG_MAX_MULTIPLIER = 3
-
-# Caliber-level sanity ranges in dollars per round. Min is the rock-bottom
-# anyone realistically charges; max is the upper end of "premium defensive
-# load" without being obviously wrong. Used for the 3x-avg sanity check.
-EXPECTED_RANGES = {
-    '9mm':     (0.15, 0.80),
-    '223-556': (0.25, 1.50),
-    '22lr':    (0.05, 0.30),
-    '380acp':  (0.20, 1.00),
-    '40sw':    (0.20, 0.90),
-    '308win':  (0.50, 3.00),
-    '762x39':  (0.20, 1.00),
-    '300blk':  (0.50, 2.50),
-    '38spl':   (0.25, 1.50),
-    '357mag':  (0.30, 1.50),
-}
-DEFAULT_RANGE = (0.10, 5.00)
+# EXPECTED_RANGES + DEFAULT_RANGE now import from caliber_registry_gen above.
 
 
 def fetch_listings(sb):
