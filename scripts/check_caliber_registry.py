@@ -134,23 +134,46 @@ BALLISTICS = [
     ('pmc', ROOT / 'scripts' / 'scraper_pmc_ballistics.py'),
     ('sb', ROOT / 'scripts' / 'scraper_sb_ballistics.py'),
 ]
-union = {}
+# Cutover-aware (Phase B step 4). Pre-cutover: each source held its own
+# CALIBER_NORMALIZE literal — the union-of-six had to equal gen with no
+# cross-source conflicts. Post-cutover (2026-06-12): all six do
+# `from caliber_registry_gen import BALLISTICS_CALIBER_NORMALIZE as
+# CALIBER_NORMALIZE`, so there are no per-source literals to union — verify
+# each source is WIRED to the union (the row-set impact of the switch was the
+# 2 approved D2 adds, proven separately by scripts/_replay_ballistics_maps.py).
+# Mixed states are handled so the suite stays green at every step.
+union_from_literals = {}
 conflicts = []
-per_source = {}
+literal_sources = []
+cutover_sources = []
 for name, path in BALLISTICS:
-    m = ast_assignments(path, {'CALIBER_NORMALIZE'})['CALIBER_NORMALIZE']
-    per_source[name] = m
-    for alias, slug in m.items():
-        if alias in union and union[alias] != slug:
-            conflicts.append((alias, union[alias], slug))
-        union[alias] = slug
-check('BALLISTICS union-of-six == gen map', union, gen.BALLISTICS_CALIBER_NORMALIZE)
-check('BALLISTICS no cross-source alias conflicts', conflicts, [])
-print('\n  D2 delta preview (aliases the union ADDS per source — live impact')
-print('  measured by scripts/_replay_ballistics_maps.py):')
-for name, m in per_source.items():
-    added = sorted(set(gen.BALLISTICS_CALIBER_NORMALIZE) - set(m))
-    print(f'    {name:<11} +{len(added)} aliases not in its own map')
+    lits = ast_assignments(path, {'CALIBER_NORMALIZE'})
+    if 'CALIBER_NORMALIZE' in lits:
+        literal_sources.append(name)
+        for alias, slug in lits['CALIBER_NORMALIZE'].items():
+            if alias in union_from_literals and union_from_literals[alias] != slug:
+                conflicts.append((alias, union_from_literals[alias], slug))
+            union_from_literals[alias] = slug
+    else:
+        aliases = ast_import_aliases(path, 'caliber_registry_gen')
+        cutover_sources.append((name, aliases.get('CALIBER_NORMALIZE')))
+
+if len(literal_sources) == len(BALLISTICS):
+    # Pre-cutover: full union-of-six must equal gen, no conflicts.
+    check('BALLISTICS union-of-six == gen map', union_from_literals, gen.BALLISTICS_CALIBER_NORMALIZE)
+    check('BALLISTICS no cross-source alias conflicts', conflicts, [])
+else:
+    for name, imported in cutover_sources:
+        check(f'BALLISTICS {name} cut over: CALIBER_NORMALIZE <- gen.BALLISTICS_CALIBER_NORMALIZE',
+              imported, 'BALLISTICS_CALIBER_NORMALIZE')
+    if literal_sources:
+        # Any source NOT yet cut over must still be a non-conflicting subset
+        # of the gen union (no divergent hand value snuck in mid-migration).
+        check('BALLISTICS remaining-literal no cross-source conflicts', conflicts, [])
+        subset_ok = all(gen.BALLISTICS_CALIBER_NORMALIZE.get(a) == s
+                        for a, s in union_from_literals.items())
+        check(f'BALLISTICS remaining literals ({", ".join(literal_sources)}) subset of gen union',
+              subset_ok, True)
 
 # --- normalize_caliber edge-case replay (built-in corpus) --------------------
 corpus = set()
