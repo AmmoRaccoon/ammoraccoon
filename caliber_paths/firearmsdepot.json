@@ -1,0 +1,13 @@
+{
+  "retailer": "firearmsdepot",
+  "retailer_slug": "firearmsdepot",
+  "platform": "bigcommerce",
+  "base": "https://firearmsdepot.com",
+  "comment": "Expansion #4 Step-2 pilot, shape E (list-of-parents). Transcribed VERBATIM from scraper_firearmsdepot.py inline PARENT_PATHS on 2026-06-14 — parity-proven byte-identical before flip. This scraper does NOT map caliber->URL: it crawls the three usage-type parent categories and buckets each product by normalize_caliber (no per-caliber static URLs exist; FD's caliber filtering is hash-based JS that breaks ?page=N pagination). So there is no `calibers` block — the parents live in `parent_paths`, loaded by load_parent_paths(). No `type` tags added (the inline literal carried none — zero new data). Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 pilot, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "parent_paths": [
+    { "path": "/ammunition/centerfire-handgun-rounds/", "status": "active" },
+    { "path": "/ammunition/centerfire-rifle-rounds/", "status": "active" },
+    { "path": "/ammunition/rimfire-rounds/", "status": "active" }
+  ]
+}
