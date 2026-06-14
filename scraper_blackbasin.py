@@ -14,6 +14,7 @@ from scraper_lib import (
     parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
     parse_bullet_type_with_url_fallback,
     mark_retailer_scraped,
+    load_caliber_paths,
 )
 
 load_dotenv()
@@ -29,30 +30,16 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
-# Black Basin migrated to Shopify on/around 2026-05-08; the previous
-# BigCommerce URLs (/handgun-ammo/9mm/, /rifle-ammo/.223-remington/, …)
-# now all return 404 and the scraper had been silently writing zero
-# rows for nine days. Shopify exposes a per-collection JSON feed at
-# /collections/<handle>/products.json with full variant detail (round
-# count in option1, price/sku/available per variant) — far cleaner
-# than DOM-scraping a theme.
-#
-# .223 and 5.56 live in two separate Shopify collections on Black
-# Basin even though we bucket them together as `223-556` in CALIBERS.
-# We hit both URLs and dedup by retailer_product_id (variant SKU) so a
-# Federal XM193 listed in both collections doesn't double-count.
-CALIBER_PATHS = {
-    '9mm':     ['/collections/9mm-ammo'],
-    '380acp':  ['/collections/380-auto-ammo'],
-    '40sw':    ['/collections/40-sw-ammo'],
-    '38spl':   ['/collections/38-special-ammo'],
-    '357mag':  ['/collections/357-mag-ammo'],
-    '22lr':    ['/collections/22-lr-ammo'],
-    '223-556': ['/collections/223-remington-ammo', '/collections/556x45-nato-ammo'],
-    '308win':  ['/collections/308-ammo'],
-    '762x39':  ['/collections/762x39mm-ammo'],
-    '300blk':  ['/collections/300-aac-blackout-ammo'],
-}
+# Per-caliber collection URLs now live in caliber_paths/blackbasin.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. This is a REQUESTS-BASED scraper (Shopify per-collection
+# /products.json feed via urllib — no browser), so ONLY the URL literal
+# moved to config; it does NOT adopt the shared Playwright redirect guard
+# or report_empty_first_pages, and keeps its own correct drift guard
+# (successful_calibers==0 -> fatal, in scrape() below). entry['url'] is a
+# drop-in for the old path string. .223 and 5.56 live in two separate
+# Shopify collections, both bucket to 223-556; dedup by variant SKU.
+CALIBER_PATHS = load_caliber_paths('blackbasin')
 
 
 def get_retailer_id():
@@ -189,7 +176,8 @@ def scrape_caliber(caliber_norm, caliber_display, retailer_id, seen_ids, counts)
     skipped_total = 0
     fetched_any = False
 
-    for path in paths:
+    for entry in paths:
+        path = entry['url']
         print(f"\n[{caliber_norm}] GET {path}/products.json")
         products, ok = fetch_collection(path)
         if not ok:
