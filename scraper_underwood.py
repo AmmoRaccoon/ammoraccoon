@@ -11,6 +11,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, normalize_caliber, parse_bullet_type as _shared_bullet_type,
     mark_retailer_scraped,
+    load_parent_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -22,19 +23,14 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "underwood"
 SITE_BASE = "https://underwoodammo.com"
 
-# BigCommerce stencil. Underwood is a manufacturer-direct boutique
-# with no per-caliber category URL — instead they slice their lineup
-# into three usage-type pages: handgun defensive, rifle target, rifle
-# hunting. Verified 2026-04-26: parent URLs without the trailing
-# sub-segment 404, so only the three full paths below are valid.
-# normalize_caliber() does the bucketing from each title; products
-# outside our 10 calibers (10mm Auto, .44 Mag, .500 S&W, etc.) are
-# silently skipped.
-PARENT_PATHS = [
-    '/ammo/handgun-ammo/defensive/',
-    '/ammo/rifle-ammo/target/',
-    '/ammo/rifle-ammo/hunting/',
-]
+# Parent crawl roots now live in caliber_paths/underwood.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. BigCommerce stencil; Underwood is a manufacturer-direct
+# boutique with no per-caliber category URL, so (like firearmsdepot) it
+# crawls three usage-type parent pages and normalize_caliber() buckets
+# each product by title. entry['url'] is a drop-in for the old SITE_BASE
+# + path string.
+PARENT_PATHS = load_parent_paths('underwood')
 
 MAX_PAGES = 8  # Each parent showed <=20 cards on page 1; Underwood's
                # entire lineup is well under 100 SKUs.
@@ -111,6 +107,7 @@ def scrape_parent(page, parent_path, retailer_id, seen_ids, counts):
     base = SITE_BASE + parent_path
     saved = 0
     skipped = 0
+    empty_first_page = False
 
     for page_num in range(1, MAX_PAGES + 1):
         url = base if page_num == 1 else f"{base}?page={page_num}"
@@ -119,15 +116,29 @@ def scrape_parent(page, parent_path, retailer_id, seen_ids, counts):
             resp = page.goto(url, wait_until='domcontentloaded', timeout=60000)
         except Exception as e:
             print(f"  goto failed: {e}")
+            if page_num == 1:
+                empty_first_page = True
             break
         if resp and resp.status >= 400:
             print(f"  HTTP {resp.status} — stopping parent.")
+            if page_num == 1:
+                empty_first_page = True
+            break
+        # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Underwood
+        # had none before): a parent category that 301s to a DIFFERENT
+        # page (renamed) stops the parent and flags it empty, feeding the
+        # storefront-drift guardrail rather than crawling the wrong tree.
+        if page_num == 1 and category_redirected(url, page.url):
+            print(f"  REDIRECTED to {page.url} - parent moved/renamed; stopping.")
+            empty_first_page = True
             break
         time.sleep(2)
 
         cards = page.query_selector_all('.productGrid article.card')
         if not cards:
             print(f"  No cards on page {page_num}, stopping parent.")
+            if page_num == 1:
+                empty_first_page = True
             break
 
         new_on_page = 0
@@ -283,7 +294,7 @@ def scrape_parent(page, parent_path, retailer_id, seen_ids, counts):
             print(f"  Page {page_num} added 0 new — stopping parent.")
             break
 
-    return saved, skipped
+    return saved, skipped, empty_first_page
 
 
 def scrape():
@@ -297,6 +308,7 @@ def scrape():
     total_skipped = 0
     seen_ids = set()
     counts = {}
+    empty_handles = []  # (label, parent url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -305,14 +317,20 @@ def scrape():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
 
-        for parent in PARENT_PATHS:
-            saved, skipped = scrape_parent(page, parent, retailer_id, seen_ids, counts)
+        for entry in PARENT_PATHS:
+            saved, skipped, empty = scrape_parent(page, entry['url'], retailer_id, seen_ids, counts)
             total_saved += saved
             total_skipped += skipped
+            if empty:
+                empty_handles.append(('parent', entry['url']))
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14):
+    # all three parents empty on first page (>= EMPTY_FAIL_THRESHOLD)
+    # exits non-zero; only advance last_scraped_at when something saved.
+    report_empty_first_pages(empty_handles, 'Underwood Ammo')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
     print("Per-caliber counts:")
     for cal in CALIBERS:

@@ -1,0 +1,13 @@
+{
+  "retailer": "underwood",
+  "retailer_slug": "underwood",
+  "platform": "bigcommerce",
+  "base": "https://underwoodammo.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape E (list-of-parents). Transcribed verbatim from scraper_underwood.py inline PARENT_PATHS on 2026-06-14, parity-proven byte-identical before flip. Like firearmsdepot, Underwood (BigCommerce stencil, manufacturer-direct boutique) has NO per-caliber category URL: it slices its lineup into three usage-type parent pages (handgun defensive, rifle target, rifle hunting) and buckets each product by normalize_caliber. So there is no `calibers` block — the parents live in `parent_paths`, loaded by load_parent_paths(). No `type` tags (the inline literal carried none). Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "parent_paths": [
+    { "path": "/ammo/handgun-ammo/defensive/", "status": "active" },
+    { "path": "/ammo/rifle-ammo/target/", "status": "active" },
+    { "path": "/ammo/rifle-ammo/hunting/", "status": "active" }
+  ]
+}
