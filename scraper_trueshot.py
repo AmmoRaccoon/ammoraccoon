@@ -6,7 +6,7 @@ import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history, load_caliber_paths
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -17,27 +17,18 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
 )
 
-# Trueshot Shopify collection handles per caliber. Values are lists
-# because some calibers resolve to more than one collection — TrueShot
-# split .223 and 5.56 into separate collections during their 2026-05-09
-# storefront restructure, so 223-556 now crawls both and merges results
-# (Shopify product handles are global, so seen_ids dedups any overlap).
-# The five non-list-only handles below were also renamed in that
-# restructure: the prior values silently 404'd and produced empty pages
-# until the audit on 2026-05-09 caught the absence.
-COLLECTION_HANDLES = {
-    '9mm':     ['ammunition-pistol-ammo-9mm'],
-    '380acp':  ['ammunition-pistol-ammo-380-auto'],
-    '40sw':    ['ammunition-pistol-ammo-40-sw'],
-    '38spl':   ['ammunition-pistol-ammo-38-special'],
-    '357mag':  ['ammunition-pistol-ammo-357-magnum'],
-    '22lr':    ['ammunition-rimfire-ammo-22-long-rifle'],
-    '223-556': ['ammunition-rifle-ammo-223-rem',
-                'ammunition-rifle-ammo-5-56x45mm'],
-    '308win':  ['ammunition-rifle-ammo-308-win'],
-    '762x39':  ['ammunition-rifle-ammo-7-62x39'],
-    '300blk':  ['ammunition-rifle-ammo-300-blackout'],
-}
+# Trueshot Shopify collection paths now live in caliber_paths/trueshot.json
+# (expansion #4 Step-2 migration) — migrated from the inline bare-handle
+# dict, parity-proven byte-identical (fetched URL). Per the blackbasin
+# precedent the config stores the full '/collections/<handle>' path and
+# the scraper appends '/products.json' at runtime, so entry['url'] is a
+# drop-in. REQUESTS-BASED (Shopify /products.json via urllib — no
+# browser), so loader-only: it keeps its own EMPTY_FAIL_THRESHOLD
+# storefront-drift guard in scrape() below and does NOT adopt the shared
+# Playwright redirect / report_empty_first_pages guards. Values are lists
+# because some calibers resolve to more than one collection (223-556
+# crawls .223 + 5.56); seen_ids dedups any overlap.
+COLLECTION_HANDLES = load_caliber_paths('trueshot')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -97,12 +88,17 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
     """
     rows = []
     flags = []
-    for handle in COLLECTION_HANDLES[caliber_norm]:
+    for entry in COLLECTION_HANDLES[caliber_norm]:
+        # Config stores the full '/collections/<handle>' path (blackbasin
+        # precedent); the scraper appends '/products.json' exactly as
+        # before, so the fetched URL is byte-identical to the old bare-
+        # handle build.
+        path = entry['url']
         empty_first_page = False
         page_num = 1
         while True:
-            url = f"{SITE_BASE}/collections/{handle}/products.json?page={page_num}&limit=250"
-            print(f"\n[{caliber_norm}/{handle}] page {page_num}: {url}")
+            url = f"{SITE_BASE}{path}/products.json?page={page_num}&limit=250"
+            print(f"\n[{caliber_norm}/{path}] page {page_num}: {url}")
             try:
                 data = fetch_json(url)
             except Exception as e:
@@ -115,7 +111,7 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
                     empty_first_page = True
                     # Loud, grep-friendly line so the cause is obvious
                     # in CI logs even if the run as a whole succeeds.
-                    print(f"  WARN: TrueShot collection {handle} returned "
+                    print(f"  WARN: TrueShot collection {path} returned "
                           f"zero products on first page (caliber {caliber_norm}).")
                 else:
                     print(f"  No products on page {page_num}, stopping handle.")
@@ -201,7 +197,7 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
             page_num += 1
             if page_num > 10:
                 break
-        flags.append((handle, empty_first_page))
+        flags.append((path, empty_first_page))
     return rows, flags
 
 
