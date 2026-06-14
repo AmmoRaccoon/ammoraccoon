@@ -51,7 +51,7 @@ from scraper_lib import (
     normalize_caliber, now_iso, with_stock_fields,
     parse_purchase_limit, parse_brand, sanity_check_ppr, clean_title,
     parse_bullet_type, parse_bullet_type_with_url_fallback,
-    mark_retailer_scraped,
+    mark_retailer_scraped, load_caliber_paths,
 )
 
 load_dotenv()
@@ -60,26 +60,19 @@ RETAILER_SLUG = "buds"
 SITE_BASE = "https://www.budsgunshop.com"
 LISTING_BASE = f"{SITE_BASE}/search.php/type/ammo"
 
-# Per-caliber filter slugs Bud's exposes in the all-ammo view's facet
-# panel (verified live 2026-05-09 by parsing the page-1 facet links).
-# Only 6 of our 10 tracked calibers have exposed filter URLs — the
-# remaining 4 (380acp, 762x39, 300blk, 357mag) are picked up by the
-# all-ammo backstop walk.
-#
-# Slugs are reproduced exactly as Bud's encodes them in the href —
-# `+` for spaces, `%26` for `&`, `%28`/`%29` for parentheses. The
-# numeric prefix (e.g. `22903-`, `10000601-`) is Bud's category id;
-# omitting or changing it yields a 404. If Bud's reorganizes their
-# taxonomy these will break — the loud-failure gate in main() detects
-# the case where every root 404s.
-CALIBER_FILTER_URLS = {
-    '9mm':     f'{LISTING_BASE}/caliber/22903-9mm',
-    '223-556': f'{LISTING_BASE}/caliber/10000601-.223+remington+5.56+nato',
-    '308win':  f'{LISTING_BASE}/caliber/10000660-308+winchester+%287.62+nato%29',
-    '22lr':    f'{LISTING_BASE}/caliber/10000844-22+long+rifle',
-    '40sw':    f'{LISTING_BASE}/caliber/10000719-40+smith+%26+wesson',
-    '38spl':   f'{LISTING_BASE}/caliber/10000566-38+special',
-}
+# Per-caliber filter URLs now live in caliber_paths/buds.json (expansion #4
+# Step-2 migration). The old inline f-strings resolved to ABSOLUTE URLs; they
+# are stored there as paths relative to SITE_BASE, URL-encoding preserved
+# verbatim (`+`=space, `%26`=&, `%28`/`%29`=parens, numeric prefix = Bud's
+# category id; changing it 404s), and parity-proven byte-identical after
+# relativizing. Only the 6 calibers Bud's exposes a filter URL for are there;
+# the other 4 (380acp, 357mag, 762x39, 300blk) are still picked up by the
+# all-ammo backstop walk below. load_caliber_paths returns {cal: [entry]};
+# SITE_BASE + entry['url'] reproduces the old absolute filter_url exactly.
+# (Bud's is requests-based and auto-follows redirects, so the Playwright
+# category_redirected guard does not apply; the successful_roots==0 loud-
+# failure gate in main() remains the drift backstop.)
+CALIBER_FILTER_URLS = load_caliber_paths('buds')
 
 CRAWL_DELAY_SEC = 5
 PAGE_HARD_CAP = 50
@@ -459,24 +452,25 @@ def main() -> int:
     # the cross-strategy dedup-hit counter without needing a wrapper class.
     dedup_hits = [0]
     successful_roots = 0
-    total_roots = len(CALIBER_FILTER_URLS) + 1  # +1 for the all-ammo backstop
+    total_roots = sum(len(v) for v in CALIBER_FILTER_URLS.values()) + 1  # +1 for the all-ammo backstop
 
     # Walk per-caliber filter views first. Six of our 10 calibers are
     # exposed via filter URLs; ordering them first means the all-ammo
     # backstop's dedup_hits counter quantifies how much its top-1000
     # overlap with the (smaller, focused) caliber views.
-    for cal_norm, filter_url in CALIBER_FILTER_URLS.items():
-        s, sk, ok = walk_listing_root(
-            root_url=filter_url,
-            source_label=f'filter[{cal_norm}]',
-            args=args, supabase=supabase, retailer_id=retailer_id,
-            seen_pids=seen_pids, errors=errors,
-            per_source_counts=per_source_counts, dedup_hits=dedup_hits,
-        )
-        saved_total += s
-        skipped_total += sk
-        if ok:
-            successful_roots += 1
+    for cal_norm, entries in CALIBER_FILTER_URLS.items():
+        for entry in entries:
+            s, sk, ok = walk_listing_root(
+                root_url=SITE_BASE + entry['url'],
+                source_label=f'filter[{cal_norm}]',
+                args=args, supabase=supabase, retailer_id=retailer_id,
+                seen_pids=seen_pids, errors=errors,
+                per_source_counts=per_source_counts, dedup_hits=dedup_hits,
+            )
+            saved_total += s
+            skipped_total += sk
+            if ok:
+                successful_roots += 1
         if args.limit_products is not None and saved_total >= args.limit_products:
             break
 
@@ -533,7 +527,10 @@ def main() -> int:
         return 1
 
     if not args.dry_run:
-        mark_retailer_scraped(supabase, retailer_id)
+        # had_success (NEW 2026-06-14): only advance last_scraped_at when the
+        # run actually saved listings, so a fully-walled/empty walk doesn't
+        # falsely advertise freshness on /status.
+        mark_retailer_scraped(supabase, retailer_id, had_success=(saved_total > 0))
     return 0 if not errors else 1
 
 

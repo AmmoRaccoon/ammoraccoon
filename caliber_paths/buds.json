@@ -1,0 +1,16 @@
+{
+  "retailer": "buds",
+  "retailer_slug": "buds",
+  "platform": "generic-sitemap",
+  "base": "https://www.budsgunshop.com",
+  "comment": "Expansion #4 Step-2 pilot, shape D (dict->f-string url). Transcribed VERBATIM from scraper_buds.py inline CALIBER_FILTER_URLS on 2026-06-14 — the f-strings resolve to absolute URLs; stored here as paths relative to base, parity-proven byte-identical (after relativizing the resolved f-strings against base) before flip. URL-encoding preserved exactly (+ = space, %26 = &, %28/%29 = parens, numeric prefix = Bud's category id); changing it 404s. Only the 6 calibers Bud's exposes a filter URL for are here; the other 4 (380acp, 357mag, 762x39, 300blk) are picked up by the all-ammo crawl backstop, which stays inline (it is NOT a per-caliber URL). Bud's is requests-based (not Playwright); see the scraper for why the Playwright redirect guard does not apply. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 pilot, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/search.php/type/ammo/caliber/22903-9mm", "status": "active" } ],
+    "223-556": [ { "path": "/search.php/type/ammo/caliber/10000601-.223+remington+5.56+nato", "status": "active" } ],
+    "308win": [ { "path": "/search.php/type/ammo/caliber/10000660-308+winchester+%287.62+nato%29", "status": "active" } ],
+    "22lr": [ { "path": "/search.php/type/ammo/caliber/10000844-22+long+rifle", "status": "active" } ],
+    "40sw": [ { "path": "/search.php/type/ammo/caliber/10000719-40+smith+%26+wesson", "status": "active" } ],
+    "38spl": [ { "path": "/search.php/type/ammo/caliber/10000566-38+special", "status": "active" } ]
+  }
+}
