@@ -1,0 +1,15 @@
+{
+  "retailer": "gorilla",
+  "retailer_slug": "gorilla",
+  "platform": "woocommerce",
+  "base": "https://www.gorillaammo.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape A (dict->str). Transcribed verbatim from scraper_gorilla.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. Gorilla is a single-brand WooCommerce manufacturer that lists only 5 of the 10 tracked calibers (no .40 S&W / .38 Spl / .357 Mag / .22 LR / 7.62x39) — those are deliberately absent, not parked. Most slugs carry a '-view-ammo-by-caliber' suffix from a WP duplicate-slug rename; .308 Win and 9mm don't. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/product-category/view-ammo-by-caliber/9-mm/", "status": "active" } ],
+    "380acp": [ { "path": "/product-category/view-ammo-by-caliber/380-acp-view-ammo-by-caliber/", "status": "active" } ],
+    "223-556": [ { "path": "/product-category/view-ammo-by-caliber/223-5-56-view-ammo-by-caliber/", "status": "active" } ],
+    "308win": [ { "path": "/product-category/view-ammo-by-caliber/308-win/", "status": "active" } ],
+    "300blk": [ { "path": "/product-category/view-ammo-by-caliber/300-blackout-view-ammo-by-caliber/", "status": "active" } ]
+  }
+}

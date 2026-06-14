@@ -11,6 +11,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, parse_bullet_type,
     mark_retailer_scraped,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -22,19 +23,14 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "gorilla"
 SITE_BASE = "https://www.gorillaammo.com"
 
-# WooCommerce. Gorilla is a single-brand manufacturer that loads only a
-# handful of calibers. Verified 2026-04-25 against the live "View Ammo
-# by Caliber" nav — the 5 tracked calibers Gorilla doesn't sell
-# (.40 S&W, .38 Spl, .357 Mag, .22 LR, 7.62x39) are dropped instead
-# of left to 404. Most slugs carry a "-view-ammo-by-caliber" suffix
-# from a WP duplicate-slug rename; .308 Win and 9mm don't.
-CALIBER_PATHS = {
-    '9mm':     '/product-category/view-ammo-by-caliber/9-mm/',
-    '380acp':  '/product-category/view-ammo-by-caliber/380-acp-view-ammo-by-caliber/',
-    '223-556': '/product-category/view-ammo-by-caliber/223-5-56-view-ammo-by-caliber/',
-    '308win':  '/product-category/view-ammo-by-caliber/308-win/',
-    '300blk':  '/product-category/view-ammo-by-caliber/300-blackout-view-ammo-by-caliber/',
-}
+# Per-caliber category URLs now live in caliber_paths/gorilla.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. WooCommerce single-brand manufacturer: only 5 of the
+# 10 tracked calibers are sold (no .40 S&W / .38 Spl / .357 Mag / .22 LR
+# / 7.62x39) — those are deliberately absent from the config, not parked.
+# Values are now LISTS of entries and entry['url'] is a drop-in for the
+# old SITE_BASE + path string.
+CALIBER_PATHS = load_caliber_paths('gorilla')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -77,17 +73,24 @@ def parse_case_material(text):
 def parse_country(text):
     return 'USA'  # Gorilla is a US manufacturer.
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    url = SITE_BASE + CALIBER_PATHS[caliber_norm]
+def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id, seen_ids):
+    url = SITE_BASE + entry['url']
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
     except Exception as e:
         print(f"  goto failed: {e}")
-        return 0, 0
+        return 0, 0, True
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
+    # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Gorilla had
+    # none before). WooCommerce duplicate-slug renames are exactly the
+    # drift this catches: a category that 301s to a DIFFERENT page with
+    # HTTP 200 skips loudly and counts as an empty handle.
+    if category_redirected(url, page.url):
+        print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+        return 0, 0, True
     time.sleep(6)
 
     products = page.query_selector_all('li.product, ul.products li')
@@ -95,7 +98,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         products = page.query_selector_all('[class*="product"]')
     print(f"  Found {len(products)} products")
     if not products:
-        return 0, 0
+        return 0, 0, True
 
     saved = 0
     skipped = 0
@@ -217,6 +220,22 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             print(f"  Skipped: {e}")
             continue
 
+    return saved, skipped, False
+
+
+def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles):
+    """Scrape every configured category URL for a caliber (always a list).
+    Appends (caliber, url) to empty_handles for any URL whose first page
+    rendered zero product cards."""
+    saved = 0
+    skipped = 0
+    for entry in CALIBER_PATHS[caliber_norm]:
+        s, k, empty = scrape_category_page(page, entry, caliber_norm,
+                                           caliber_display, retailer_id, seen_ids)
+        saved += s
+        skipped += k
+        if empty:
+            empty_handles.append((caliber_norm, entry['url']))
     return saved, skipped
 
 
@@ -231,6 +250,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (caliber, url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -241,13 +261,18 @@ def scrape():
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
+            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles)
             total_saved += saved
             total_skipped += skipped
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14).
+    # Gorilla covers only 5 calibers, so the EMPTY_FAIL_THRESHOLD of 3
+    # is a wider net here — three empty first-pages out of five is a
+    # strong WooCommerce-rename signal.
+    report_empty_first_pages(empty_handles, 'Gorilla Ammunition')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 if __name__ == '__main__':
