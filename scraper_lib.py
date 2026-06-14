@@ -10,7 +10,10 @@ shelves) can still tag listings correctly.
 """
 
 from datetime import datetime, timezone
+import json
+import os
 import re
+import sys
 from urllib.parse import urlparse
 
 # Phase B step 2 (2026-06-12): six per-caliber data tables — display names,
@@ -1447,3 +1450,152 @@ def insert_price_history(supabase, row):
     if _PH_CACHE['ok']:
         _PH_CACHE['latest'][lid] = new
     return True
+
+
+# ---------------------------------------------------------------------------
+# Caliber-paths config loader + shared scraper guards (expansion #4, Step 2).
+#
+# The per-retailer caliber->[category URL] map used to live as an inline
+# CALIBER_PATHS literal in every scraper. It now lives as a version-controlled
+# JSON file per retailer (caliber_paths/<retailer>.json) — see the file's own
+# `comment` for the format. load_caliber_paths() reads that file; the two
+# guards below (category_redirected, report_empty_first_pages) lift the
+# TSUSA redirect guard and the EMPTY_FAIL_THRESHOLD storefront-drift guardrail
+# out of individual scrapers so every migrated scraper inherits them
+# uniformly. (The third guard, freshness honesty, already lives here as
+# mark_retailer_scraped(..., had_success=...).) NOTHING calls these until a
+# scraper is migrated to the loader — adding them is behavior-neutral.
+# ---------------------------------------------------------------------------
+
+_CALIBER_PATHS_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'caliber_paths')
+
+_CALIBER_PATH_STATUSES = ('active', 'candidate', 'parked')
+
+
+def _validate_caliber_paths_cfg(cfg, retailer):
+    """Hand-rolled structural validation of a caliber_paths/<retailer>.json
+    config (mirrors caliber_paths.schema.json; no jsonschema dependency, same
+    pattern as the calibers.json generator). Raises ValueError naming the
+    offending location on the FIRST malformed entry — fail loudly, never load
+    a garbage config silently. The title_filter regex itself is validated when
+    the loader compiles it (re.error names the bad pattern)."""
+    def bad(msg):
+        raise ValueError(f"caliber_paths/{retailer}.json: {msg}")
+
+    if not isinstance(cfg, dict):
+        bad("top level must be a JSON object")
+    for key in ('retailer', 'platform', 'base'):
+        if not isinstance(cfg.get(key), str) or not cfg.get(key):
+            bad(f"missing/empty required string field '{key}'")
+    cals = cfg.get('calibers')
+    if not isinstance(cals, dict):
+        bad("missing required object field 'calibers'")
+    for cal, entries in cals.items():
+        if not isinstance(entries, list):
+            bad(f"calibers['{cal}'] must be a list of entries")
+        for i, e in enumerate(entries):
+            where = f"calibers['{cal}'][{i}]"
+            if not isinstance(e, dict):
+                bad(f"{where} must be an object")
+            path = e.get('path')
+            if not isinstance(path, str) or not path.startswith('/'):
+                bad(f"{where}.path must be a string starting with '/'")
+            if e.get('status') not in _CALIBER_PATH_STATUSES:
+                bad(f"{where}.status must be one of {_CALIBER_PATH_STATUSES}, "
+                    f"got {e.get('status')!r}")
+            for opt in ('query', 'expect_landed', 'source'):
+                if e.get(opt) is not None and not isinstance(e.get(opt), str):
+                    bad(f"{where}.{opt} must be a string")
+            tf = e.get('title_filter')
+            if tf is not None and not isinstance(tf, str):
+                bad(f"{where}.title_filter must be a string or null")
+
+
+def load_caliber_paths(retailer, *, status='active'):
+    """Load a retailer's caliber->[category URL entries] from
+    caliber_paths/<retailer>.json (the version-controlled replacement for the
+    inline CALIBER_PATHS dict). Returns {caliber_norm: [entry, ...]} containing
+    ONLY entries whose status matches `status` (default 'active'); calibers
+    with no matching entry are omitted, so iterating the result is equivalent
+    to iterating today's CALIBER_PATHS keys.
+
+    Each entry is a dict:
+        url            relative '<path>?<query>' — byte-identical to the old
+                       CALIBER_PATHS value, so `SITE_BASE + entry['url']` is a
+                       drop-in for `SITE_BASE + path`.
+        path, query    the split components (query has no leading '?').
+        expect_landed  canonical landed path (redirect-guard / validation
+                       target); defaults to `path` when absent.
+        title_filter   compiled re.Pattern for mixed-caliber category pages,
+                       or None.
+
+    Values are ALWAYS lists: one of our combined calibers can split into
+    several upstream category pages (.223 Rem + 5.56 NATO), the TSUSA lesson.
+    """
+    cfg_path = os.path.join(_CALIBER_PATHS_DIR, f'{retailer}.json')
+    with open(cfg_path, encoding='utf-8') as f:
+        cfg = json.load(f)
+    _validate_caliber_paths_cfg(cfg, retailer)
+    out = {}
+    for cal, entries in cfg.get('calibers', {}).items():
+        kept = []
+        for e in entries:
+            if e.get('status') != status:
+                continue
+            p = e['path']
+            q = e.get('query') or ''
+            tf = e.get('title_filter')
+            kept.append({
+                'url': p + ('?' + q if q else ''),
+                'path': p,
+                'query': q,
+                'expect_landed': e.get('expect_landed', p),
+                'title_filter': re.compile(tf, re.IGNORECASE) if tf else None,
+            })
+        if kept:
+            out[cal] = kept
+    return out
+
+
+def category_redirected(requested_url, landed_url):
+    """True when a category navigation landed somewhere other than where it was
+    sent — the TSUSA renumber trap (old category IDs 301'd to a DIFFERENT
+    caliber's page with HTTP 200, so the status check passed and the strict
+    gate silently saved zero for 9 of 10 calibers). Query strings (sort/paging)
+    are ignored and the compare is case-insensitive — byte-identical to the
+    inline guard added to scraper_targetsports 2026-06-12. Skip the page loudly
+    when this returns True so the next renumbering fails visibly."""
+    return requested_url.split('?')[0].lower() != landed_url.split('?')[0].lower()
+
+
+EMPTY_FAIL_THRESHOLD = 3
+
+
+def report_empty_first_pages(empty_handles, retailer_name,
+                             *, threshold=EMPTY_FAIL_THRESHOLD):
+    """Storefront-drift guardrail (the EMPTY_FAIL_THRESHOLD pattern, centralized
+    from the ~9 scrapers that hand-rolled it). `empty_handles` is a list of
+    (caliber, handle) that returned zero products on first page.
+
+    >= threshold of them is the signal that the retailer renamed category
+    paths and the scraper is silently producing partial data (the symptom that
+    hid 5 of 10 calibers until the 2026-05-09 audit): print the offenders and
+    sys.exit(1) so CI goes red AND mark_retailer_scraped() is skipped (we exit
+    before reaching it, so /status does not falsely advertise a fresh scrape).
+    Fewer than `threshold` is warned but tolerated (transient empties happen).
+    Returns the count of empty handles (0 when clean). Behaviour matches the
+    inline blocks it replaces."""
+    n = len(empty_handles)
+    if n >= threshold:
+        print(f"\nFAIL: {n} {retailer_name} categories returned zero products "
+              f"on first page — likely storefront drift:")
+        for cal, h in empty_handles:
+            print(f"  - {cal}: {h} returned zero products on first page")
+        sys.exit(1)
+    if empty_handles:
+        print(f"\nWARN: {n} {retailer_name} category/categories returned zero "
+              f"products on first page (transient or worth investigating):")
+        for cal, h in empty_handles:
+            print(f"  - {cal}: {h}")
+    return n

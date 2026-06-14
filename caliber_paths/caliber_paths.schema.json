@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ammoraccoon/caliber_paths/caliber_paths.schema.json",
+  "title": "AmmoRaccoon per-retailer caliber-paths config",
+  "description": "Schema for caliber_paths/<retailer>.json — the version-controlled per-retailer caliber->[category URL] map (expansion #4, Step 2), the replacement for each scraper's inline CALIBER_PATHS literal. scraper_lib.load_caliber_paths() hand-validates against these rules at load time (no jsonschema dependency, mirroring how the generator validates calibers.json) and fails loudly on a malformed entry. The URLs here are NOT derivable from calibers.json, so this is a separate source of truth, not a *_gen.* artifact. No URL reaches status=active without passing the Step-3 validation harness.",
+  "type": "object",
+  "required": ["retailer", "platform", "base", "calibers"],
+  "additionalProperties": false,
+  "properties": {
+    "retailer": { "type": "string", "description": "Loader key = scraper short-name = file stem (e.g. 'targetsports'). load_caliber_paths('targetsports') reads this file." },
+    "retailer_slug": { "type": "string", "description": "The retailers.slug DB value (e.g. 'target-sports'), stored alongside for cross-reference. Not load-bearing." },
+    "platform": { "type": "string", "description": "Discovery platform family that owns this retailer (shopify | bigcommerce | woocommerce | generic-sitemap | classic-firearms-oneoff). Persisted here because the 2026-06-11 scoping audit's platform table was never written down." },
+    "base": { "type": "string", "description": "Origin the relative paths hang off (e.g. 'https://www.targetsportsusa.com'). The scraper's own SITE_BASE must equal this." },
+    "comment": { "type": "string", "description": "Plain-English provenance / format note (JSON has no comments)." },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the URLs were (or will be) discovered — input for the Step-3 discovery adapters + re-validation drift watch.",
+      "properties": {
+        "method": { "type": "string", "description": "sitemap | shopify-collections | woo-rest | bigcommerce-sitemap | manual | ..." },
+        "sitemap": { "type": "string", "description": "Sitemap URL/name when method=sitemap (e.g. 'product-categories-sitemap.xml (declared in robots.txt)')." },
+        "category_url_pattern": { "type": "string", "description": "Regex signature that distinguishes a caliber category URL in the sitemap (e.g. '-c-\\d+\\.aspx')." }
+      }
+    },
+    "calibers": {
+      "type": "object",
+      "description": "registry caliber slug -> LIST of category-URL entries. Always a list: one combined caliber can split into several upstream pages (.223 Rem + 5.56 NATO).",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/$defs/entry" }
+      }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["path", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "pattern": "^/", "description": "Category page path, no query string, leading slash. Joined to `base` (or the scraper's SITE_BASE) at fetch time." },
+        "query": { "type": "string", "description": "Sort/paging suffix without the leading '?' (e.g. 'pp=240&SortOrder=PriceAscending'). Stored apart from path so the redirect guard can ignore it." },
+        "status": {
+          "enum": ["active", "candidate", "parked"],
+          "description": "active = fetched by the scraper. candidate = discovered + validated, awaiting human sign-off (NEVER fetched). parked = known-bad / walled (NEVER fetched). load_caliber_paths returns only status=active by default."
+        },
+        "expect_landed": { "type": "string", "description": "Canonical landed path the request must resolve to — the redirect-guard / Step-3-validation target. Defaults to `path` when absent. Not used to alter runtime behavior (the runtime guard compares request-vs-landed)." },
+        "title_filter": { "type": ["string", "null"], "description": "Optional case-insensitive regex applied to product titles on a mixed-caliber category page (e.g. gritr's 'other handgun calibers'). null when the page is single-caliber. Compiled by the loader; an invalid regex fails loudly." },
+        "source": { "type": "string", "description": "Where this URL came from (e.g. 'sitemap:product-categories-sitemap.xml', 'manual')." },
+        "validation": { "$ref": "#/$defs/validation" },
+        "approved_by": { "type": "string", "description": "Who signed off activation." },
+        "approved_at": { "type": "string", "description": "Date of activation sign-off (YYYY-MM-DD)." }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Result/provenance of the last validation. Booleans/status reflect known-true facts; measured numerics are null until the Step-3 harness records them (honest-by-default — never invented).",
+      "properties": {
+        "method": { "type": "string", "description": "manual-dryrun | harness | ..." },
+        "validated_at": { "type": "string", "description": "Date of the validation (YYYY-MM-DD)." },
+        "status": { "type": ["integer", "null"], "description": "HTTP status observed (200)." },
+        "redirect": { "type": ["boolean", "null"], "description": "Whether the request redirected away from `path`." },
+        "title_match": { "type": ["boolean", "null"], "description": "Whether the page <title> names the caliber." },
+        "gate_pass_pct": { "type": ["number", "null"], "description": "Fraction of product titles that pass the caliber gate. null = not yet measured." },
+        "n_products": { "type": ["integer", "null"], "description": "Product count on the page. null = not yet measured." },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}
