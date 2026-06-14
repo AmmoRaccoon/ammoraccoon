@@ -1,13 +1,16 @@
 import os
 import re
-import sys
 import time
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history
+from scraper_lib import (
+    CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand,
+    sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
+)
 
 load_dotenv()
 
@@ -18,30 +21,16 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "sgammo"
 SITE_BASE = "https://www.sgammo.com"
 
-# SGAmmo category URLs per caliber. Values are lists for parity with
-# the other CALIBER_PATHS scrapers (TrueShot/LG/BulkAmmo) — SGAmmo
-# doesn't currently split any caliber across multiple collections, so
-# each list has a single entry, but the per-handle loop in
-# scrape_caliber relies on the list shape. Five entries below were
-# renamed during a 2026-05-09-or-earlier storefront restructure: the
-# prior values silently 404'd until the audit on 2026-05-09 caught
-# the absence (5 of 10 configured URLs were dead, exact-match to the
-# 5 calibers with implausibly low DB row counts). SGAmmo also changed
-# the in-row price markup so that "$X.XX Each" now renders as
-# "$ X.XX Each" (literal space between dollar sign and digits) — the
-# regex fixes for that live further down in scrape_caliber.
-CALIBER_PATHS = {
-    '9mm':     ['/catalog/pistol-ammo-sale/9mm-luger-ammo/'],
-    '380acp':  ['/catalog/pistol-ammo-sale/380-auto-ammo/'],
-    '40sw':    ['/catalog/pistol-ammo-sale/40-cal-ammo/'],
-    '38spl':   ['/catalog/pistol-ammo-sale/38-special-ammo/'],
-    '357mag':  ['/catalog/pistol-ammo-sale/357-magnum-ammo/'],
-    '22lr':    ['/catalog/rimfire-ammo-sale/22-lr-ammo/'],
-    '223-556': ['/catalog/rifle-ammo-sale/223-556mm-ammo/'],
-    '308win':  ['/catalog/rifle-ammo-sale/308-win-762x51-ammo/'],
-    '762x39':  ['/catalog/rifle-ammo-sale/762x39-ammo/'],
-    '300blk':  ['/catalog/rifle-ammo-sale/300-aac-blackout-ammo/'],
-}
+# Per-caliber category URLs now live in caliber_paths/sgammo.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. SGAmmo doesn't currently split any caliber across
+# multiple collections, so each list has a single entry, but the
+# per-handle loop in scrape_caliber relies on the list shape.
+# entry['url'] is a drop-in for the old SITE_BASE + handle string.
+# NOTE: SGAmmo renders the in-row price markup as "$ X.XX Each" (literal
+# space between dollar sign and digits) — the regex fixes for that live
+# further down in scrape_caliber.
+CALIBER_PATHS = load_caliber_paths('sgammo')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -110,7 +99,8 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
     skipped = 0
     flags = []
 
-    for handle in CALIBER_PATHS[caliber_norm]:
+    for entry in CALIBER_PATHS[caliber_norm]:
+        handle = entry['url']
         url = SITE_BASE + handle
         empty_first_page = False
         print(f"\n[{caliber_norm}/{handle}] Loading: {url}")
@@ -123,6 +113,17 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             continue
         if resp and resp.status >= 400:
             print(f"  HTTP {resp.status} — handle unreachable.")
+            print(f"  WARN: SGAmmo collection {handle} returned "
+                  f"zero products on first page (caliber {caliber_norm}).")
+            empty_first_page = True
+            flags.append((handle, empty_first_page))
+            continue
+        # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — SGAmmo
+        # had none before): a collection that 301s to a DIFFERENT page
+        # with HTTP 200 is the wrong-caliber trap; skip loudly and count
+        # it as an empty handle so the storefront-drift guardrail sees it.
+        if category_redirected(url, page.url):
+            print(f"  REDIRECTED to {page.url} - skipping (collection moved/renamed).")
             print(f"  WARN: SGAmmo collection {handle} returned "
                   f"zero products on first page (caliber {caliber_norm}).")
             empty_first_page = True
@@ -283,25 +284,14 @@ def scrape():
 
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
-    # Storefront-drift guardrail. A single transient empty handle is
-    # fine; three or more is a strong signal that SGAmmo renamed
-    # collection paths and the scraper is silently producing partial
-    # data (the exact symptom that hid 5 of 10 calibers from the DB
-    # until the 2026-05-09 audit). Exit non-zero so CI runs go red.
-    EMPTY_FAIL_THRESHOLD = 3
-    if len(empty_handles) >= EMPTY_FAIL_THRESHOLD:
-        print(f"\nFAIL: {len(empty_handles)} SGAmmo collections returned "
-              f"zero products on first page — likely storefront drift:")
-        for cal, h in empty_handles:
-            print(f"  - {cal}: SGAmmo collection {h} returned zero products on first page")
-        sys.exit(1)
-    elif empty_handles:
-        print(f"\nWARN: {len(empty_handles)} SGAmmo collection(s) returned "
-              f"zero products on first page (transient or worth investigating):")
-        for cal, h in empty_handles:
-            print(f"  - {cal}: SGAmmo collection {h} returned zero products on first page")
-
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail (centralized scraper_lib.report_empty_first_pages
+    # as of the 2026-06-14 caliber-paths migration; replaces the inline
+    # EMPTY_FAIL_THRESHOLD block). >= 3 empty handles is a strong signal
+    # SGAmmo renamed collection paths and the scraper is silently
+    # producing partial data (the symptom that hid 5 of 10 calibers
+    # until the 2026-05-09 audit); it sys.exit(1)s so CI goes red.
+    report_empty_first_pages(empty_handles, 'SGAmmo')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
 
 if __name__ == '__main__':
     scrape()
