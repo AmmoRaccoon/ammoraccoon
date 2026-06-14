@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history, load_caliber_paths, category_redirected, report_empty_first_pages
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -17,29 +17,12 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
 
-# Natchez category paths per caliber. Values are lists for parity
-# with the other CALIBER_PATHS scrapers. 223-556 splits into two
-# collections (.223 and 5.56 are separate Natchez pages, mirroring
-# TrueShot/LG/BulkAmmo). Seven entries below were renamed during a
-# 2026-05-09-or-earlier storefront restructure: the prior values
-# silently rendered zero .product__tile elements until the audit
-# caught the absence (7 of 10 configured URLs were dead, exact-match
-# to the 7 calibers missing in the DB). Natchez's suffix convention
-# is inconsistent — most calibers use `-ammo`, but 380acp + 357mag
-# (and a handful of others outside our tracking) use `-ammunition`.
-CALIBER_PATHS = {
-    '9mm':     ['/ammunition/handgun-ammunition/9mm-ammo'],
-    '380acp':  ['/ammunition/handgun-ammunition/380-acp-ammunition'],
-    '40sw':    ['/ammunition/handgun-ammunition/40-cal-sw-ammo'],
-    '38spl':   ['/ammunition/handgun-ammunition/38-special-ammo'],
-    '357mag':  ['/ammunition/handgun-ammunition/357-magnum-ammunition'],
-    '22lr':    ['/ammunition/rimfire-ammunition/22-lr-ammo'],
-    '223-556': ['/ammunition/rifle-ammunition/223-ammo',
-                '/ammunition/rifle-ammunition/5-56-ammo'],
-    '308win':  ['/ammunition/rifle-ammunition/308-ammo'],
-    '762x39':  ['/ammunition/rifle-ammunition/7-62-x39-ammo'],
-    '300blk':  ['/ammunition/rifle-ammunition/300-blackout-ammo'],
-}
+# Per-caliber category paths now live in caliber_paths/natchez.json
+# (expansion #4 Step-2 migration) — transcribed verbatim from the prior
+# inline map and parity-proven byte-identical. Values are still lists
+# (223-556 splits into two collections — .223 and 5.56 are separate
+# Natchez pages); each entry's 'url' is a drop-in for the old handle.
+CALIBER_PATHS = load_caliber_paths('natchez')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -102,7 +85,8 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
     products = []
     flags = []
 
-    for handle in CALIBER_PATHS[caliber_norm]:
+    for entry in CALIBER_PATHS[caliber_norm]:
+        handle = entry['url']
         base = SITE_BASE + handle
         page_num = 1
         empty_first_page = False
@@ -123,6 +107,15 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     empty_first_page = True
                     print(f"  WARN: Natchez collection {handle} returned "
                           f"zero products on first page (caliber {caliber_norm}).")
+                break
+            # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Natchez had
+            # none before): a collection that 301s to a DIFFERENT page (the
+            # TSUSA renumber trap returns HTTP 200 on the wrong caliber) is
+            # routed to the existing empty-handle drift detection on page 1.
+            if page_num == 1 and category_redirected(url, page.url):
+                print(f"  REDIRECTED to {page.url} — Natchez collection {handle} "
+                      f"moved/renamed; treating as empty (drift signal).")
+                empty_first_page = True
                 break
             try:
                 await page.wait_for_selector('.product__tile', timeout=30000)
@@ -263,27 +256,18 @@ async def scrape():
 
         print(f"\nTotal scraped: {len(all_products)}")
 
-        # Storefront-drift guardrail. A single transient empty handle
-        # is fine; three or more is a strong signal that Natchez
-        # renamed collection paths and the scraper is silently
-        # producing partial data (the exact symptom that hid 7 of 10
-        # calibers from the DB until the 2026-05-09 audit). Exit
-        # non-zero so CI runs go red, and skip the upsert step so
-        # partial data doesn't replace good rows.
-        EMPTY_FAIL_THRESHOLD = 3
-        if len(empty_handles) >= EMPTY_FAIL_THRESHOLD:
-            print(f"\nFAIL: {len(empty_handles)} Natchez collections returned "
-                  f"zero products on first page — likely storefront drift:")
-            for cal, h in empty_handles:
-                print(f"  - {cal}: Natchez collection {h} returned zero products on first page")
-            sys.exit(1)
-        elif empty_handles:
-            print(f"\nWARN: {len(empty_handles)} Natchez collection(s) returned "
-                  f"zero products on first page (transient or worth investigating):")
-            for cal, h in empty_handles:
-                print(f"  - {cal}: Natchez collection {h} returned zero products on first page")
+        # Storefront-drift guardrail (centralized 2026-06-14 — was an inline
+        # EMPTY_FAIL_THRESHOLD=3 block; report_empty_first_pages reproduces it
+        # byte-for-byte in behavior: >= 3 empty handles -> sys.exit(1), which
+        # skips the upsert below AND mark_retailer_scraped so partial data
+        # doesn't replace good rows and CI goes red). The redirect guard above
+        # routes a moved collection here as an empty handle.
+        report_empty_first_pages(empty_handles, 'Natchez')
 
-        mark_retailer_scraped(supabase, RETAILER_ID)
+        # had_success (NEW 2026-06-14): only advance last_scraped_at when the
+        # run actually produced listings, so a silently-empty scrape doesn't
+        # falsely advertise freshness on /status.
+        mark_retailer_scraped(supabase, RETAILER_ID, had_success=bool(all_products))
 
         if not all_products:
             print("Nothing to upsert.")

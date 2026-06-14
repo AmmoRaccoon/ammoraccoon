@@ -1,0 +1,23 @@
+{
+  "retailer": "natchez",
+  "retailer_id": 16,
+  "platform": "bigcommerce",
+  "base": "https://www.natchezss.com",
+  "comment": "Expansion #4 Step-2 pilot, shape B (dict->list). Transcribed VERBATIM from scraper_natchez.py inline CALIBER_PATHS on 2026-06-14 — parity-proven byte-identical before the scraper was flipped to load_caliber_paths(). 223-556 splits into two collections (.223 and 5.56 are separate Natchez pages). Natchez hardcodes retailer_id=16 (no slug). Not yet harness-validated; validation booleans null until Step-3. Approved by Jon, Step-2 pilot, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/ammunition/handgun-ammunition/9mm-ammo", "status": "active" } ],
+    "380acp": [ { "path": "/ammunition/handgun-ammunition/380-acp-ammunition", "status": "active" } ],
+    "40sw": [ { "path": "/ammunition/handgun-ammunition/40-cal-sw-ammo", "status": "active" } ],
+    "38spl": [ { "path": "/ammunition/handgun-ammunition/38-special-ammo", "status": "active" } ],
+    "357mag": [ { "path": "/ammunition/handgun-ammunition/357-magnum-ammunition", "status": "active" } ],
+    "22lr": [ { "path": "/ammunition/rimfire-ammunition/22-lr-ammo", "status": "active" } ],
+    "223-556": [
+      { "path": "/ammunition/rifle-ammunition/223-ammo", "status": "active" },
+      { "path": "/ammunition/rifle-ammunition/5-56-ammo", "status": "active" }
+    ],
+    "308win": [ { "path": "/ammunition/rifle-ammunition/308-ammo", "status": "active" } ],
+    "762x39": [ { "path": "/ammunition/rifle-ammunition/7-62-x39-ammo", "status": "active" } ],
+    "300blk": [ { "path": "/ammunition/rifle-ammunition/300-blackout-ammo", "status": "active" } ]
+  }
+}
