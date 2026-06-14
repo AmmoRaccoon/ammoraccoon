@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history, load_caliber_paths, category_redirected, report_empty_first_pages
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -17,29 +17,13 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/122.0 Safari/537.36"
 )
 
-# Ammo.com category paths per caliber. Values are lists for parity
-# with the other CALIBER_PATHS scrapers. 223-556 splits into two
-# collections (.223 and 5.56 are separate Ammo.com pages, mirroring
-# Natchez/TrueShot/LG/BulkAmmo). Four entries below were renamed
-# during a 2026-05-09-or-earlier storefront restructure: the prior
-# values silently 404'd until the audit caught the absence (4 of 10
-# configured URLs were dead, exact-match to the 4 calibers missing
-# in the DB). Pattern: shorter slugs (-sw- → -cal-, -winchester- →
-# -win-, dotted variants like 7.62x39, and a separate 5.56x45
-# collection split off from .223).
-CALIBER_PATHS = {
-    '9mm':     ['/handgun/9mm-ammo'],
-    '380acp':  ['/handgun/380-acp-ammo'],
-    '40sw':    ['/handgun/40-cal-ammo'],
-    '38spl':   ['/handgun/38-special-ammo'],
-    '357mag':  ['/handgun/357-magnum-ammo'],
-    '22lr':    ['/rimfire/22-lr-ammo'],
-    '223-556': ['/rifle/223-rem-ammo',
-                '/rifle/5.56x45-ammo'],
-    '308win':  ['/rifle/308-win-ammo'],
-    '762x39':  ['/rifle/7.62x39-ammo'],
-    '300blk':  ['/rifle/300-blackout-ammo'],
-}
+# Per-caliber category paths now live in caliber_paths/ammocom.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. entry['url'] is a drop-in for the old path string.
+# 223-556 splits into two upstream pages (.223 Rem + 5.56x45 are
+# separate Ammo.com categories); both bucket to 223-556 and seen_ids
+# dedups overlap.
+CALIBER_PATHS = load_caliber_paths('ammocom')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -102,7 +86,8 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
     products = []
     flags = []
 
-    for handle in CALIBER_PATHS[caliber_norm]:
+    for entry in CALIBER_PATHS[caliber_norm]:
+        handle = entry['url']
         base = SITE_BASE + handle
         page_num = 1
         empty_first_page = False
@@ -125,6 +110,14 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     empty_first_page = True
                     print(f"  WARN: Ammo.com collection {handle} returned "
                           f"zero products on first page (caliber {caliber_norm}).")
+                break
+            # Redirect guard (NEW 2026-06-14, expansion #4 Step-2): a
+            # category that 200s but lands on a DIFFERENT page (the TSUSA
+            # renumber trap) is skipped loudly and counts as an empty
+            # first page, feeding the storefront-drift guardrail.
+            if page_num == 1 and category_redirected(url, page.url):
+                print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+                empty_first_page = True
                 break
             await page.wait_for_timeout(4000)
 
@@ -248,27 +241,14 @@ async def scrape():
 
         print(f"\nTotal scraped: {len(all_products)}")
 
-        # Storefront-drift guardrail. A single transient empty handle
-        # is fine; three or more is a strong signal that Ammo.com
-        # renamed collection paths and the scraper is silently
-        # producing partial data (the exact symptom that hid 4 of 10
-        # calibers from the DB until the 2026-05-09 audit). Exit
-        # non-zero so CI runs go red, and skip the upsert step so
-        # partial data doesn't replace good rows.
-        EMPTY_FAIL_THRESHOLD = 3
-        if len(empty_handles) >= EMPTY_FAIL_THRESHOLD:
-            print(f"\nFAIL: {len(empty_handles)} Ammo.com collections returned "
-                  f"zero products on first page — likely storefront drift:")
-            for cal, h in empty_handles:
-                print(f"  - {cal}: Ammo.com collection {h} returned zero products on first page")
-            sys.exit(1)
-        elif empty_handles:
-            print(f"\nWARN: {len(empty_handles)} Ammo.com collection(s) returned "
-                  f"zero products on first page (transient or worth investigating):")
-            for cal, h in empty_handles:
-                print(f"  - {cal}: Ammo.com collection {h} returned zero products on first page")
+        # Storefront-drift guardrail (centralized 2026-06-14, expansion
+        # #4 Step-2 — was an inline EMPTY_FAIL_THRESHOLD block): >= 3
+        # collections empty on first page exits non-zero (CI red) and
+        # skips the upsert + freshness bump so partial data can't replace
+        # good rows and /status can't falsely advertise a fresh scrape.
+        report_empty_first_pages(empty_handles, 'Ammo.com')
 
-        mark_retailer_scraped(supabase, RETAILER_ID)
+        mark_retailer_scraped(supabase, RETAILER_ID, had_success=(len(all_products) > 0))
 
         if not all_products:
             print("Nothing to upsert.")
