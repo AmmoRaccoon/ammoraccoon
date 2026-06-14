@@ -1,0 +1,18 @@
+{
+  "retailer": "georgiaarms",
+  "retailer_slug": "georgiaarms",
+  "platform": "bigcommerce",
+  "base": "https://www.georgia-arms.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape A (dict->str). Transcribed verbatim from scraper_georgiaarms.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. Only 8 calibers (22lr/762x39 intentionally absent — not carried). Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/9mm-luger-1/", "status": "active" } ],
+    "380acp": [ { "path": "/380-acp-1/", "status": "active" } ],
+    "40sw": [ { "path": "/40-s-w-1/", "status": "active" } ],
+    "38spl": [ { "path": "/38-special-1/", "status": "active" } ],
+    "357mag": [ { "path": "/357-mag-1/", "status": "active" } ],
+    "223-556": [ { "path": "/223-rem-1/", "status": "active" } ],
+    "308win": [ { "path": "/308-win-1/", "status": "active" } ],
+    "300blk": [ { "path": "/300-blackout/", "status": "active" } ]
+  }
+}
