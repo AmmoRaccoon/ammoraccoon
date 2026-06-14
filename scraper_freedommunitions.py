@@ -6,7 +6,7 @@ import urllib.request
 from datetime import datetime, timezone
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type as _shared_bullet_type, mark_retailer_scraped, insert_price_history
+from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type as _shared_bullet_type, mark_retailer_scraped, insert_price_history, load_caliber_paths
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -17,31 +17,19 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
 
-# Freedom Munitions Shopify collection handles per caliber. Values
-# are lists for parity with the other CALIBER_PATHS scrapers. The
-# configured handles for 7 of 10 calibers had drifted by 2026-05-09:
-# the old handles still resolve to HTTP 200 (Shopify keeps empty
-# legacy collections live for SEO continuity) but products had
-# migrated to renamed/split collections. The pattern looks like a
-# storefront re-keying — separator changes (-7-62x39 -> -762x39),
-# alias unification (-380-acp -> -380-auto), and category splits
-# (-223-556 -> -223-remington + -556-nato; -308-7-62x51 ->
-# -308-winchester + -762x51-nato). Confirmed by crawling
-# /collections.json (298 collections live).
-COLLECTION_HANDLES = {
-    '9mm':     ['pistol-9mm'],
-    '380acp':  ['pistol-380-auto'],
-    '40sw':    ['pistol-40-sw'],
-    '38spl':   ['pistol-38-special'],
-    '357mag':  ['pistol-357-magnum'],
-    '22lr':    ['rimfire-22-long-rifle'],
-    '223-556': ['rifle-223-remington',
-                'rifle-556-nato'],
-    '308win':  ['rifle-308-winchester',
-                'rifle-762x51-nato'],
-    '762x39':  ['rifle-762x39'],
-    '300blk':  ['rifle-300-aac-blackout'],
-}
+# Freedom Munitions Shopify collection paths now live in
+# caliber_paths/freedommunitions.json (expansion #4 Step-2 migration) —
+# migrated from the inline bare-handle dict, parity-proven byte-identical
+# (fetched URL). Per the blackbasin precedent the config stores the full
+# '/collections/<handle>' path and the scraper appends '/products.json'
+# at runtime, so entry['url'] is a drop-in. REQUESTS-BASED (Shopify
+# /products.json via urllib — no browser), so loader-only: it keeps its
+# own EMPTY_FAIL_THRESHOLD storefront-drift guard in scrape() below and
+# does NOT adopt the shared Playwright redirect / report_empty_first_pages
+# guards. Values are lists because 223-556 and 308win each split into two
+# collections (223-remington + 556-nato; 308-winchester + 762x51-nato);
+# seen_ids dedups any overlap.
+COLLECTION_HANDLES = load_caliber_paths('freedommunitions')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -117,20 +105,25 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
     rows = []
     flags = []
 
-    for handle in COLLECTION_HANDLES[caliber_norm]:
+    for entry in COLLECTION_HANDLES[caliber_norm]:
+        # Config stores the full '/collections/<handle>' path (blackbasin
+        # precedent); the scraper appends '/products.json' exactly as
+        # before, so the fetched URL is byte-identical to the old bare-
+        # handle build.
+        path = entry['url']
         page_num = 1
         empty_first_page = False
 
         while True:
-            url = f"{SITE_BASE}/collections/{handle}/products.json?page={page_num}&limit=250"
-            print(f"\n[{caliber_norm}/{handle}] page {page_num}: {url}")
+            url = f"{SITE_BASE}{path}/products.json?page={page_num}&limit=250"
+            print(f"\n[{caliber_norm}/{path}] page {page_num}: {url}")
             try:
                 data = fetch_json(url)
             except Exception as e:
                 print(f"  Fetch failed: {e}")
                 if page_num == 1:
                     empty_first_page = True
-                    print(f"  WARN: Freedom Munitions collection {handle} returned "
+                    print(f"  WARN: Freedom Munitions collection {path} returned "
                           f"zero products on first page (caliber {caliber_norm}).")
                 break
 
@@ -138,7 +131,7 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
             if not products:
                 if page_num == 1:
                     empty_first_page = True
-                    print(f"  WARN: Freedom Munitions collection {handle} returned "
+                    print(f"  WARN: Freedom Munitions collection {path} returned "
                           f"zero products on first page (caliber {caliber_norm}).")
                 else:
                     print(f"  No products on page {page_num}, stopping handle.")
@@ -223,7 +216,7 @@ def scrape_caliber(caliber_norm, caliber_display, seen_ids):
             if page_num > 10:
                 break
 
-        flags.append((handle, empty_first_page))
+        flags.append((path, empty_first_page))
     return rows, flags
 
 
