@@ -12,6 +12,7 @@ from scraper_lib import (
     parse_brand_with_url, sanity_check_ppr, clean_title,
     parse_bullet_type_with_url_fallback,
     mark_retailer_scraped,
+    load_caliber_paths,
 )
 
 load_dotenv()
@@ -23,27 +24,22 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "gunbuyer"
 SITE_BASE = "https://www.gunbuyer.com"
 
-# Magento storefront. Handgun calibers have clean per-caliber subcat
-# pages; the rifle parent doesn't subdivide so we drive the layered-nav
-# `?caliber=N` facet IDs (verified 2026-05-02 against the live filter
-# sidebar). Combo facets (e.g. "223 Remington/5.56x45mm NATO") and the
-# pure NATO facet are listed separately because Gunbuyer indexes some
-# SKUs only on one, and the seen_ids dedup cleans up any overlap.
-CALIBER_URLS = {
-    '9mm':     ['/ammunition/handgun/9mm.html'],
-    '380acp':  ['/ammunition/handgun/380-acp.html'],
-    '40sw':    ['/ammunition/handgun/40-s-w.html'],
-    '38spl':   ['/ammunition/handgun/38-special.html'],
-    '357mag':  ['/ammunition/handgun.html?caliber=760'],
-    '22lr':    ['/ammunition/rimfire/22-lr.html'],
-    '223-556': ['/ammunition/rifle.html?caliber=675',   # 223 Remington
-                '/ammunition/rifle.html?caliber=680',   # 223/5.56 combo
-                '/ammunition/rifle.html?caliber=827'],  # 5.56x45mm NATO
-    '308win':  ['/ammunition/rifle.html?caliber=737',   # 308 Winchester
-                '/ammunition/rifle.html?caliber=738'],  # 308/7.62x51 NATO
-    '762x39':  ['/ammunition/rifle.html?caliber=854'],
-    '300blk':  ['/ammunition/rifle.html?caliber=720'],
-}
+# Per-caliber category URLs now live in caliber_paths/gunbuyer.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. entry['url'] (path + ?caliber= facet query) is a
+# drop-in for the old facet-path string. Magento storefront behind a
+# Cloudflare wall that 403s the layered-nav URLs after 1-2 hits, so each
+# pagination page opens a fresh browser context. Because partial-facet
+# loss is a NORMAL day on this wall (not storefront drift), gunbuyer
+# deliberately does NOT adopt the shared redirect / report_empty_first_pages
+# guards — at 13 facets they would hard-fail CI on healthy partial-wall
+# runs (Jon's call, 2026-06-14). It DOES wire had_success=(total_saved>0)
+# so a fully-walled 0-save run no longer bumps last_scraped_at — the
+# wall-aware freshness case had_success was built for. Handgun calibers
+# have clean per-caliber subcat pages; rifle calibers drive ?caliber=N
+# facet IDs; the combo + pure-NATO facets are separate entries and the
+# seen_ids dedup cleans up any overlap.
+CALIBER_PATHS = load_caliber_paths('gunbuyer')
 
 # Cap pagination defensively. Most caliber facets surface 50-200 items
 # at 15/page = 4-14 pages. 25 leaves headroom for the 192-item 9mm
@@ -353,12 +349,12 @@ def scrape():
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        for caliber_norm, paths in CALIBER_URLS.items():
+        for caliber_norm, entries in CALIBER_PATHS.items():
             caliber_display = CALIBERS[caliber_norm]
-            for facet_path in paths:
+            for entry in entries:
                 saved, skipped = scrape_facet(
                     browser, caliber_norm, caliber_display,
-                    facet_path, retailer_id, seen_ids,
+                    entry['url'], retailer_id, seen_ids,
                 )
                 total_saved += saved
                 total_skipped += skipped
@@ -368,7 +364,11 @@ def scrape():
                 time.sleep(3)
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # had_success only (no shared redirect / empty-first-page guards):
+    # partial-facet loss is a normal Cloudflare day for gunbuyer, not
+    # drift, so a fully-walled 0-save run must not bump last_scraped_at,
+    # but a routine partial-wall run must NOT hard-fail CI (Jon, 2026-06-14).
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 

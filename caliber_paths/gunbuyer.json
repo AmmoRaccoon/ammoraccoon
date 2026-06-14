@@ -1,0 +1,27 @@
+{
+  "retailer": "gunbuyer",
+  "retailer_slug": "gunbuyer",
+  "platform": "magento",
+  "base": "https://www.gunbuyer.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list[str], some entries with ?caliber= layered-nav queries). Transcribed verbatim from scraper_gunbuyer.py inline CALIBER_URLS on 2026-06-14, parity-proven byte-identical before flip. Magento storefront behind a Cloudflare wall that 403s the layered-nav (?caliber=) URLs after 1-2 hits per session, so the scraper opens a FRESH browser context per pagination page. Handgun calibers have clean per-caliber subcat .html pages; the rifle parent doesn't subdivide, so rifle calibers drive the layered-nav ?caliber=N facet IDs (verified 2026-05-02 vs the live filter sidebar). Combo facets (e.g. 223/5.56) and the pure-NATO facet are separate entries because Gunbuyer indexes some SKUs on only one; seen_ids dedups overlap. The facet id is stored in `query`, apart from `path`, so the redirect guard ignores it. Per-entry `source` records which facet id maps to which upstream caliber label. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/ammunition/handgun/9mm.html", "status": "active" } ],
+    "380acp": [ { "path": "/ammunition/handgun/380-acp.html", "status": "active" } ],
+    "40sw": [ { "path": "/ammunition/handgun/40-s-w.html", "status": "active" } ],
+    "38spl": [ { "path": "/ammunition/handgun/38-special.html", "status": "active" } ],
+    "357mag": [ { "path": "/ammunition/handgun.html", "query": "caliber=760", "status": "active", "source": "manual: layered-nav ?caliber=760 (357 Magnum)" } ],
+    "22lr": [ { "path": "/ammunition/rimfire/22-lr.html", "status": "active" } ],
+    "223-556": [
+      { "path": "/ammunition/rifle.html", "query": "caliber=675", "status": "active", "source": "manual: layered-nav ?caliber=675 (223 Remington)" },
+      { "path": "/ammunition/rifle.html", "query": "caliber=680", "status": "active", "source": "manual: layered-nav ?caliber=680 (223/5.56 combo)" },
+      { "path": "/ammunition/rifle.html", "query": "caliber=827", "status": "active", "source": "manual: layered-nav ?caliber=827 (5.56x45mm NATO)" }
+    ],
+    "308win": [
+      { "path": "/ammunition/rifle.html", "query": "caliber=737", "status": "active", "source": "manual: layered-nav ?caliber=737 (308 Winchester)" },
+      { "path": "/ammunition/rifle.html", "query": "caliber=738", "status": "active", "source": "manual: layered-nav ?caliber=738 (308/7.62x51 NATO)" }
+    ],
+    "762x39": [ { "path": "/ammunition/rifle.html", "query": "caliber=854", "status": "active", "source": "manual: layered-nav ?caliber=854 (7.62x39)" } ],
+    "300blk": [ { "path": "/ammunition/rifle.html", "query": "caliber=720", "status": "active", "source": "manual: layered-nav ?caliber=720 (300 AAC Blackout)" } ]
+  }
+}
