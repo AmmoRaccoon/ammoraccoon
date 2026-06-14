@@ -16,12 +16,21 @@ Handles every inline CALIBER_PATHS shape:
 f-string / absolute URLs are relativized against the config `base` so an
 absolute inline url compares equal to the loader's relative `url`.
 
+Bare-handle Shopify scrapers (trueshot, freedommunitions) store BARE
+collection handles inline (e.g. 'pistol-9mm') but build the fetch URL as
+'/collections/<handle>/products.json' at runtime; the config (blackbasin
+precedent) stores the full '/collections/<handle>' path. Pass the optional
+4th arg INLINE_PREFIX='/collections/' to prepend it to each inline handle
+so the comparison is the FETCHED URL, not the raw literal. Default '' is a
+no-op for every other retailer.
+
 Usage:
-    py scripts/_probe_caliber_paths_parity.py <retailer> <scraper_file> [literal_name]
+    py scripts/_probe_caliber_paths_parity.py <retailer> <scraper_file> [literal_name] [inline_prefix]
 Examples:
     py scripts/_probe_caliber_paths_parity.py outdoorlimited scraper_outdoorlimited.py
     py scripts/_probe_caliber_paths_parity.py buds scraper_buds.py CALIBER_FILTER_URLS
     py scripts/_probe_caliber_paths_parity.py firearmsdepot scraper_firearmsdepot.py PARENT_PATHS
+    py scripts/_probe_caliber_paths_parity.py trueshot scraper_trueshot.py COLLECTION_HANDLES /collections/
 
 Exit 0 = identical url set. Exit 1 = any divergence (prints the first one).
 """
@@ -102,6 +111,9 @@ def main():
     retailer = sys.argv[1] if len(sys.argv) > 1 else 'targetsports'
     scraper = sys.argv[2] if len(sys.argv) > 2 else 'scraper_targetsports.py'
     literal_name = sys.argv[3] if len(sys.argv) > 3 else 'CALIBER_PATHS'
+    # Optional prefix prepended to each inline value before comparison —
+    # for bare-handle Shopify scrapers whose runtime URL adds '/collections/'.
+    inline_prefix = sys.argv[4] if len(sys.argv) > 4 else ''
 
     tree = ast.parse((ROOT / scraper).read_text(encoding='utf-8'))
     ns = _build_string_ns(tree)
@@ -113,7 +125,8 @@ def main():
 
     fails = []
     if isinstance(node, ast.Dict):
-        inline = {_resolve_str(k, ns): [_rel(u, base) for u in _value_urls(v, ns)]
+        inline = {_resolve_str(k, ns): [inline_prefix + _rel(u, base)
+                                        for u in _value_urls(v, ns)]
                   for k, v in zip(node.keys, node.values)}
         loaded = {cal: [e['url'] for e in entries]
                   for cal, entries in load_caliber_paths(retailer).items()}
