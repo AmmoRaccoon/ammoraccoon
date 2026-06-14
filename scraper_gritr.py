@@ -11,6 +11,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, parse_bullet_type,
     mark_retailer_scraped,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -22,26 +23,14 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "gritr"
 SITE_BASE = "https://www.gritrsports.com"
 
-# Verified 2026-04-25 against the live "Shop by Caliber" nav. Each
-# value is a tuple: (path, optional title-filter regex). The title
-# filter narrows mixed-caliber category pages — Gritr puts .357 Mag
-# inside "other-handgun-calibers" alongside 10mm/.44/etc., and bundles
-# all rimfire calibers (.17 HMR, .22 WMR, .22 LR) into a single
-# /rimfire-ammo/ page; we drop rows whose title doesn't match.
-CALIBER_PATHS = {
-    '9mm':     ('/shooting/ammunition/handgun-ammo/9mm-luger-ammo/',     None),
-    '380acp':  ('/shooting/ammunition/handgun-ammo/380-auto-ammo/',      None),
-    '40sw':    ('/shooting/ammunition/handgun-ammo/40-s-w-ammo/',        None),
-    '38spl':   ('/shooting/ammunition/handgun-ammo/38-specials-ammo/',   None),
-    '357mag':  ('/shooting/ammunition/handgun-ammo/other-handgun-calibers/',
-                re.compile(r'\b357\b|\.357\b', re.IGNORECASE)),
-    '22lr':    ('/shooting/ammunition/rimfire-ammo/',
-                re.compile(r'\b22\s*(?:LR|long\s*rifle)\b|\.22\s*LR\b|22LR', re.IGNORECASE)),
-    '223-556': ('/shooting/ammunition/rifle-ammo/223-ammo/',              None),
-    '308win':  ('/shooting/ammunition/rifle-ammo/308-7-62x51-ammo/',      None),
-    '762x39':  ('/shooting/ammunition/rifle-ammo/7-62x39-ammo/',          None),
-    '300blk':  ('/shooting/ammunition/rifle-ammo/300-aac-blackout/',      None),
-}
+# Per-caliber category URLs now live in caliber_paths/gritr.json (expansion
+# #4 Step-2 migration) — transcribed verbatim from the prior inline map and
+# parity-proven byte-identical. The two mixed-caliber pages carry a
+# title_filter regex (357mag is inside "other-handgun-calibers" alongside
+# 10mm/.44; 22lr is the all-rimfire page); load_caliber_paths compiles it with
+# re.IGNORECASE, matching the old re.compile(..., re.I). entry['url'] is a
+# drop-in for the old path; entry['title_filter'] for the old regex (or None).
+CALIBER_PATHS = load_caliber_paths('gritr')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -99,18 +88,25 @@ def parse_country(text):
             return country
     return None
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    path, title_filter = CALIBER_PATHS[caliber_norm]
-    url = SITE_BASE + path
+def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id, seen_ids):
+    title_filter = entry['title_filter']
+    url = SITE_BASE + entry['url']
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
     except Exception as e:
         print(f"  goto failed: {e}")
-        return 0, 0
+        return 0, 0, True
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
+    # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Gritr had none
+    # before): a category that 301s to a DIFFERENT page (the TSUSA renumber
+    # trap returns HTTP 200 on the wrong caliber) skips loudly and counts as an
+    # empty handle, feeding the storefront-drift guardrail.
+    if category_redirected(url, page.url):
+        print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+        return 0, 0, True
     # Gritr renders its catalog through Searchspring's Snize widget,
     # which mounts its <li class="snize-product"> cards client-side
     # after the SPA boots. domcontentloaded fires on an empty grid;
@@ -119,7 +115,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         page.wait_for_selector('li.snize-product', timeout=25000)
     except Exception:
         print(f"  no snize-product cards rendered after 25s - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
     time.sleep(2)
 
     # Old selectors targeted BigCommerce's stencil theme (article.card,
@@ -127,7 +123,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
     products = page.query_selector_all('li.snize-product')
     print(f"  Found {len(products)} products")
     if not products:
-        return 0, 0
+        return 0, 0, True
 
     saved = 0
     skipped = 0
@@ -269,6 +265,22 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             print(f"  Skipped: {e}")
             continue
 
+    return saved, skipped, False
+
+
+def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles):
+    """Scrape every configured category URL for a caliber (always a list — the
+    TSUSA multi-URL lesson). Appends (caliber, url) to empty_handles for any
+    URL whose first page rendered zero product cards."""
+    saved = 0
+    skipped = 0
+    for entry in CALIBER_PATHS[caliber_norm]:
+        s, k, empty = scrape_category_page(page, entry, caliber_norm,
+                                           caliber_display, retailer_id, seen_ids)
+        saved += s
+        skipped += k
+        if empty:
+            empty_handles.append((caliber_norm, entry['url']))
     return saved, skipped
 
 
@@ -283,6 +295,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (caliber, url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -293,13 +306,15 @@ def scrape():
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
+            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles)
             total_saved += saved
             total_skipped += skipped
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14).
+    report_empty_first_pages(empty_handles, 'Gritr')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 if __name__ == '__main__':
