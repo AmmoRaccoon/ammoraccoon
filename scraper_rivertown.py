@@ -6,35 +6,21 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history, load_caliber_paths, category_redirected, report_empty_first_pages
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 RETAILER_ID = 12
 SITE_BASE = "https://rivertownmunitions.com"
 
-# Rivertown WooCommerce paths per caliber. Values are lists for parity
-# with the other CALIBER_PATHS scrapers. Sitemap (sitemap_index.xml,
-# 220 /product-category/ URLs) confirmed as source of truth on
-# 2026-05-09. Five of the 10 originally configured paths had drifted
-# to 404; all five are recoverable via slug rename. Three calibers
-# split into two collections each (380acp, 223-556, 308win), mirroring
-# the Natchez/Ammo.com pattern for split-leg calibers.
-CALIBER_PATHS = {
-    '9mm':     ['/product-category/handgun/9mm/'],
-    '380acp':  ['/product-category/handgun/380/',
-                '/product-category/handgun/380-auto/'],
-    '40sw':    ['/product-category/handgun/40-sw/'],
-    '38spl':   ['/product-category/handgun/38-special/'],
-    '357mag':  ['/product-category/handgun/357-mag/'],
-    '22lr':    ['/product-category/rimfire/22lr/'],
-    '223-556': ['/product-category/rifle/223/',
-                '/product-category/rifle/5-56x45mm-nato/'],
-    '308win':  ['/product-category/rifle/308-win/',
-                '/product-category/rifle/308-7-62x51mm/'],
-    '762x39':  ['/product-category/rifle/7-62x39mm/'],
-    '300blk':  ['/product-category/rifle/300-blackout/'],
-}
+# Per-caliber WooCommerce paths now live in caliber_paths/rivertown.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. entry['url'] is a drop-in for the old path string
+# (trailing slashes are load-bearing for the page/N/ pagination and are
+# preserved exactly). Three calibers split into two upstream categories
+# each (380acp, 223-556, 308win); both bucket per caliber and seen_ids
+# dedups overlap.
+CALIBER_PATHS = load_caliber_paths('rivertown')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -100,7 +86,8 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
     products = []
     flags = []
 
-    for handle in CALIBER_PATHS[caliber_norm]:
+    for entry in CALIBER_PATHS[caliber_norm]:
+        handle = entry['url']
         base = SITE_BASE + handle
         page_num = 1
         empty_first_page = False
@@ -123,6 +110,15 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     empty_first_page = True
                     print(f"  WARN: Rivertown collection {handle} returned "
                           f"zero products on first page (caliber {caliber_norm}).")
+                break
+            # Redirect guard (NEW 2026-06-14, expansion #4 Step-2): a
+            # category that 200s but lands on a DIFFERENT page is skipped
+            # loudly and counts as an empty first page. category_redirected
+            # ignores query + trailing slash, so WooCommerce's slash
+            # canonicalization won't false-fire — only a real path change.
+            if page_num == 1 and category_redirected(url, page.url):
+                print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+                empty_first_page = True
                 break
             await page.wait_for_timeout(3000)
 
@@ -261,27 +257,14 @@ async def scrape():
 
         print(f"\nTotal scraped: {len(all_products)}")
 
-        # Storefront-drift guardrail. A single transient empty handle is
-        # fine; three or more is a strong signal that Rivertown renamed
-        # WooCommerce category slugs and the scraper is silently producing
-        # partial data (the exact symptom that hid 5 of 10 calibers from
-        # the DB until the 2026-05-09 audit). Exit non-zero so CI runs go
-        # red, and skip the upsert step so partial data doesn't replace
-        # good rows.
-        EMPTY_FAIL_THRESHOLD = 3
-        if len(empty_handles) >= EMPTY_FAIL_THRESHOLD:
-            print(f"\nFAIL: {len(empty_handles)} Rivertown collections returned "
-                  f"zero products on first page — likely storefront drift:")
-            for cal, h in empty_handles:
-                print(f"  - {cal}: Rivertown collection {h} returned zero products on first page")
-            sys.exit(1)
-        elif empty_handles:
-            print(f"\nWARN: {len(empty_handles)} Rivertown collection(s) returned "
-                  f"zero products on first page (transient or worth investigating):")
-            for cal, h in empty_handles:
-                print(f"  - {cal}: Rivertown collection {h} returned zero products on first page")
+        # Storefront-drift guardrail (centralized 2026-06-14, expansion
+        # #4 Step-2 — was an inline EMPTY_FAIL_THRESHOLD block): >= 3
+        # collections empty on first page exits non-zero (CI red) and
+        # skips the upsert + freshness bump so partial data can't replace
+        # good rows and /status can't falsely advertise a fresh scrape.
+        report_empty_first_pages(empty_handles, 'Rivertown')
 
-        mark_retailer_scraped(supabase, RETAILER_ID)
+        mark_retailer_scraped(supabase, RETAILER_ID, had_success=(len(all_products) > 0))
 
         if not all_products:
             print("Nothing to upsert.")

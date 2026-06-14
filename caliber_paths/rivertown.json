@@ -1,0 +1,28 @@
+{
+  "retailer": "rivertown",
+  "platform": "woocommerce",
+  "base": "https://rivertownmunitions.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list[str]). Transcribed verbatim from scraper_rivertown.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. ASYNC-Playwright (async_api); WooCommerce (/product-category/ paths, page/N/ pagination — trailing slashes are LOAD-BEARING and preserved exactly). Scraper keys off RETAILER_ID=12 (no slug lookup). Three calibers split into two upstream categories each (380acp, 223-556, 308win); both bucket per caliber, seen_ids dedups overlap. Migration wiring: loader + report_empty_first_pages (swap of the inline EMPTY_FAIL_THRESHOLD block) + category_redirected at page 1 (tolerant of WooCommerce trailing-slash canonicalization) + had_success. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/product-category/handgun/9mm/", "status": "active" } ],
+    "380acp": [
+      { "path": "/product-category/handgun/380/", "status": "active" },
+      { "path": "/product-category/handgun/380-auto/", "status": "active" }
+    ],
+    "40sw": [ { "path": "/product-category/handgun/40-sw/", "status": "active" } ],
+    "38spl": [ { "path": "/product-category/handgun/38-special/", "status": "active" } ],
+    "357mag": [ { "path": "/product-category/handgun/357-mag/", "status": "active" } ],
+    "22lr": [ { "path": "/product-category/rimfire/22lr/", "status": "active" } ],
+    "223-556": [
+      { "path": "/product-category/rifle/223/", "status": "active" },
+      { "path": "/product-category/rifle/5-56x45mm-nato/", "status": "active" }
+    ],
+    "308win": [
+      { "path": "/product-category/rifle/308-win/", "status": "active" },
+      { "path": "/product-category/rifle/308-7-62x51mm/", "status": "active" }
+    ],
+    "762x39": [ { "path": "/product-category/rifle/7-62x39mm/", "status": "active" } ],
+    "300blk": [ { "path": "/product-category/rifle/300-blackout/", "status": "active" } ]
+  }
+}
