@@ -11,6 +11,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, parse_bullet_type,
     mark_retailer_scraped,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -22,21 +23,12 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "outdoorlimited"
 SITE_BASE = "https://www.outdoorlimited.com"
 
-# Outdoor Limited paths — verified 2026-04-25 against the live homepage
-# nav. All [type]-ammo/[caliber]-ammo, but the .380 slug is "auto"
-# rather than "acp" (the only entry the previous map got wrong).
-CALIBER_PATHS = {
-    '9mm':     '/handgun-ammo/9mm-ammo/',
-    '380acp':  '/handgun-ammo/380-auto-ammo/',
-    '40sw':    '/handgun-ammo/40-s-w-ammo/',
-    '38spl':   '/handgun-ammo/38-special-ammo/',
-    '357mag':  '/handgun-ammo/357-magnum-ammo/',
-    '22lr':    '/rimfire-ammo/22-lr-ammo/',
-    '223-556': '/rifle-ammo/223-remington-ammo/',
-    '308win':  '/rifle-ammo/308-win-ammo/',
-    '762x39':  '/rifle-ammo/7-62x39mm-ammo/',
-    '300blk':  '/rifle-ammo/300-aac-blackout-ammo/',
-}
+# Per-caliber category URLs now live in caliber_paths/outdoorlimited.json
+# (expansion #4 Step-2 migration) — transcribed verbatim from the prior
+# inline map and parity-proven byte-identical. load_caliber_paths returns
+# {caliber: [entry, ...]} (always a list); each entry's 'url' is a drop-in
+# for the old SITE_BASE + path string.
+CALIBER_PATHS = load_caliber_paths('outdoorlimited')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -94,17 +86,26 @@ def parse_country(text):
             return country
     return None
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    url = SITE_BASE + CALIBER_PATHS[caliber_norm]
+def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id, seen_ids):
+    url = SITE_BASE + entry['url']
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
     except Exception as e:
         print(f"  goto failed: {e}")
-        return 0, 0
+        return 0, 0, True
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
+    # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Outdoor Limited
+    # had none before): a category that 301s to a DIFFERENT page (the TSUSA
+    # renumber trap returns HTTP 200 on the wrong caliber) now skips loudly
+    # and counts as an empty handle, feeding the storefront-drift guardrail
+    # instead of silently scraping the wrong caliber. First real fire is
+    # expected, not alarming.
+    if category_redirected(url, page.url):
+        print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+        return 0, 0, True
     # Outdoor Limited renders the product grid client-side — products
     # only mount after a few seconds of JS. domcontentloaded fires on
     # an empty grid, so we explicitly wait for the title links to
@@ -115,7 +116,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         page.wait_for_selector('.v-product__title', timeout=25000)
     except Exception:
         print(f"  no .v-product__title cards rendered after 25s - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
     time.sleep(2)
 
     # Each card is a .row_inner wrapper containing image link, title
@@ -125,7 +126,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
     products = page.query_selector_all('.row_inner')
     print(f"  Found {len(products)} products")
     if not products:
-        return 0, 0
+        return 0, 0, True
 
     saved = 0
     skipped = 0
@@ -267,6 +268,22 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             print(f"  Skipped: {e}")
             continue
 
+    return saved, skipped, False
+
+
+def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles):
+    """Scrape every configured category URL for a caliber (always a list — the
+    TSUSA multi-URL lesson). Appends (caliber, url) to empty_handles for any
+    URL whose first page rendered zero product cards."""
+    saved = 0
+    skipped = 0
+    for entry in CALIBER_PATHS[caliber_norm]:
+        s, k, empty = scrape_category_page(page, entry, caliber_norm,
+                                           caliber_display, retailer_id, seen_ids)
+        saved += s
+        skipped += k
+        if empty:
+            empty_handles.append((caliber_norm, entry['url']))
     return saved, skipped
 
 
@@ -281,6 +298,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (caliber, url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -291,13 +309,17 @@ def scrape():
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
+            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles)
             total_saved += saved
             total_skipped += skipped
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14): exit
+    # non-zero if >= EMPTY_FAIL_THRESHOLD category URLs rendered zero products
+    # on first page, and only advance last_scraped_at when something saved.
+    report_empty_first_pages(empty_handles, 'Outdoor Limited')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 if __name__ == '__main__':

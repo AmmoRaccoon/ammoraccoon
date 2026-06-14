@@ -1,0 +1,20 @@
+{
+  "retailer": "outdoorlimited",
+  "retailer_slug": "outdoorlimited",
+  "platform": "generic-sitemap",
+  "base": "https://www.outdoorlimited.com",
+  "comment": "Expansion #4 Step-2 pilot, shape A (dict->str). Transcribed VERBATIM from scraper_outdoorlimited.py inline CALIBER_PATHS on 2026-06-14 — the exact URLs the scraper fetches in production today, parity-proven byte-identical to the inline literal before the scraper was flipped to load_caliber_paths(). Not yet harness-validated; validation booleans are null (honest-by-default) until the Step-3 harness records measured status/redirect/title_match/gate_pass_pct/n_products. Approved by Jon as part of the Step-2 pilot, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/handgun-ammo/9mm-ammo/", "status": "active" } ],
+    "380acp": [ { "path": "/handgun-ammo/380-auto-ammo/", "status": "active" } ],
+    "40sw": [ { "path": "/handgun-ammo/40-s-w-ammo/", "status": "active" } ],
+    "38spl": [ { "path": "/handgun-ammo/38-special-ammo/", "status": "active" } ],
+    "357mag": [ { "path": "/handgun-ammo/357-magnum-ammo/", "status": "active" } ],
+    "22lr": [ { "path": "/rimfire-ammo/22-lr-ammo/", "status": "active" } ],
+    "223-556": [ { "path": "/rifle-ammo/223-remington-ammo/", "status": "active" } ],
+    "308win": [ { "path": "/rifle-ammo/308-win-ammo/", "status": "active" } ],
+    "762x39": [ { "path": "/rifle-ammo/7-62x39mm-ammo/", "status": "active" } ],
+    "300blk": [ { "path": "/rifle-ammo/300-aac-blackout-ammo/", "status": "active" } ]
+  }
+}
