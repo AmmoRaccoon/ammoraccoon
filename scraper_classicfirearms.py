@@ -12,6 +12,7 @@ from scraper_lib import (
     parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
     parse_bullet_type_with_url_fallback,
     mark_retailer_scraped,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -23,21 +24,15 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "classic-firearms"
 SITE_BASE = "https://www.classicfirearms.com"
 
-# Magento store, pure SSR. URLs verified 2026-04-25 by reading <title>
-# of each page. 7.62x39 lives at the hyphenated slug; the unhyphenated
-# 762x39 variant 404s on this site.
-CALIBER_PATHS = {
-    '9mm':     '/ammo/handgun-ammo/9mm/',
-    '380acp':  '/ammo/handgun-ammo/380-acp/',
-    '40sw':    '/ammo/handgun-ammo/40sw/',
-    '38spl':   '/ammo/handgun-ammo/38-special/',
-    '357mag':  '/ammo/handgun-ammo/357/',
-    '22lr':    '/ammo/rimfire-ammo/22lr/',
-    '223-556': '/ammo/rifle-ammo/223rem/',
-    '308win':  '/ammo/rifle-ammo/308/',
-    '762x39':  '/ammo/rifle-ammo/7-62x39/',
-    '300blk':  '/ammo/rifle-ammo/300-blackout/',
-}
+# Per-caliber category URLs now live in caliber_paths/classicfirearms.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. Magento store, pure SSR; the scraper paginates each
+# page with ?p=N. .38 Special and .357 are SEPARATE dedicated pages, so
+# no per-URL title_filter is needed here — the _title_names_caliber()
+# dual-caliber honesty guard below is unrelated runtime logic and is
+# left untouched. Values are now LISTS of entries and entry['url'] is a
+# drop-in for the old SITE_BASE + path string.
+CALIBER_PATHS = load_caliber_paths('classicfirearms')
 
 
 def _title_names_caliber(name, norm):
@@ -155,10 +150,10 @@ def extract_price_from_block(price_text):
     return None
 
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    base = SITE_BASE + CALIBER_PATHS[caliber_norm]
+def scrape_caliber_url(page, base, caliber_norm, caliber_display, retailer_id, seen_ids):
     saved = 0
     skipped = 0
+    empty_first_page = False
 
     for page_num in range(1, MAX_PAGES + 1):
         url = base if page_num == 1 else f"{base}?p={page_num}"
@@ -167,9 +162,21 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             resp = page.goto(url, wait_until='domcontentloaded', timeout=60000)
         except Exception as e:
             print(f"  goto failed: {e}")
+            if page_num == 1:
+                empty_first_page = True
             break
         if resp and resp.status >= 400:
             print(f"  HTTP {resp.status} - stopping caliber.")
+            if page_num == 1:
+                empty_first_page = True
+            break
+        # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — CF had none
+        # before): a category that 301s to a DIFFERENT page (renamed slug)
+        # stops the caliber and flags page 1 empty, feeding the storefront-
+        # drift guardrail rather than silently scraping the wrong page.
+        if page_num == 1 and category_redirected(url, page.url):
+            print(f"  REDIRECTED to {page.url} - category moved/renamed; stopping.")
+            empty_first_page = True
             break
         time.sleep(2)
 
@@ -178,6 +185,8 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         cards = page.query_selector_all('div.product-card.item')
         if not cards:
             print(f"  No cards on page {page_num}, stopping caliber.")
+            if page_num == 1:
+                empty_first_page = True
             break
 
         new_on_page = 0
@@ -376,6 +385,22 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             # way, no point continuing further.
             break
 
+    return saved, skipped, empty_first_page
+
+
+def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles):
+    """Scrape every configured category URL for a caliber (always a list).
+    Appends (caliber, url) to empty_handles for any URL whose first page
+    rendered zero product cards."""
+    saved = 0
+    skipped = 0
+    for entry in CALIBER_PATHS[caliber_norm]:
+        s, k, empty = scrape_caliber_url(page, SITE_BASE + entry['url'], caliber_norm,
+                                         caliber_display, retailer_id, seen_ids)
+        saved += s
+        skipped += k
+        if empty:
+            empty_handles.append((caliber_norm, entry['url']))
     return saved, skipped
 
 
@@ -390,6 +415,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (caliber, url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -400,13 +426,15 @@ def scrape():
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
+            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles)
             total_saved += saved
             total_skipped += skipped
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14).
+    report_empty_first_pages(empty_handles, 'Classic Firearms')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 
