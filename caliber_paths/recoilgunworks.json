@@ -1,0 +1,18 @@
+{
+  "retailer": "recoilgunworks",
+  "retailer_slug": "recoilgunworks",
+  "platform": "bigcommerce",
+  "base": "https://recoilgunworks.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape A (dict->str). Transcribed verbatim from scraper_recoilgunworks.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. Only 8 calibers (308win/300blk intentionally absent — not carried). Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/ammo/handgun-ammo/9mm/", "status": "active" } ],
+    "380acp": [ { "path": "/ammo/handgun-ammo/380-auto-ammo/", "status": "active" } ],
+    "40sw": [ { "path": "/ammo/handgun-ammo/40-s-w/", "status": "active" } ],
+    "38spl": [ { "path": "/ammo/handgun-ammo/38-special-ammo/", "status": "active" } ],
+    "357mag": [ { "path": "/ammo/handgun-ammo/357-magnum/", "status": "active" } ],
+    "22lr": [ { "path": "/ammo/rimfire-ammo/22lr/", "status": "active" } ],
+    "223-556": [ { "path": "/ammo/rifle-ammo/223-5-56/", "status": "active" } ],
+    "762x39": [ { "path": "/ammo/rifle-ammo/7-62x39mm-ammo/", "status": "active" } ]
+  }
+}

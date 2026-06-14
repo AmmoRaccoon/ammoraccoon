@@ -11,6 +11,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand_with_url, sanity_check_ppr, parse_bullet_type,
     mark_retailer_scraped,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -22,22 +23,11 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "recoilgunworks"
 SITE_BASE = "https://recoilgunworks.com"
 
-# BigCommerce store. Verified 2026-04-25 by following each redirect
-# from the live "Shop by Caliber" nav and probing slug variants. RGW
-# does NOT carry .308 Win or .300 BLK as dedicated category pages
-# (every plausible slug 404'd) so they're omitted — re-add later if
-# RGW expands inventory. Most categories use an "-ammo" suffix; .357
-# Magnum and .40 S&W are the inconsistent exceptions.
-CALIBER_PATHS = {
-    '9mm':     '/ammo/handgun-ammo/9mm/',
-    '380acp':  '/ammo/handgun-ammo/380-auto-ammo/',
-    '40sw':    '/ammo/handgun-ammo/40-s-w/',
-    '38spl':   '/ammo/handgun-ammo/38-special-ammo/',
-    '357mag':  '/ammo/handgun-ammo/357-magnum/',
-    '22lr':    '/ammo/rimfire-ammo/22lr/',
-    '223-556': '/ammo/rifle-ammo/223-5-56/',
-    '762x39':  '/ammo/rifle-ammo/7-62x39mm-ammo/',
-}
+# Per-caliber category URLs now live in caliber_paths/recoilgunworks.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. RGW carries only 8 calibers (no .308 Win / .300 BLK
+# category pages). entry['url'] is a drop-in for the old path.
+CALIBER_PATHS = load_caliber_paths('recoilgunworks')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -165,17 +155,24 @@ def parse_country(text):
             return country
     return None
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    url = SITE_BASE + CALIBER_PATHS[caliber_norm]
+def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id, seen_ids):
+    url = SITE_BASE + entry['url']
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
     except Exception as e:
         print(f"  goto failed: {e}")
-        return 0, 0
+        return 0, 0, True
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
+    # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — RGW had none
+    # before): a category that 301s to a DIFFERENT page (the TSUSA renumber
+    # trap returns HTTP 200 on the wrong caliber) skips loudly and counts as an
+    # empty handle, feeding the storefront-drift guardrail.
+    if category_redirected(url, page.url):
+        print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+        return 0, 0, True
     time.sleep(6)
 
     # Scope to the main product grid — RGW's BigCommerce stencil theme
@@ -188,7 +185,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         products = page.query_selector_all('ul.productGrid li.product')
     print(f"  Found {len(products)} products")
     if not products:
-        return 0, 0
+        return 0, 0, True
 
     # Collect the cheap parts (URL, title, lowest-of-range price) from
     # the category page first; visit each product page in a second
@@ -355,6 +352,22 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             print(f"  Skipped: {e}")
             continue
 
+    return saved, skipped, False
+
+
+def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles):
+    """Scrape every configured category URL for a caliber (always a list).
+    Appends (caliber, url) to empty_handles for any URL whose first page
+    rendered zero product cards."""
+    saved = 0
+    skipped = 0
+    for entry in CALIBER_PATHS[caliber_norm]:
+        s, k, empty = scrape_category_page(page, entry, caliber_norm,
+                                           caliber_display, retailer_id, seen_ids)
+        saved += s
+        skipped += k
+        if empty:
+            empty_handles.append((caliber_norm, entry['url']))
     return saved, skipped
 
 
@@ -369,6 +382,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (caliber, url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -379,13 +393,15 @@ def scrape():
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
+            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles)
             total_saved += saved
             total_skipped += skipped
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14).
+    report_empty_first_pages(empty_handles, 'RecoilGunWorks')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 if __name__ == '__main__':
