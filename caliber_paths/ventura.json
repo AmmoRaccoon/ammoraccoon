@@ -1,0 +1,20 @@
+{
+  "retailer": "ventura",
+  "retailer_slug": "ventura",
+  "platform": "bigcommerce",
+  "base": "https://www.venturamunitions.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape A (dict->str). Transcribed verbatim from scraper_ventura.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/categories/handgun/9mm-ammo-for-sale.html", "status": "active" } ],
+    "380acp": [ { "path": "/categories/handgun/380-acp-ammo-for-sale.html", "status": "active" } ],
+    "40sw": [ { "path": "/categories/handgun/40-s-w-ammo-for-sale.html", "status": "active" } ],
+    "38spl": [ { "path": "/categories/handgun/38-special-ammo-for-sale.html", "status": "active" } ],
+    "357mag": [ { "path": "/categories/handgun/357-magnum-ammo-for-sale.html", "status": "active" } ],
+    "22lr": [ { "path": "/22lr-long-rifle/", "status": "active" } ],
+    "223-556": [ { "path": "/categories/rifle/223-rem-1-ammo-for-sale.html", "status": "active" } ],
+    "308win": [ { "path": "/categories/rifle/308-win-ammo-for-sale.html", "status": "active" } ],
+    "762x39": [ { "path": "/categories/rifle/7-62-x-39-ammo-for-sale.html", "status": "active" } ],
+    "300blk": [ { "path": "/categories/300-aac-blackout-ammo-for-sale.html", "status": "active" } ]
+  }
+}
