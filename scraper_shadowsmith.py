@@ -11,6 +11,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand_with_url, sanity_check_ppr, parse_bullet_type,
     mark_retailer_scraped,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -23,21 +24,13 @@ RETAILER_SLUG = "shadowsmith"
 # shadowsmithammo.com 301-redirects to www.shadowsmith.net.
 SITE_BASE = "https://www.shadowsmith.net"
 
-# WooCommerce store. URL prefix is /product-category/ammunition/...
-# (the previous map was missing the /product-category/ root, so every
-# request 404'd). Verified 2026-04-25 against the live homepage nav.
-CALIBER_PATHS = {
-    '9mm':     '/product-category/ammunition/filters/caliber-gauge/9mm/',
-    '380acp':  '/product-category/ammunition/filters/caliber-gauge/380-acp/',
-    '40sw':    '/product-category/ammunition/filters/caliber-gauge/40-sw/',
-    '38spl':   '/product-category/ammunition/filters/caliber-gauge/38-special/',
-    '357mag':  '/product-category/ammunition/filters/caliber-gauge/357-magnum/',
-    '22lr':    '/product-category/ammunition/filters/caliber-gauge/22-lr/',
-    '223-556': '/product-category/ammunition/filters/caliber-gauge/223-rem-5-56-nato/',
-    '308win':  '/product-category/ammunition/filters/caliber-gauge/308-7-62-nato/',
-    '762x39':  '/product-category/ammunition/filters/caliber-gauge/7-62-x-39mm/',
-    '300blk':  '/product-category/ammunition/filters/caliber-gauge/300-aac-blackout/',
-}
+# Per-caliber category URLs now live in caliber_paths/shadowsmith.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. WooCommerce store; the canonical host is
+# www.shadowsmith.net (shadowsmithammo.com 301s to it). Values are now
+# LISTS of entries and entry['url'] is a drop-in for the old SITE_BASE +
+# path string.
+CALIBER_PATHS = load_caliber_paths('shadowsmith')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -124,17 +117,24 @@ def parse_country(text):
             return country
     return None
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    url = SITE_BASE + CALIBER_PATHS[caliber_norm]
+def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id, seen_ids):
+    url = SITE_BASE + entry['url']
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
     except Exception as e:
         print(f"  goto failed: {e}")
-        return 0, 0
+        return 0, 0, True
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
+    # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Shadowsmith
+    # had none before). WooCommerce duplicate-slug renames are exactly
+    # the drift this catches: a category that 301s to a DIFFERENT page
+    # with HTTP 200 skips loudly and counts as an empty handle.
+    if category_redirected(url, page.url):
+        print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+        return 0, 0, True
     # Shadowsmith renders behind an age-verification overlay but the
     # product DOM mounts regardless. Wait for the title selector
     # explicitly so we don't race the JS that paints products into the
@@ -143,7 +143,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
         page.wait_for_selector('.woocommerce-loop-product__title', timeout=20000)
     except Exception:
         print(f"  no product titles rendered after 20s - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
     time.sleep(2)
 
     # WooCommerce: products are <li class="...product..."> inside a
@@ -153,7 +153,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
     products = page.query_selector_all('ul.products li.product, li.product')
     print(f"  Found {len(products)} products")
     if not products:
-        return 0, 0
+        return 0, 0, True
 
     saved = 0
     skipped = 0
@@ -297,6 +297,22 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             print(f"  Skipped: {e}")
             continue
 
+    return saved, skipped, False
+
+
+def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles):
+    """Scrape every configured category URL for a caliber (always a list).
+    Appends (caliber, url) to empty_handles for any URL whose first page
+    rendered zero product cards."""
+    saved = 0
+    skipped = 0
+    for entry in CALIBER_PATHS[caliber_norm]:
+        s, k, empty = scrape_category_page(page, entry, caliber_norm,
+                                           caliber_display, retailer_id, seen_ids)
+        saved += s
+        skipped += k
+        if empty:
+            empty_handles.append((caliber_norm, entry['url']))
     return saved, skipped
 
 
@@ -311,6 +327,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (caliber, url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -321,13 +338,15 @@ def scrape():
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
+            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles)
             total_saved += saved
             total_skipped += skipped
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14).
+    report_empty_first_pages(empty_handles, 'Shadowsmith Ammo')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 if __name__ == '__main__':
