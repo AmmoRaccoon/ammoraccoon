@@ -4,7 +4,8 @@
   "title": "AmmoRaccoon per-retailer caliber-paths config",
   "description": "Schema for caliber_paths/<retailer>.json — the version-controlled per-retailer caliber->[category URL] map (expansion #4, Step 2), the replacement for each scraper's inline CALIBER_PATHS literal. scraper_lib.load_caliber_paths() hand-validates against these rules at load time (no jsonschema dependency, mirroring how the generator validates calibers.json) and fails loudly on a malformed entry. The URLs here are NOT derivable from calibers.json, so this is a separate source of truth, not a *_gen.* artifact. No URL reaches status=active without passing the Step-3 validation harness.",
   "type": "object",
-  "required": ["retailer", "platform", "base", "calibers"],
+  "required": ["retailer", "platform", "base"],
+  "description_model": "A config carries `calibers` (per-caliber URL lists) and/or `parent_paths` (flat crawl roots for list-of-parents scrapers that bucket products by title). At least one must be present (enforced by the loader's hand-rolled validation).",
   "additionalProperties": false,
   "properties": {
     "retailer": { "type": "string", "description": "Loader key = scraper short-name = file stem (e.g. 'targetsports'). load_caliber_paths('targetsports') reads this file." },
@@ -29,6 +30,11 @@
         "type": "array",
         "items": { "$ref": "#/$defs/entry" }
       }
+    },
+    "parent_paths": {
+      "type": "array",
+      "description": "Flat list of parent-category crawl roots for 'list-of-parents' scrapers (e.g. firearmsdepot) that do NOT map caliber->URL but crawl a few parent pages and bucket each product by normalize_caliber. The optional `type` on each entry tags the parent's usage category. Loaded by scraper_lib.load_parent_paths().",
+      "items": { "$ref": "#/$defs/entry" }
     }
   },
   "$defs": {
@@ -45,6 +51,7 @@
         },
         "expect_landed": { "type": "string", "description": "Canonical landed path the request must resolve to — the redirect-guard / Step-3-validation target. Defaults to `path` when absent. Not used to alter runtime behavior (the runtime guard compares request-vs-landed)." },
         "title_filter": { "type": ["string", "null"], "description": "Optional case-insensitive regex applied to product titles on a mixed-caliber category page (e.g. gritr's 'other handgun calibers'). null when the page is single-caliber. Compiled by the loader; an invalid regex fails loudly." },
+        "type": { "type": "string", "description": "Optional usage-category tag for a parent_paths crawl root (e.g. 'handgun', 'rifle', 'rimfire'). Carried through to the scraper; not used for caliber bucketing (normalize_caliber does that)." },
         "source": { "type": "string", "description": "Where this URL came from (e.g. 'sitemap:product-categories-sitemap.xml', 'manual')." },
         "validation": { "$ref": "#/$defs/validation" },
         "approved_by": { "type": "string", "description": "Who signed off activation." },

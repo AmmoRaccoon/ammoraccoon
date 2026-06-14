@@ -1473,13 +1473,39 @@ _CALIBER_PATHS_DIR = os.path.join(
 _CALIBER_PATH_STATUSES = ('active', 'candidate', 'parked')
 
 
+def _validate_entry_list(entries, label, bad):
+    """Validate a list of path entries — used for both a caliber's URL list
+    (calibers[cal]) and the flat crawl-root list (parent_paths)."""
+    if not isinstance(entries, list):
+        bad(f"{label} must be a list of entries")
+    for i, e in enumerate(entries):
+        where = f"{label}[{i}]"
+        if not isinstance(e, dict):
+            bad(f"{where} must be an object")
+        path = e.get('path')
+        if not isinstance(path, str) or not path.startswith('/'):
+            bad(f"{where}.path must be a string starting with '/'")
+        if e.get('status') not in _CALIBER_PATH_STATUSES:
+            bad(f"{where}.status must be one of {_CALIBER_PATH_STATUSES}, "
+                f"got {e.get('status')!r}")
+        for opt in ('query', 'expect_landed', 'source', 'type'):
+            if e.get(opt) is not None and not isinstance(e.get(opt), str):
+                bad(f"{where}.{opt} must be a string")
+        tf = e.get('title_filter')
+        if tf is not None and not isinstance(tf, str):
+            bad(f"{where}.title_filter must be a string or null")
+
+
 def _validate_caliber_paths_cfg(cfg, retailer):
     """Hand-rolled structural validation of a caliber_paths/<retailer>.json
     config (mirrors caliber_paths.schema.json; no jsonschema dependency, same
     pattern as the calibers.json generator). Raises ValueError naming the
     offending location on the FIRST malformed entry — fail loudly, never load
     a garbage config silently. The title_filter regex itself is validated when
-    the loader compiles it (re.error names the bad pattern)."""
+    the loader compiles it (re.error names the bad pattern).
+
+    A config carries `calibers` (per-caliber URL lists) and/or `parent_paths`
+    (flat crawl roots for the list-of-parents scrapers that bucket by title)."""
     def bad(msg):
         raise ValueError(f"caliber_paths/{retailer}.json: {msg}")
 
@@ -1489,27 +1515,37 @@ def _validate_caliber_paths_cfg(cfg, retailer):
         if not isinstance(cfg.get(key), str) or not cfg.get(key):
             bad(f"missing/empty required string field '{key}'")
     cals = cfg.get('calibers')
-    if not isinstance(cals, dict):
-        bad("missing required object field 'calibers'")
-    for cal, entries in cals.items():
-        if not isinstance(entries, list):
-            bad(f"calibers['{cal}'] must be a list of entries")
-        for i, e in enumerate(entries):
-            where = f"calibers['{cal}'][{i}]"
-            if not isinstance(e, dict):
-                bad(f"{where} must be an object")
-            path = e.get('path')
-            if not isinstance(path, str) or not path.startswith('/'):
-                bad(f"{where}.path must be a string starting with '/'")
-            if e.get('status') not in _CALIBER_PATH_STATUSES:
-                bad(f"{where}.status must be one of {_CALIBER_PATH_STATUSES}, "
-                    f"got {e.get('status')!r}")
-            for opt in ('query', 'expect_landed', 'source'):
-                if e.get(opt) is not None and not isinstance(e.get(opt), str):
-                    bad(f"{where}.{opt} must be a string")
-            tf = e.get('title_filter')
-            if tf is not None and not isinstance(tf, str):
-                bad(f"{where}.title_filter must be a string or null")
+    parents = cfg.get('parent_paths')
+    if cals is None and parents is None:
+        bad("config must define 'calibers' and/or 'parent_paths'")
+    if cals is not None:
+        if not isinstance(cals, dict):
+            bad("'calibers' must be an object")
+        for cal, entries in cals.items():
+            _validate_entry_list(entries, f"calibers['{cal}']", bad)
+    if parents is not None:
+        _validate_entry_list(parents, 'parent_paths', bad)
+
+
+def _build_entry(e):
+    """Materialize a stored entry into the runtime shape scrapers consume.
+    `url` is the relative '<path>?<query>' — byte-identical to the old inline
+    value, so `SITE_BASE + entry['url']` is a drop-in for the old string.
+    title_filter is compiled; expect_landed defaults to path; an optional
+    `type` tag (list-of-parents usage category) is carried through."""
+    p = e['path']
+    q = e.get('query') or ''
+    tf = e.get('title_filter')
+    out = {
+        'url': p + ('?' + q if q else ''),
+        'path': p,
+        'query': q,
+        'expect_landed': e.get('expect_landed', p),
+        'title_filter': re.compile(tf, re.IGNORECASE) if tf else None,
+    }
+    if e.get('type') is not None:
+        out['type'] = e['type']
+    return out
 
 
 def load_caliber_paths(retailer, *, status='active'):
@@ -1518,55 +1554,53 @@ def load_caliber_paths(retailer, *, status='active'):
     inline CALIBER_PATHS dict). Returns {caliber_norm: [entry, ...]} containing
     ONLY entries whose status matches `status` (default 'active'); calibers
     with no matching entry are omitted, so iterating the result is equivalent
-    to iterating today's CALIBER_PATHS keys.
-
-    Each entry is a dict:
-        url            relative '<path>?<query>' — byte-identical to the old
-                       CALIBER_PATHS value, so `SITE_BASE + entry['url']` is a
-                       drop-in for `SITE_BASE + path`.
-        path, query    the split components (query has no leading '?').
-        expect_landed  canonical landed path (redirect-guard / validation
-                       target); defaults to `path` when absent.
-        title_filter   compiled re.Pattern for mixed-caliber category pages,
-                       or None.
-
-    Values are ALWAYS lists: one of our combined calibers can split into
-    several upstream category pages (.223 Rem + 5.56 NATO), the TSUSA lesson.
-    """
+    to iterating today's CALIBER_PATHS keys. See _build_entry for the entry
+    shape. Values are ALWAYS lists: one combined caliber can split into several
+    upstream category pages (.223 Rem + 5.56 NATO), the TSUSA lesson."""
     cfg_path = os.path.join(_CALIBER_PATHS_DIR, f'{retailer}.json')
     with open(cfg_path, encoding='utf-8') as f:
         cfg = json.load(f)
     _validate_caliber_paths_cfg(cfg, retailer)
     out = {}
-    for cal, entries in cfg.get('calibers', {}).items():
-        kept = []
-        for e in entries:
-            if e.get('status') != status:
-                continue
-            p = e['path']
-            q = e.get('query') or ''
-            tf = e.get('title_filter')
-            kept.append({
-                'url': p + ('?' + q if q else ''),
-                'path': p,
-                'query': q,
-                'expect_landed': e.get('expect_landed', p),
-                'title_filter': re.compile(tf, re.IGNORECASE) if tf else None,
-            })
+    for cal, entries in (cfg.get('calibers') or {}).items():
+        kept = [_build_entry(e) for e in entries if e.get('status') == status]
         if kept:
             out[cal] = kept
     return out
+
+
+def load_parent_paths(retailer, *, status='active'):
+    """Load a retailer's flat list of crawl-root entries from the `parent_paths`
+    array of caliber_paths/<retailer>.json — for the 'list-of-parents' scrapers
+    that DON'T map caliber->URL but crawl a few parent category pages and bucket
+    each product by normalize_caliber. Returns [entry, ...] (active-only by
+    default), same entry shape as load_caliber_paths plus an optional 'type'
+    tag — a drop-in for the old inline PARENT_PATHS list."""
+    cfg_path = os.path.join(_CALIBER_PATHS_DIR, f'{retailer}.json')
+    with open(cfg_path, encoding='utf-8') as f:
+        cfg = json.load(f)
+    _validate_caliber_paths_cfg(cfg, retailer)
+    return [_build_entry(e) for e in (cfg.get('parent_paths') or [])
+            if e.get('status') == status]
 
 
 def category_redirected(requested_url, landed_url):
     """True when a category navigation landed somewhere other than where it was
     sent — the TSUSA renumber trap (old category IDs 301'd to a DIFFERENT
     caliber's page with HTTP 200, so the status check passed and the strict
-    gate silently saved zero for 9 of 10 calibers). Query strings (sort/paging)
-    are ignored and the compare is case-insensitive — byte-identical to the
-    inline guard added to scraper_targetsports 2026-06-12. Skip the page loudly
-    when this returns True so the next renumbering fails visibly."""
-    return requested_url.split('?')[0].lower() != landed_url.split('?')[0].lower()
+    gate silently saved zero for 9 of 10 calibers). Skip the page loudly when
+    this returns True so the next renumbering fails visibly.
+
+    Query strings (sort/paging) AND a trailing slash are ignored, and the
+    compare is case-insensitive. The trailing-slash tolerance matters because
+    most of the migrated scrapers use '/cat/' style URLs and many storefronts
+    301 '/cat/' -> '/cat' (or vice-versa) as a same-page canonicalization that
+    is NOT the wrong-caliber redirect we guard against; without it the guard
+    would false-fire on every caliber. Equivalent to the TSUSA inline guard for
+    .aspx URLs (which carry no trailing slash)."""
+    def norm(u):
+        return u.split('?')[0].rstrip('/').lower()
+    return norm(requested_url) != norm(landed_url)
 
 
 EMPTY_FAIL_THRESHOLD = 3
