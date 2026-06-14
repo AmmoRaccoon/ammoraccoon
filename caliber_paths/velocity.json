@@ -1,0 +1,20 @@
+{
+  "retailer": "velocity",
+  "retailer_slug": "velocity",
+  "platform": "woocommerce",
+  "base": "https://www.velocityammosales.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape A (dict->str). Transcribed verbatim from scraper_velocity.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/collections/9-mm/", "status": "active" } ],
+    "380acp": [ { "path": "/collections/380-acp/", "status": "active" } ],
+    "40sw": [ { "path": "/collections/40-s-w/", "status": "active" } ],
+    "38spl": [ { "path": "/collections/38-special/", "status": "active" } ],
+    "357mag": [ { "path": "/collections/357-magnum/", "status": "active" } ],
+    "22lr": [ { "path": "/collections/22-lr/", "status": "active" } ],
+    "223-556": [ { "path": "/collections/223/", "status": "active" } ],
+    "308win": [ { "path": "/collections/308-win/", "status": "active" } ],
+    "762x39": [ { "path": "/collections/7-62x39/", "status": "active" } ],
+    "300blk": [ { "path": "/collections/300-blackout/", "status": "active" } ]
+  }
+}
