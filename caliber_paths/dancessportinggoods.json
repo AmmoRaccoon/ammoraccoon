@@ -1,0 +1,13 @@
+{
+  "retailer": "dancessportinggoods",
+  "retailer_slug": "dancessportinggoods",
+  "platform": "bigcommerce",
+  "base": "https://www.dancessportinggoods.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape E (list-of-parents). Transcribed verbatim from scraper_dancessportinggoods.py inline TYPE_PATHS on 2026-06-14, parity-proven byte-identical before flip. Like underwood/firearmsdepot, Dance's (BigCommerce stencil) only buckets ammo by gun type, not by caliber, so each scrape walks three top-level type pages and normalize_caliber() buckets each product by title. No `calibers` block — the parents live in `parent_paths`, loaded by load_parent_paths(). The inline literal carried no type tags, so none here. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "parent_paths": [
+    { "path": "/ammo/handgun-centerfire/", "status": "active" },
+    { "path": "/ammo/rifle-centerfire/", "status": "active" },
+    { "path": "/ammo/rimfire/", "status": "active" }
+  ]
+}

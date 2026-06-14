@@ -11,6 +11,7 @@ from scraper_lib import (
     CALIBERS, normalize_caliber, now_iso, with_stock_fields,
     parse_purchase_limit, parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
     mark_retailer_scraped,
+    load_parent_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -22,16 +23,14 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "dancessportinggoods"
 SITE_BASE = "https://www.dancessportinggoods.com"
 
-# BigCommerce stencil. Dance's only buckets ammo by gun type, not by
-# caliber, so each scrape walks all three top-level type pages and
-# normalize_caliber() shoulders the per-caliber bucketing from the
-# title. Verified 2026-05-02 — handgun + rifle each ~6 pages of 60,
-# rimfire ~3 pages.
-TYPE_PATHS = [
-    '/ammo/handgun-centerfire/',
-    '/ammo/rifle-centerfire/',
-    '/ammo/rimfire/',
-]
+# Parent crawl roots now live in caliber_paths/dancessportinggoods.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. BigCommerce stencil; Dance's only buckets ammo by gun
+# type, not by caliber, so (like underwood/firearmsdepot) each scrape
+# walks three top-level type parent pages and normalize_caliber()
+# shoulders the per-caliber bucketing from the title. entry['url'] is a
+# drop-in for the old SITE_BASE + path string.
+PARENT_PATHS = load_parent_paths('dancessportinggoods')
 
 # Cap pagination defensively. Six pages was the deepest seen across
 # all three categories on probe day; 12 leaves headroom without an
@@ -110,6 +109,7 @@ def scrape_type_page(page, type_path, retailer_id, seen_ids):
     label = type_path.strip('/').split('/')[-1]
     saved = 0
     skipped = 0
+    empty_first_page = False
 
     for page_num in range(1, MAX_PAGES + 1):
         url = base if page_num == 1 else f"{base}?page={page_num}"
@@ -118,9 +118,21 @@ def scrape_type_page(page, type_path, retailer_id, seen_ids):
             resp = page.goto(url, wait_until='networkidle', timeout=60000)
         except Exception as e:
             print(f"  goto failed: {e}")
+            if page_num == 1:
+                empty_first_page = True
             break
         if resp and resp.status >= 400:
             print(f"  HTTP {resp.status} - stopping category.")
+            if page_num == 1:
+                empty_first_page = True
+            break
+        # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Dance's
+        # had none before): a parent category that 301s to a DIFFERENT
+        # page (renamed) stops the parent and flags it empty, feeding the
+        # storefront-drift guardrail rather than crawling the wrong tree.
+        if page_num == 1 and category_redirected(url, page.url):
+            print(f"  REDIRECTED to {page.url} - parent moved/renamed; stopping.")
+            empty_first_page = True
             break
         # Stencil renders the full grid server-side; networkidle is
         # enough. Brief settle for any final image-lazy-load.
@@ -129,6 +141,8 @@ def scrape_type_page(page, type_path, retailer_id, seen_ids):
         cards = page.query_selector_all('article.card')
         if not cards:
             print(f"  No cards on page {page_num}, stopping category.")
+            if page_num == 1:
+                empty_first_page = True
             break
 
         new_on_page = 0
@@ -269,7 +283,7 @@ def scrape_type_page(page, type_path, retailer_id, seen_ids):
             # way, no point continuing further.
             break
 
-    return saved, skipped
+    return saved, skipped, empty_first_page
 
 
 def scrape():
@@ -283,6 +297,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (label, parent url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -291,14 +306,20 @@ def scrape():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         })
 
-        for type_path in TYPE_PATHS:
-            saved, skipped = scrape_type_page(page, type_path, retailer_id, seen_ids)
+        for entry in PARENT_PATHS:
+            saved, skipped, empty = scrape_type_page(page, entry['url'], retailer_id, seen_ids)
             total_saved += saved
             total_skipped += skipped
+            if empty:
+                empty_handles.append(('parent', entry['url']))
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14):
+    # all three type parents empty on first page (>= EMPTY_FAIL_THRESHOLD)
+    # exits non-zero; only advance last_scraped_at when something saved.
+    report_empty_first_pages(empty_handles, "Dance's Sporting Goods")
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 
