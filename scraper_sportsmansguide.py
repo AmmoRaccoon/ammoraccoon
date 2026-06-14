@@ -13,6 +13,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, normalize_caliber, parse_bullet_type,
     mark_retailer_scraped,
+    load_parent_paths, category_redirected, report_empty_first_pages,
 )
 
 load_dotenv()
@@ -24,20 +25,19 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "sportsmansguide"
 SITE_BASE = "https://www.sportsmansguide.com"
 
-# Sportsman's Guide is fronted by a Cloudflare-style anti-bot wall
-# that fires inconsistently — fresh contexts get a couple of pages
-# through before being flagged. Recon 2026-04-26 confirmed the three
-# parent productlist URLs work with stealth-Playwright; per-caliber
-# sub-slugs exist but probing each one in sequence trips the wall,
-# so we crawl the parents and use normalize_caliber() on titles to
-# bucket into our 10 tracked calibers (same approach as Firearms
-# Depot). 403s are logged and the parent is skipped — the next
-# 2-hour cron pass picks up what this run missed.
-PARENT_PATHS = [
-    ('/productlist/ammo/handgun-pistol-ammo?d=121&c=95',  'handgun'),
-    ('/productlist/ammo/rifle-ammo?d=121&c=96',           'rifle'),
-    ('/productlist/ammo/rimfire-ammo?d=121&c=417',        'rimfire'),
-]
+# Parent crawl roots now live in caliber_paths/sportsmansguide.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. Sportsman's Guide is fronted by a Cloudflare-style
+# anti-bot wall that fires inconsistently — fresh contexts get a couple
+# of pages through before being flagged. The three parent productlist
+# URLs work with stealth-Playwright; per-caliber sub-slugs trip the
+# wall, so (like firearmsdepot) we crawl the parents and use
+# normalize_caliber() on titles to bucket into our 10 tracked calibers.
+# 403s are logged and the parent is skipped — the next 2-hour cron pass
+# picks up what this run missed. Each entry carries a `type` tag
+# (handgun/rifle/rimfire), used only as a log label; entry['url'] is a
+# drop-in for the old (path, type) tuple's path.
+PARENT_PATHS = load_parent_paths('sportsmansguide')
 
 # Defensive cap. Each productlist showed 50 tiles per page on probe
 # day — handgun/rifle parents are the largest. 30 pages × 50 = 1500
@@ -117,6 +117,7 @@ def parse_country(text):
 def scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts):
     saved = 0
     skipped = 0
+    empty_first_page = False
     base = SITE_BASE + parent_path
 
     for page_num in range(1, MAX_PAGES + 1):
@@ -130,6 +131,8 @@ def scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts):
             resp = page.goto(url, wait_until='domcontentloaded', timeout=60000)
         except Exception as e:
             print(f"  goto failed: {e}")
+            if page_num == 1:
+                empty_first_page = True
             break
 
         # 403s from SG's bot wall — log and stop the parent. The cron
@@ -137,9 +140,24 @@ def scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts):
         # the next pass.
         if resp and resp.status == 403:
             print(f"  HTTP 403 (bot wall) — skipping rest of {label}.")
+            if page_num == 1:
+                empty_first_page = True
             break
         if resp and resp.status >= 400:
             print(f"  HTTP {resp.status} — stopping {label}.")
+            if page_num == 1:
+                empty_first_page = True
+            break
+        # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — SG had
+        # none before): a parent that 301s to a DIFFERENT path (renamed,
+        # or the bot wall's challenge page) stops the parent and flags it
+        # empty, feeding the storefront-drift guardrail. The d=/c= facet
+        # and ?pg= paging queries and trailing slashes are ignored by
+        # category_redirected, so SG's own canonicalization won't
+        # false-fire — only a genuine path change does.
+        if page_num == 1 and category_redirected(url, page.url):
+            print(f"  REDIRECTED to {page.url} - parent moved/walled; stopping {label}.")
+            empty_first_page = True
             break
 
         # Stealth wait: SG product tiles ship in markup, but a beat
@@ -149,11 +167,15 @@ def scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts):
             page.wait_for_selector('.product-tile', timeout=8000)
         except Exception:
             print(f"  No .product-tile rendered on page {page_num}, stopping {label}.")
+            if page_num == 1:
+                empty_first_page = True
             break
 
         tiles = page.query_selector_all('.product-tile')
         if not tiles:
             print(f"  No tiles on page {page_num}, stopping {label}.")
+            if page_num == 1:
+                empty_first_page = True
             break
 
         new_on_page = 0
@@ -329,7 +351,7 @@ def scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts):
         # Conservative jittered pacing — SG's wall is rate-aware.
         time.sleep(random.uniform(4.5, 7.5))
 
-    return saved, skipped
+    return saved, skipped, empty_first_page
 
 
 def scrape():
@@ -344,6 +366,7 @@ def scrape():
     total_skipped = 0
     seen_ids = set()
     counts = {}
+    empty_handles = []  # (label, parent url) for the storefront-drift guardrail
 
     stealth = Stealth(navigator_languages_override=('en-US', 'en'))
     with sync_playwright() as p:
@@ -357,7 +380,9 @@ def scrape():
         # Each parent gets a fresh context — the bot wall flags
         # within a session, so resetting cookies + TLS between
         # parents materially improves our hit rate.
-        for parent_path, label in PARENT_PATHS:
+        for entry in PARENT_PATHS:
+            parent_path = entry['url']
+            label = entry.get('type', 'parent')
             ctx = browser.new_context(
                 user_agent=('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                             'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -376,9 +401,11 @@ def scrape():
             stealth.apply_stealth_sync(ctx)
             page = ctx.new_page()
             try:
-                saved, skipped = scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts)
+                saved, skipped, empty = scrape_parent(page, parent_path, label, retailer_id, seen_ids, counts)
                 total_saved += saved
                 total_skipped += skipped
+                if empty:
+                    empty_handles.append((label, parent_path))
             finally:
                 ctx.close()
             # Breathe between parents so SG's rate detector cools off.
@@ -386,7 +413,13 @@ def scrape():
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14):
+    # all three parents empty on first page (>= EMPTY_FAIL_THRESHOLD)
+    # exits non-zero — for SG that means a fully-walled run, which must
+    # NOT silently bump last_scraped_at. had_success keeps the freshness
+    # stamp honest when the wall blocks everything (total_saved == 0).
+    report_empty_first_pages(empty_handles, "Sportsman's Guide")
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
     print("Per-caliber counts:")
     for cal in CALIBERS:
