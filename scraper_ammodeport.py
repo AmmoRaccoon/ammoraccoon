@@ -6,7 +6,11 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history
+from scraper_lib import (
+    CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand,
+    sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
+)
 
 load_dotenv()
 
@@ -17,18 +21,11 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "ammunition-depot"
 SITE_BASE = "https://www.ammunitiondepot.com"
 
-CALIBER_PATHS = {
-    '9mm':     '/ammo/9mm/?sort=price-asc&limit=96',
-    '380acp':  '/ammo/380-auto/?sort=price-asc&limit=96',
-    '40sw':    '/ammo/40-s-w/?sort=price-asc&limit=96',
-    '38spl':   '/ammo/38-special/?sort=price-asc&limit=96',
-    '357mag':  '/ammo/357-magnum/?sort=price-asc&limit=96',
-    '22lr':    '/ammo/22-lr/?sort=price-asc&limit=96',
-    '223-556': '/ammo/223-556/?sort=price-asc&limit=96',
-    '308win':  '/ammo/308-762x51/?sort=price-asc&limit=96',
-    '762x39':  '/ammo/762x39/?sort=price-asc&limit=96',
-    '300blk':  '/ammo/300-blackout/?sort=price-asc&limit=96',
-}
+# Per-caliber category URLs now live in caliber_paths/ammodeport.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. Values are now LISTS of entries (one per caliber today)
+# and entry['url'] is a drop-in for the old SITE_BASE + path string.
+CALIBER_PATHS = load_caliber_paths('ammodeport')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -83,23 +80,30 @@ def parse_country(text):
             return country
     return None
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
-    url = SITE_BASE + CALIBER_PATHS[caliber_norm]
+def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id, seen_ids):
+    url = SITE_BASE + entry['url']
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
     except Exception as e:
         print(f"  goto failed: {e}")
-        return 0, 0
+        return 0, 0, True
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
-        return 0, 0
+        return 0, 0, True
+    # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Ammunition
+    # Depot had none before): a category that 301s to a DIFFERENT page
+    # with HTTP 200 skips loudly and counts as an empty handle, feeding
+    # the storefront-drift guardrail.
+    if category_redirected(url, page.url):
+        print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+        return 0, 0, True
     time.sleep(8)
 
     products = page.query_selector_all('.product-item')
     print(f"  Found {len(products)} products")
     if not products:
-        return 0, 0
+        return 0, 0, True
 
     saved = 0
     skipped = 0
@@ -195,6 +199,22 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             print(f"  Skipped: {e}")
             continue
 
+    return saved, skipped, False
+
+
+def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles):
+    """Scrape every configured category URL for a caliber (always a list).
+    Appends (caliber, url) to empty_handles for any URL whose first page
+    rendered zero product cards."""
+    saved = 0
+    skipped = 0
+    for entry in CALIBER_PATHS[caliber_norm]:
+        s, k, empty = scrape_category_page(page, entry, caliber_norm,
+                                           caliber_display, retailer_id, seen_ids)
+        saved += s
+        skipped += k
+        if empty:
+            empty_handles.append((caliber_norm, entry['url']))
     return saved, skipped
 
 
@@ -206,6 +226,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (caliber, url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -216,13 +237,17 @@ def scrape():
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
+            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles)
             total_saved += saved
             total_skipped += skipped
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14).
+    # Ammunition Depot is Cloudflare-walled — had_success=(total_saved>0)
+    # so a fully-403'd run no longer falsely bumps last_scraped_at.
+    report_empty_first_pages(empty_handles, 'Ammunition Depot')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 if __name__ == '__main__':
