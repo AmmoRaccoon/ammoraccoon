@@ -6,7 +6,12 @@ from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history
+from scraper_lib import (
+    CALIBERS, normalize_caliber, now_iso, with_stock_fields, parse_purchase_limit,
+    parse_brand, sanity_check_ppr, parse_bullet_type, mark_retailer_scraped,
+    insert_price_history,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
+)
 
 load_dotenv()
 
@@ -17,34 +22,17 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "target-sports"
 SITE_BASE = "https://www.targetsportsusa.com"
 
-# Category IDs re-harvested from TSUSA's own sitemap 2026-06-12
-# (product-categories-sitemap.xml, via robots.txt) after the site
-# renumbered its categories. The old IDs 301'd to WRONG calibers with
-# HTTP 200 — the .223 URL landed on .44 Rem Mag, the .22 LR URL on
-# .44 Special — so the strict caliber gate silently saved zero and
-# 9 of 10 calibers went dark. Only 9mm (c-51) kept its old ID.
-# Each URL below was dry-run verified before wiring: 200, no redirect,
-# page title names the caliber, 95-100% of product cards pass the gate
-# (scripts/_probe_tsusa_dryrun.py).
-#
-# Values are LISTS because TSUSA split two of our combined calibers
-# into separate category pages: .223 Rem vs 5.56 NATO, and .308 Win
-# vs 7.62x51 NATO. normalize_caliber buckets both halves into the
-# same normalized caliber, and seen_ids dedups any cross-listed SKU.
-CALIBER_PATHS = {
-    '9mm':     ['/9mm-luger-ammo-c-51.aspx?pp=240&SortOrder=PriceAscending'],
-    '380acp':  ['/380-acp-auto-ammo-c-50.aspx?pp=240&SortOrder=PriceAscending'],
-    '40sw':    ['/40-sw-ammo-c-59.aspx?pp=240&SortOrder=PriceAscending'],
-    '38spl':   ['/38-special-ammo-c-56.aspx?pp=240&SortOrder=PriceAscending'],
-    '357mag':  ['/357-magnum-ammo-c-57.aspx?pp=240&SortOrder=PriceAscending'],
-    '22lr':    ['/22-long-rifle-ammo-c-202.aspx?pp=240&SortOrder=PriceAscending'],
-    '223-556': ['/223-remington-ammo-c-83.aspx?pp=240&SortOrder=PriceAscending',
-                '/556mm-nato-ammo-c-2719.aspx?pp=240&SortOrder=PriceAscending'],
-    '308win':  ['/308-winchester-ammo-c-101.aspx?pp=240&SortOrder=PriceAscending',
-                '/762x51mm-nato-ammo-c-2720.aspx?pp=240&SortOrder=PriceAscending'],
-    '762x39':  ['/762x39mm-ammo-c-108.aspx?pp=240&SortOrder=PriceAscending'],
-    '300blk':  ['/300-aac-blackout-ammo-c-969.aspx?pp=240&SortOrder=PriceAscending'],
-}
+# Per-caliber category URLs now live in caliber_paths/targetsports.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical before flip. The 2026-06-12 TSUSA category-renumber fix
+# (commit e9d7c98) lives in that config now; the old IDs had 301'd to
+# WRONG calibers with HTTP 200 (.223->.44 Rem Mag, .22 LR->.44 Special),
+# which the redirect guard below now catches. Values stay LISTS: TSUSA
+# splits .223 Rem vs 5.56 NATO and .308 Win vs 7.62x51 NATO into
+# separate pages; normalize_caliber buckets both halves into one
+# normalized caliber and seen_ids dedups cross-listed SKUs.
+# entry['url'] is a drop-in for the old SITE_BASE + path string.
+CALIBER_PATHS = load_caliber_paths('targetsports')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -102,45 +90,51 @@ def parse_country(text):
             return country
     return None
 
-def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
+def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles):
+    """Scrape every configured category URL for a caliber (always a list).
+    Appends (caliber, url) to empty_handles for any URL whose first page
+    rendered zero candidate links."""
     saved = 0
     skipped = 0
-    for path in CALIBER_PATHS[caliber_norm]:
-        s, k = scrape_category_page(page, SITE_BASE + path, caliber_norm,
-                                    caliber_display, retailer_id, seen_ids)
+    for entry in CALIBER_PATHS[caliber_norm]:
+        s, k, empty = scrape_category_page(page, entry, caliber_norm,
+                                           caliber_display, retailer_id, seen_ids)
         saved += s
         skipped += k
+        if empty:
+            empty_handles.append((caliber_norm, entry['url']))
     return saved, skipped
 
 
-def scrape_category_page(page, url, caliber_norm, caliber_display, retailer_id, seen_ids):
+def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id, seen_ids):
+    url = SITE_BASE + entry['url']
     print(f"\n[{caliber_norm}] Loading: {url}")
     try:
         resp = page.goto(url, wait_until='domcontentloaded', timeout=90000)
     except Exception as e:
         print(f"  goto failed: {e}")
-        return 0, 0
+        return 0, 0, True
     if resp and resp.status >= 400:
         print(f"  HTTP {resp.status} - skipping caliber.")
-        return 0, 0
-    # Redirect guard — 2026-06 incident: TSUSA renumbered its category
-    # IDs and the old URLs 301'd to OTHER calibers' pages with a 200,
-    # so the caliber gate silently saved zero for 9 of 10 calibers.
-    # A category URL that navigates anywhere but itself is the wrong
-    # page; skip loudly so the failure shows up in the run log.
-    requested_path = url.split('?')[0].lower()
-    landed_path = page.url.split('?')[0].lower()
-    if landed_path != requested_path:
+        return 0, 0, True
+    # Redirect guard (shared scraper_lib.category_redirected as of the
+    # 2026-06-14 caliber-paths migration) — 2026-06 incident: TSUSA
+    # renumbered its category IDs and the old URLs 301'd to OTHER
+    # calibers' pages with a 200, so the caliber gate silently saved
+    # zero for 9 of 10 calibers. A category URL that navigates anywhere
+    # but itself is the wrong page; skip loudly so the failure shows up
+    # in the run log and feeds the storefront-drift guardrail.
+    if category_redirected(url, page.url):
         print(f"  REDIRECTED to {page.url} - category ID likely renumbered "
               f"again; skipping this page instead of scraping wrong ammo.")
-        return 0, 0
+        return 0, 0, True
     print("  Waiting for products to load...")
     time.sleep(20)
 
     products = page.query_selector_all('li a[href*="-p-"]')
     print(f"  Found {len(products)} candidate links")
     if not products:
-        return 0, 0
+        return 0, 0, True
 
     saved = 0
     skipped = 0
@@ -266,7 +260,7 @@ def scrape_category_page(page, url, caliber_norm, caliber_display, retailer_id, 
             print(f"  Skipped: {e}")
             continue
 
-    return saved, skipped
+    return saved, skipped, False
 
 
 def scrape():
@@ -280,6 +274,7 @@ def scrape():
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
+    empty_handles = []  # (caliber, url) for the storefront-drift guardrail
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -290,13 +285,17 @@ def scrape():
 
         for caliber_norm in CALIBER_PATHS:
             caliber_display = CALIBERS[caliber_norm]
-            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids)
+            saved, skipped = scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids, empty_handles)
             total_saved += saved
             total_skipped += skipped
 
         browser.close()
 
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail + freshness honesty (NEW 2026-06-14,
+    # expansion #4 Step-2 — TSUSA had a redirect guard but no empty-fail
+    # or had_success before).
+    report_empty_first_pages(empty_handles, 'Target Sports USA')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
 if __name__ == '__main__':
