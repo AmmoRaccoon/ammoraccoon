@@ -6,47 +6,25 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type as _shared_bullet_type, parse_brand, mark_retailer_scraped, normalize_caliber, insert_price_history
+from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type as _shared_bullet_type, parse_brand, mark_retailer_scraped, normalize_caliber, insert_price_history, load_caliber_paths, category_redirected, report_empty_first_pages
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 RETAILER_ID = 11
 SITE_BASE = "https://aeammo.com"
 
-# AE Ammo (BigCommerce) restructured the storefront on or before
-# 2026-05-09. Sitemap (xmlsitemap.php?type=categories) was the
-# source of truth at audit time (currently also 404). Of the
-# original 10 caliber paths, 7 had drifted to 404; 5 are
-# recoverable here via slug rename. One caliber remains dropped:
-#   - 40sw: real product-line absence (no slug, no sitemap entry,
-#     no filter facet on /Ammo/Handgun-Ammo).
-# 22lr is recovered (2026-05-11) via the parent-URL pattern: the
-# /Ammo/Rimfire-Ammo category lists 22 LR alongside 22 WMR / 22
-# Short / 22 CB. We point CALIBER_PATHS['22lr'] at the parent and
-# let normalize_caliber() in the card loop drop the non-22LR
-# rimfire SKUs. The BigCommerce filter URL ?Caliber=22LR still
-# returns 403 to bots — the category URL above is the only viable
-# handle. The 5.56 leg of 223-556 is recovered; the .223 Rem leg
-# has no category page either, and is filter-only (also 403).
-# PARKED 2026-06-12 — genuine catalog absence, not URL drift (first
-# catches of the new per-caliber zero-coverage alert; probe:
-# scripts/_probe_aeammo_ga_triage.py). Both category pages are alive
-# (200, no redirect, correct titles, still linked from the rifle nav)
-# but render ZERO product cards, and the /Ammo/Rifle-Ammo caliber
-# facet panel — which BigCommerce only populates for calibers with
-# >= 1 product — lists neither cartridge. AE simply has no .308 Win
-# or 7.62x39 product right now. Re-add when the facet reappears:
-#   '308win':  ['/Ammo/Rifle-Ammo/308-Win-Ammo'],
-#   '762x39':  ['/Ammo/Rifle-Ammo/7.62x39-Ammo'],
-CALIBER_PATHS = {
-    '9mm':     ['/Ammo/Handgun-Ammo/9mm-Ammo'],
-    '380acp':  ['/Ammo/Handgun-Ammo/380-Acp-Ammo'],
-    '38spl':   ['/Ammo/Handgun-Ammo/38-Special-Ammo'],
-    '357mag':  ['/Ammo/Handgun-Ammo/357-Magnum-Ammo'],
-    '22lr':    ['/Ammo/Rimfire-Ammo'],
-    '223-556': ['/Ammo/Rifle-Ammo/556-Nato-Ammo'],
-    '300blk':  ['/Ammo/Rifle-Ammo/300-Blackout'],
-}
+# Per-caliber category paths now live in caliber_paths/aeammo.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. entry['url'] is a drop-in for the old path string.
+# BigCommerce stencil. 22lr points at the /Ammo/Rimfire-Ammo PARENT
+# (lists 22 WMR/Short/CB alongside 22 LR); the card loop drops off-
+# caliber SKUs via normalize_caliber() at runtime. The .223 Rem leg of
+# 223-556 has no category page (filter-only, 403), so only the 5.56 leg
+# is configured. 308win + 762x39 are status=parked in the config
+# (genuine catalog absence, PARKED 2026-06-12 — not URL drift); the
+# loader returns active-only so they are not fetched, and their recovery
+# slugs are preserved in the config for re-activation.
+CALIBER_PATHS = load_caliber_paths('aeammo')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -116,7 +94,8 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
     products = []
     flags = []
 
-    for handle in CALIBER_PATHS[caliber_norm]:
+    for entry in CALIBER_PATHS[caliber_norm]:
+        handle = entry['url']
         base = SITE_BASE + handle
         page_num = 1
         empty_first_page = False
@@ -139,6 +118,14 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     empty_first_page = True
                     print(f"  WARN: AE Ammo collection {handle} returned "
                           f"zero products on first page (caliber {caliber_norm}).")
+                break
+            # Redirect guard (NEW 2026-06-14, expansion #4 Step-2): a
+            # category that 200s but lands on a DIFFERENT page (the TSUSA
+            # renumber trap) is skipped loudly and counts as an empty
+            # first page, feeding the storefront-drift guardrail.
+            if page_num == 1 and category_redirected(url, page.url):
+                print(f"  REDIRECTED to {page.url} - skipping (category moved/renamed).")
+                empty_first_page = True
                 break
             await page.wait_for_timeout(4000)
 
@@ -277,30 +264,16 @@ async def scrape():
 
         print(f"\nTotal scraped: {len(all_products)}")
 
-        # Storefront-drift guardrail. A single transient empty handle
-        # is fine; three or more is a strong signal that AE Ammo
-        # renamed collection paths and the scraper is silently
-        # producing partial data (the exact symptom that hid 7 of 10
-        # calibers from the DB until the 2026-05-09 audit). Exit
-        # non-zero so CI runs go red, and skip the upsert step so
-        # partial data doesn't replace good rows. Note: 308win and
-        # 762x39 currently render zero products (correct slug, no
-        # inventory) — that's 2 baseline empties, leaving 1 unit of
-        # headroom before the guardrail trips.
-        EMPTY_FAIL_THRESHOLD = 3
-        if len(empty_handles) >= EMPTY_FAIL_THRESHOLD:
-            print(f"\nFAIL: {len(empty_handles)} AE Ammo collections returned "
-                  f"zero products on first page — likely storefront drift:")
-            for cal, h in empty_handles:
-                print(f"  - {cal}: AE Ammo collection {h} returned zero products on first page")
-            sys.exit(1)
-        elif empty_handles:
-            print(f"\nWARN: {len(empty_handles)} AE Ammo collection(s) returned "
-                  f"zero products on first page (transient or worth investigating):")
-            for cal, h in empty_handles:
-                print(f"  - {cal}: AE Ammo collection {h} returned zero products on first page")
+        # Storefront-drift guardrail (centralized 2026-06-14, expansion
+        # #4 Step-2 — was an inline EMPTY_FAIL_THRESHOLD block): >= 3
+        # collections empty on first page exits non-zero (CI red) and
+        # skips the upsert + freshness bump so partial data can't replace
+        # good rows and /status can't falsely advertise a fresh scrape.
+        # 308win + 762x39 are now status=parked in the config, so they no
+        # longer fetch or count as baseline empties.
+        report_empty_first_pages(empty_handles, 'AE Ammo')
 
-        mark_retailer_scraped(supabase, RETAILER_ID)
+        mark_retailer_scraped(supabase, RETAILER_ID, had_success=(len(all_products) > 0))
 
         if not all_products:
             print("Nothing to upsert.")
