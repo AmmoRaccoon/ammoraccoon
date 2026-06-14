@@ -1,13 +1,17 @@
 import os
 import re
-import sys
 import time
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand, sanity_check_ppr, parse_bullet_type, parse_bullet_type_with_url_fallback, mark_retailer_scraped, insert_price_history
+from scraper_lib import (
+    CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand,
+    sanity_check_ppr, parse_bullet_type, parse_bullet_type_with_url_fallback,
+    mark_retailer_scraped, insert_price_history,
+    load_caliber_paths, category_redirected, report_empty_first_pages,
+)
 
 load_dotenv()
 
@@ -18,27 +22,15 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 RETAILER_SLUG = "lucky-gunner"
 SITE_BASE = "https://www.luckygunner.com"
 
-# Lucky Gunner caliber category paths. Values are lists because some
-# calibers map to multiple categories — Lucky Gunner splits .223 and
-# 5.56 into separate collection pages, mirroring the TrueShot pattern.
-# Five entries below were renamed during a 2026-05-09-or-earlier
-# storefront restructure: the prior values silently 404'd and produced
-# empty pages until the audit on 2026-05-09 caught the absence (5 of
-# 10 configured URLs were dead, exact-match to the 5 missing calibers
-# in the DB).
-CALIBER_PATHS = {
-    '9mm':     ['/handgun/9mm-ammo?show=100'],
-    '380acp':  ['/handgun/380-auto-ammo?show=100'],
-    '40sw':    ['/handgun/40-s-w-ammo?show=100'],
-    '38spl':   ['/handgun/38-special-ammo?show=100'],
-    '357mag':  ['/handgun/357-magnum-ammo?show=100'],
-    '22lr':    ['/rimfire/22-lr-ammo?show=100'],
-    '223-556': ['/rifle/223-remington-ammo?show=100',
-                '/rifle/5.56x45-ammo?show=100'],
-    '308win':  ['/rifle/308-ammo?show=100'],
-    '762x39':  ['/rifle/7.62x39mm-ammo?show=100'],
-    '300blk':  ['/rifle/300-blackout-ammo?show=100'],
-}
+# Per-caliber category URLs now live in caliber_paths/luckygunner.json
+# (expansion #4 Step-2 migration) — transcribed verbatim, parity-proven
+# byte-identical. Values are LISTS because Lucky Gunner splits .223 and
+# 5.56 into separate collection pages; both bucket to 223-556 via
+# normalize_caliber and seen_ids dedups cross-listed SKUs. Each inline
+# value carried its '?show=100' paging suffix inline; stored split into
+# path + query in the config. entry['url'] is a drop-in for the old
+# SITE_BASE + handle string.
+CALIBER_PATHS = load_caliber_paths('luckygunner')
 
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
@@ -102,7 +94,8 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
     skipped = 0
     flags = []
 
-    for handle in CALIBER_PATHS[caliber_norm]:
+    for entry in CALIBER_PATHS[caliber_norm]:
+        handle = entry['url']
         url = SITE_BASE + handle
         empty_first_page = False
         print(f"\n[{caliber_norm}/{handle}] Loading: {url}")
@@ -115,6 +108,17 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
             continue
         if resp and resp.status >= 400:
             print(f"  HTTP {resp.status} — handle unreachable.")
+            print(f"  WARN: Lucky Gunner collection {handle} returned "
+                  f"zero products on first page (caliber {caliber_norm}).")
+            empty_first_page = True
+            flags.append((handle, empty_first_page))
+            continue
+        # Redirect guard (NEW 2026-06-14, expansion #4 Step-2 — Lucky
+        # Gunner had none before): a collection that 301s to a DIFFERENT
+        # page with HTTP 200 is the wrong-caliber trap; skip loudly and
+        # count it as an empty handle so the drift guardrail sees it.
+        if category_redirected(url, page.url):
+            print(f"  REDIRECTED to {page.url} - skipping (collection moved/renamed).")
             print(f"  WARN: Lucky Gunner collection {handle} returned "
                   f"zero products on first page (caliber {caliber_norm}).")
             empty_first_page = True
@@ -282,25 +286,14 @@ def scrape():
 
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
 
-    # Storefront-drift guardrail. A single transient empty handle is
-    # fine; three or more is a strong signal that Lucky Gunner renamed
-    # collection paths and the scraper is silently producing partial
-    # data (the exact symptom that hid 5 of 10 calibers from the DB
-    # until the 2026-05-09 audit). Exit non-zero so CI runs go red.
-    EMPTY_FAIL_THRESHOLD = 3
-    if len(empty_handles) >= EMPTY_FAIL_THRESHOLD:
-        print(f"\nFAIL: {len(empty_handles)} Lucky Gunner collections returned "
-              f"zero products on first page — likely storefront drift:")
-        for cal, h in empty_handles:
-            print(f"  - {cal}: Lucky Gunner collection {h} returned zero products on first page")
-        sys.exit(1)
-    elif empty_handles:
-        print(f"\nWARN: {len(empty_handles)} Lucky Gunner collection(s) returned "
-              f"zero products on first page (transient or worth investigating):")
-        for cal, h in empty_handles:
-            print(f"  - {cal}: Lucky Gunner collection {h} returned zero products on first page")
-
-    mark_retailer_scraped(supabase, retailer_id)
+    # Storefront-drift guardrail (centralized scraper_lib.report_empty_first_pages
+    # as of the 2026-06-14 caliber-paths migration; replaces the inline
+    # EMPTY_FAIL_THRESHOLD block). >= 3 empty handles is a strong signal
+    # Lucky Gunner renamed collection paths and the scraper is silently
+    # producing partial data (the symptom that hid 5 of 10 calibers
+    # until the 2026-05-09 audit); it sys.exit(1)s so CI goes red.
+    report_empty_first_pages(empty_handles, 'Lucky Gunner')
+    mark_retailer_scraped(supabase, retailer_id, had_success=(total_saved > 0))
 
 if __name__ == '__main__':
     scrape()

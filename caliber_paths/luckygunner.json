@@ -1,0 +1,23 @@
+{
+  "retailer": "luckygunner",
+  "retailer_slug": "lucky-gunner",
+  "platform": "custom",
+  "base": "https://www.luckygunner.com",
+  "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list[str]). Transcribed verbatim from scraper_luckygunner.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. Each inline value carried its '?show=100' paging suffix inline; stored here split into path + query so the redirect guard can ignore the query. 223-556 splits upstream into two collection pages (.223 Rem + 5.56x45), both bucket to 223-556 via normalize_caliber and seen_ids dedups cross-listed SKUs. Platform family not positively classified, labelled 'custom' (honest-by-default, not load-bearing). Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
+  "discovery": { "method": "manual" },
+  "calibers": {
+    "9mm": [ { "path": "/handgun/9mm-ammo", "query": "show=100", "status": "active" } ],
+    "380acp": [ { "path": "/handgun/380-auto-ammo", "query": "show=100", "status": "active" } ],
+    "40sw": [ { "path": "/handgun/40-s-w-ammo", "query": "show=100", "status": "active" } ],
+    "38spl": [ { "path": "/handgun/38-special-ammo", "query": "show=100", "status": "active" } ],
+    "357mag": [ { "path": "/handgun/357-magnum-ammo", "query": "show=100", "status": "active" } ],
+    "22lr": [ { "path": "/rimfire/22-lr-ammo", "query": "show=100", "status": "active" } ],
+    "223-556": [
+      { "path": "/rifle/223-remington-ammo", "query": "show=100", "status": "active" },
+      { "path": "/rifle/5.56x45-ammo", "query": "show=100", "status": "active" }
+    ],
+    "308win": [ { "path": "/rifle/308-ammo", "query": "show=100", "status": "active" } ],
+    "762x39": [ { "path": "/rifle/7.62x39mm-ammo", "query": "show=100", "status": "active" } ],
+    "300blk": [ { "path": "/rifle/300-blackout-ammo", "query": "show=100", "status": "active" } ]
+  }
+}
