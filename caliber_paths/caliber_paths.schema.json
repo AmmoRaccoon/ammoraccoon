@@ -23,6 +23,27 @@
         "category_url_pattern": { "type": "string", "description": "Regex signature that distinguishes a caliber category URL in the sitemap (e.g. '-c-\\d+\\.aspx')." }
       }
     },
+    "fetch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "description": "How the Step-3 VALIDATION HARNESS must fetch this retailer's pages — the real fetch environment, a DIFFERENT axis from `platform` (which is the discovery axis). Backfilled once per retailer from the scraper. The Wideners trap (200 on a naive probe, walled on the real run) is why this is explicit, not inferred: the harness's adapter library replicates `mode` + the wall flags so a walled retailer is validated THROUGH the wall, not around it.",
+      "properties": {
+        "mode": { "enum": ["requests", "playwright-sync", "playwright-async"], "description": "The fetch primitive the scraper uses." },
+        "stealth": { "type": "boolean", "description": "true when the scraper uses playwright_stealth (e.g. sportsmansguide)." },
+        "fresh_context_per_request": { "type": "boolean", "description": "true when the scraper opens a fresh browser context per page to beat a Cloudflare session throttle (e.g. gunbuyer, wideners)." },
+        "user_agent": { "type": "string", "description": "Optional UA override when the scraper sets a non-default one." }
+      }
+    },
+    "selectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "DOM extraction selectors for the deep gates (4: product-title gate-pass %, 5: n_products) on Playwright/DOM retailers. Omitted for requests-Shopify retailers (products come structured from /products.json). Backfilled from the scraper; a parity test guards drift between the scraper's real selectors and these.",
+      "properties": {
+        "product_card": { "type": "string", "description": "Selector matching one product card on a category page (e.g. '.productGrid article.card')." },
+        "product_title": { "type": "string", "description": "Selector for the product title within a card (e.g. 'h4.card-title a'), fed to normalize_caliber for the gate-pass measurement." }
+      }
+    },
     "calibers": {
       "type": "object",
       "description": "registry caliber slug -> LIST of category-URL entries. Always a list: one combined caliber can split into several upstream pages (.223 Rem + 5.56 NATO).",

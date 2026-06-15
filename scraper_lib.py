@@ -1472,6 +1472,8 @@ _CALIBER_PATHS_DIR = os.path.join(
 
 _CALIBER_PATH_STATUSES = ('active', 'candidate', 'parked')
 
+_CALIBER_PATH_FETCH_MODES = ('requests', 'playwright-sync', 'playwright-async')
+
 
 def _validate_entry_list(entries, label, bad):
     """Validate a list of path entries — used for both a caliber's URL list
@@ -1525,6 +1527,37 @@ def _validate_caliber_paths_cfg(cfg, retailer):
             _validate_entry_list(entries, f"calibers['{cal}']", bad)
     if parents is not None:
         _validate_entry_list(parents, 'parent_paths', bad)
+
+    # Optional Step-3 (validation harness) blocks. Absent on every config
+    # until the per-retailer backfill; validated here so a malformed block
+    # fails loudly at scrape time too. `fetch` declares the real fetch
+    # environment (the discovery-vs-fetch axis split); `selectors` carries
+    # the DOM extraction selectors for the deep gates on Playwright retailers.
+    fetch_cfg = cfg.get('fetch')
+    if fetch_cfg is not None:
+        if not isinstance(fetch_cfg, dict):
+            bad("'fetch' must be an object")
+        if fetch_cfg.get('mode') not in _CALIBER_PATH_FETCH_MODES:
+            bad(f"fetch.mode must be one of {_CALIBER_PATH_FETCH_MODES}, "
+                f"got {fetch_cfg.get('mode')!r}")
+        for flag in ('stealth', 'fresh_context_per_request'):
+            if fetch_cfg.get(flag) is not None and not isinstance(fetch_cfg.get(flag), bool):
+                bad(f"fetch.{flag} must be a boolean")
+        if fetch_cfg.get('user_agent') is not None and not isinstance(fetch_cfg.get('user_agent'), str):
+            bad("fetch.user_agent must be a string")
+        for k in fetch_cfg:
+            if k not in ('mode', 'stealth', 'fresh_context_per_request', 'user_agent'):
+                bad(f"fetch has unknown key {k!r}")
+
+    selectors_cfg = cfg.get('selectors')
+    if selectors_cfg is not None:
+        if not isinstance(selectors_cfg, dict):
+            bad("'selectors' must be an object")
+        for k, v in selectors_cfg.items():
+            if k not in ('product_card', 'product_title'):
+                bad(f"selectors has unknown key {k!r}")
+            if not isinstance(v, str):
+                bad(f"selectors.{k} must be a string")
 
 
 def _build_entry(e):
