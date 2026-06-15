@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import urllib.request
 import json
 from datetime import datetime
@@ -11,6 +12,7 @@ from scraper_lib import (
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
     mark_retailer_scraped,
+    load_caliber_paths,
 )
 
 load_dotenv()
@@ -26,23 +28,18 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
-# Shopify exposes a per-collection JSON feed at
-# /collections/<handle>/products.json that returns title, vendor,
-# variants[].price/sku/available, etc. — far cleaner than DOM-scraping
-# Fenix's theme (which renders two anchors per product, the second
-# being a Yotpo rating widget that confuses card-based selectors).
-# Verified 2026-04-26: the endpoint is open with no auth.
-#
-# Fenix is a Michigan competition / defensive manufacturer that does
-# not produce rimfire (.22 LR), revolver rounds (.38 Spl, .357 Mag),
-# .308 Win, or 7.62x39, so those slugs are omitted (would 404).
-CALIBER_PATHS = {
-    '9mm':     '/collections/9mm/products.json',
-    '380acp':  '/collections/380-acp/products.json',
-    '40sw':    '/collections/40-s-w/products.json',
-    '223-556': '/collections/223-5-56/products.json',
-    '300blk':  '/collections/300blk/products.json',
-}
+# Per-caliber Shopify collection paths now live in caliber_paths/fenix.json
+# (expansion #4 Step-2 migration) — migrated from the inline dict, parity-
+# proven byte-identical (fetched URL). Per the blackbasin precedent the
+# config stores the HTML category path '/collections/<handle>' and the
+# scraper appends '/products.json' at runtime (the old literal embedded the
+# suffix). REQUESTS-BASED (Shopify /products.json via urllib — no browser),
+# so loader-only + no shared Playwright guards; a NEW blackbasin-style
+# loud-failure guard is added in scrape() below (fenix previously had none).
+# Fenix is a Michigan competition / defensive manufacturer that does not
+# produce rimfire (.22 LR), revolver rounds (.38 Spl, .357 Mag), .308 Win,
+# or 7.62x39, so those calibers are absent by design (would 404).
+CALIBER_PATHS = load_caliber_paths('fenix')
 
 
 def get_retailer_id():
@@ -99,8 +96,14 @@ def parse_country(text):
 
 
 def fetch_products_json(path):
-    """GET /<path> as JSON. Returns the products list or [] on failure."""
-    url = SITE_BASE + path
+    """GET <path>/products.json as JSON. Returns (products, ok). ok is
+    False when the request failed to load (404/timeout/etc.) — the
+    loud-failure guard in scrape() uses it so a wholesale Shopify
+    migration that 404s every collection fails the run loudly instead of
+    silently saving zero (fenix previously had NO such guard). The config
+    stores the '/collections/<handle>' path; the '/products.json' suffix
+    is appended here at runtime (blackbasin precedent)."""
+    url = f"{SITE_BASE}{path}/products.json"
     req = urllib.request.Request(url, headers={
         'User-Agent': USER_AGENT,
         'Accept': 'application/json',
@@ -108,16 +111,18 @@ def fetch_products_json(path):
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read())
-        return data.get('products', []) or []
+        return data.get('products', []) or [], True
     except Exception as e:
         print(f"  fetch failed for {url}: {e}")
-        return []
+        return [], False
 
 
-def scrape_caliber(caliber_norm, caliber_display, retailer_id, seen_ids, counts):
-    path = CALIBER_PATHS[caliber_norm]
-    print(f"\n[{caliber_norm}] GET {path}")
-    products = fetch_products_json(path)
+def scrape_caliber(path, caliber_norm, caliber_display, retailer_id, seen_ids, counts):
+    print(f"\n[{caliber_norm}] GET {path}/products.json")
+    products, ok = fetch_products_json(path)
+    if not ok:
+        print(f"  FAILED to load {path}")
+        return 0, 0, False
     print(f"  {len(products)} products in feed")
     saved = 0
     skipped = 0
@@ -230,34 +235,54 @@ def scrape_caliber(caliber_norm, caliber_display, retailer_id, seen_ids, counts)
             print(f"  Skipped: {e}")
             continue
 
-    return saved, skipped
+    return saved, skipped, True
 
 
 def scrape():
     print(f"[{datetime.now()}] Starting Fenix Ammunition scraper (calibers Fenix produces)...")
     retailer_id = get_retailer_id()
     if not retailer_id:
-        return
+        return 1
     print(f"Retailer ID: {retailer_id}")
 
     total_saved = 0
     total_skipped = 0
     seen_ids = set()
     counts = {}
+    successful_calibers = 0
 
     for caliber_norm in CALIBER_PATHS:
         caliber_display = CALIBERS[caliber_norm]
-        saved, skipped = scrape_caliber(caliber_norm, caliber_display,
-                                        retailer_id, seen_ids, counts)
-        total_saved += saved
-        total_skipped += skipped
+        caliber_ok = False
+        for entry in CALIBER_PATHS[caliber_norm]:
+            saved, skipped, ok = scrape_caliber(entry['url'], caliber_norm,
+                                                caliber_display, retailer_id,
+                                                seen_ids, counts)
+            total_saved += saved
+            total_skipped += skipped
+            if ok:
+                caliber_ok = True
+        if caliber_ok:
+            successful_calibers += 1
 
-    mark_retailer_scraped(supabase, retailer_id)
     print(f"\nDone! Saved: {total_saved} | Skipped: {total_skipped}")
     print("Per-caliber counts:")
     for cal in CALIBERS:
         print(f"  {cal}: {counts.get(cal, 0)}")
 
+    # Loud-failure guard (NEW 2026-06-14, expansion #4 Step-2 — fenix had
+    # NO drift guard at all before this; this is an ADD, not a swap, per
+    # Jon's call). If every Fenix collection URL failed to load, a
+    # wholesale Shopify migration has broken the storefront: exit non-zero
+    # so CI goes red and last_scraped_at is NOT bumped (mirrors blackbasin).
+    if successful_calibers == 0:
+        print("\nFATAL: every Fenix caliber URL failed to load. "
+              "Site may have moved or migrated again — manual check needed.")
+        return 1
+
+    mark_retailer_scraped(supabase, retailer_id)
+    return 0
+
 
 if __name__ == '__main__':
-    scrape()
+    sys.exit(scrape())
