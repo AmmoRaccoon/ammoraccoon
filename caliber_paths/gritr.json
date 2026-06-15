@@ -4,17 +4,71 @@
   "platform": "bigcommerce",
   "base": "https://www.gritrsports.com",
   "comment": "Expansion #4 Step-2 pilot, shape C (dict->(path, title-regex)). Transcribed VERBATIM from scraper_gritr.py inline CALIBER_PATHS on 2026-06-14 — parity-proven byte-identical (URL set) before flip. The two mixed-caliber category pages carry a title_filter regex (357mag is inside 'other-handgun-calibers' alongside 10mm/.44; 22lr is the all-rimfire page); the loader compiles title_filter with re.IGNORECASE, matching the inline re.compile(..., re.I). Not yet harness-validated; validation booleans null until Step-3. Approved by Jon, Step-2 pilot, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/shooting/ammunition/handgun-ammo/9mm-luger-ammo/", "status": "active" } ],
-    "380acp": [ { "path": "/shooting/ammunition/handgun-ammo/380-auto-ammo/", "status": "active" } ],
-    "40sw": [ { "path": "/shooting/ammunition/handgun-ammo/40-s-w-ammo/", "status": "active" } ],
-    "38spl": [ { "path": "/shooting/ammunition/handgun-ammo/38-specials-ammo/", "status": "active" } ],
-    "357mag": [ { "path": "/shooting/ammunition/handgun-ammo/other-handgun-calibers/", "status": "active", "title_filter": "\\b357\\b|\\.357\\b" } ],
-    "22lr": [ { "path": "/shooting/ammunition/rimfire-ammo/", "status": "active", "title_filter": "\\b22\\s*(?:LR|long\\s*rifle)\\b|\\.22\\s*LR\\b|22LR" } ],
-    "223-556": [ { "path": "/shooting/ammunition/rifle-ammo/223-ammo/", "status": "active" } ],
-    "308win": [ { "path": "/shooting/ammunition/rifle-ammo/308-7-62x51-ammo/", "status": "active" } ],
-    "762x39": [ { "path": "/shooting/ammunition/rifle-ammo/7-62x39-ammo/", "status": "active" } ],
-    "300blk": [ { "path": "/shooting/ammunition/rifle-ammo/300-aac-blackout/", "status": "active" } ]
+    "9mm": [
+      {
+        "path": "/shooting/ammunition/handgun-ammo/9mm-luger-ammo/",
+        "status": "active"
+      }
+    ],
+    "380acp": [
+      {
+        "path": "/shooting/ammunition/handgun-ammo/380-auto-ammo/",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/shooting/ammunition/handgun-ammo/40-s-w-ammo/",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/shooting/ammunition/handgun-ammo/38-specials-ammo/",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/shooting/ammunition/handgun-ammo/other-handgun-calibers/",
+        "status": "active",
+        "title_filter": "\\b357\\b|\\.357\\b"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/shooting/ammunition/rimfire-ammo/",
+        "status": "active",
+        "title_filter": "\\b22\\s*(?:LR|long\\s*rifle)\\b|\\.22\\s*LR\\b|22LR"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/shooting/ammunition/rifle-ammo/223-ammo/",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/shooting/ammunition/rifle-ammo/308-7-62x51-ammo/",
+        "status": "active"
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/shooting/ammunition/rifle-ammo/7-62x39-ammo/",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/shooting/ammunition/rifle-ammo/300-aac-blackout/",
+        "status": "active"
+      }
+    ]
   }
 }

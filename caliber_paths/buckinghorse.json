@@ -4,17 +4,69 @@
   "platform": "bigcommerce",
   "base": "https://buckinghorseoutpost.com",
   "comment": "Expansion #4 Step-2 fan-out, shape A (dict->str). Transcribed verbatim from scraper_buckinghorse.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/9mm/", "status": "active" } ],
-    "380acp": [ { "path": "/380-auto/", "status": "active" } ],
-    "40sw": [ { "path": "/40-s-w/", "status": "active" } ],
-    "38spl": [ { "path": "/38-special/", "status": "active" } ],
-    "357mag": [ { "path": "/357-magnum/", "status": "active" } ],
-    "22lr": [ { "path": "/22-lr/", "status": "active" } ],
-    "223-556": [ { "path": "/223-remington/", "status": "active" } ],
-    "308win": [ { "path": "/308-winchester/", "status": "active" } ],
-    "762x39": [ { "path": "/7-62x39mm/", "status": "active" } ],
-    "300blk": [ { "path": "/300-aac-blackout/", "status": "active" } ]
+    "9mm": [
+      {
+        "path": "/9mm/",
+        "status": "active"
+      }
+    ],
+    "380acp": [
+      {
+        "path": "/380-auto/",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/40-s-w/",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/38-special/",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/357-magnum/",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/22-lr/",
+        "status": "active"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/223-remington/",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/308-winchester/",
+        "status": "active"
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/7-62x39mm/",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/300-aac-blackout/",
+        "status": "active"
+      }
+    ]
   }
 }

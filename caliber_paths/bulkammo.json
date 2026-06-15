@@ -3,20 +3,73 @@
   "platform": "magento",
   "base": "https://www.bulkammo.com",
   "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list[str]). Transcribed verbatim from scraper_bulkammo.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. ASYNC-Playwright (async_api); Magento (#catalog-listing li.item cards, ?p= pagination). Scraper keys off RETAILER_ID=14 (no slug lookup). BulkAmmo standardized on leading-period caliber slugs (.380/.40/.357/.223/.300) plus shortened suffixes (-spl/-mag) — preserved EXACTLY. 223-556 splits into .223 + 5.56 categories; both bucket to 223-556, seen_ids dedups overlap. Migration wiring: loader + report_empty_first_pages (swap of the inline EMPTY_FAIL_THRESHOLD block) + category_redirected at page 1 + had_success. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/handgun/bulk-9mm-ammo", "status": "active" } ],
-    "380acp": [ { "path": "/handgun/bulk-.380-acp-ammo", "status": "active" } ],
-    "40sw": [ { "path": "/handgun/bulk-.40-s-w-ammo", "status": "active" } ],
-    "38spl": [ { "path": "/handgun/bulk-.38-spl-ammo", "status": "active" } ],
-    "357mag": [ { "path": "/handgun/bulk-.357-mag-ammo", "status": "active" } ],
-    "22lr": [ { "path": "/rimfire/bulk-.22-lr-ammo", "status": "active" } ],
-    "223-556": [
-      { "path": "/rifle/bulk-.223-ammo", "status": "active" },
-      { "path": "/rifle/bulk-5.56x45-ammo", "status": "active" }
+    "9mm": [
+      {
+        "path": "/handgun/bulk-9mm-ammo",
+        "status": "active"
+      }
     ],
-    "308win": [ { "path": "/rifle/bulk-.308-win-ammo", "status": "active" } ],
-    "762x39": [ { "path": "/rifle/bulk-7.62x39mm-ammo", "status": "active" } ],
-    "300blk": [ { "path": "/rifle/bulk-.300-aac-blackout-ammo", "status": "active" } ]
+    "380acp": [
+      {
+        "path": "/handgun/bulk-.380-acp-ammo",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/handgun/bulk-.40-s-w-ammo",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/handgun/bulk-.38-spl-ammo",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/handgun/bulk-.357-mag-ammo",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/rimfire/bulk-.22-lr-ammo",
+        "status": "active"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/rifle/bulk-.223-ammo",
+        "status": "active"
+      },
+      {
+        "path": "/rifle/bulk-5.56x45-ammo",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/rifle/bulk-.308-win-ammo",
+        "status": "active"
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/rifle/bulk-7.62x39mm-ammo",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/rifle/bulk-.300-aac-blackout-ammo",
+        "status": "active"
+      }
+    ]
   }
 }

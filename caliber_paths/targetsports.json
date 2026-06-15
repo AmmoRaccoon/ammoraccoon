@@ -18,7 +18,16 @@
         "expect_landed": "/9mm-luger-ammo-c-51.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null, "note": "Re-harvested + dry-run-verified in the 2026-06-12 TSUSA category-renumber fix (commit e9d7c98). Per-URL gate% / n_products were not recorded then; the Step-3 harness populates measured values on first validation run." },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null,
+          "note": "Re-harvested + dry-run-verified in the 2026-06-12 TSUSA category-renumber fix (commit e9d7c98). Per-URL gate% / n_products were not recorded then; the Step-3 harness populates measured values on first validation run."
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -31,7 +40,15 @@
         "expect_landed": "/380-acp-auto-ammo-c-50.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -44,7 +61,15 @@
         "expect_landed": "/40-sw-ammo-c-59.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -57,7 +82,15 @@
         "expect_landed": "/38-special-ammo-c-56.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -70,7 +103,15 @@
         "expect_landed": "/357-magnum-ammo-c-57.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -83,7 +124,15 @@
         "expect_landed": "/22-long-rifle-ammo-c-202.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -96,7 +145,16 @@
         "expect_landed": "/223-remington-ammo-c-83.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null, "note": "Upstream split: .223 Rem and 5.56 NATO are separate TSUSA category pages; both bucket to 223-556 via normalize_caliber, and the run-global seen_ids set dedups any SKU cross-listed on both." },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null,
+          "note": "Upstream split: .223 Rem and 5.56 NATO are separate TSUSA category pages; both bucket to 223-556 via normalize_caliber, and the run-global seen_ids set dedups any SKU cross-listed on both."
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       },
@@ -107,7 +165,15 @@
         "expect_landed": "/556mm-nato-ammo-c-2719.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -120,7 +186,16 @@
         "expect_landed": "/308-winchester-ammo-c-101.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null, "note": "Upstream split: .308 Win and 7.62x51 NATO are separate TSUSA category pages; both bucket to 308win via normalize_caliber; seen_ids dedups cross-listed SKUs." },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null,
+          "note": "Upstream split: .308 Win and 7.62x51 NATO are separate TSUSA category pages; both bucket to 308win via normalize_caliber; seen_ids dedups cross-listed SKUs."
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       },
@@ -131,7 +206,15 @@
         "expect_landed": "/762x51mm-nato-ammo-c-2720.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -144,7 +227,15 @@
         "expect_landed": "/762x39mm-ammo-c-108.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
@@ -157,7 +248,15 @@
         "expect_landed": "/300-aac-blackout-ammo-c-969.aspx",
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
-        "validation": { "method": "manual-dryrun", "validated_at": "2026-06-12", "status": 200, "redirect": false, "title_match": true, "gate_pass_pct": null, "n_products": null },
+        "validation": {
+          "method": "manual-dryrun",
+          "validated_at": "2026-06-12",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": null,
+          "n_products": null
+        },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }

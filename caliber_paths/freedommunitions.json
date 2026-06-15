@@ -3,23 +3,77 @@
   "platform": "shopify",
   "base": "https://www.freedommunitions.com",
   "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list of Shopify collection paths). Migrated from scraper_freedommunitions.py inline COLLECTION_HANDLES on 2026-06-14. The inline literal stored BARE collection handles (e.g. 'pistol-9mm'); per the blackbasin precedent (Jon's call, 2026-06-14) the config stores the full '/collections/<handle>' path instead, and the scraper appends '/products.json?...' at runtime — keeping the schema's leading-slash path invariant and one consistent Shopify convention across blackbasin/trueshot/freedommunitions. Parity-proven byte-identical (fetched URL) before flip via _probe_caliber_paths_parity.py with the /collections/ inline prefix. REQUESTS-BASED scraper (Shopify per-collection /products.json feed via urllib — no browser), so it does NOT use the shared Playwright redirect / report_empty_first_pages guards; it keeps its own inline EMPTY_FAIL_THRESHOLD storefront-drift guard. The scraper keys off RETAILER_ID=18 (no slug lookup). 223-556 and 308win each split into two collections (223-remington + 556-nato; 308-winchester + 762x51-nato); seen_ids dedups overlap. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/collections/pistol-9mm", "status": "active" } ],
-    "380acp": [ { "path": "/collections/pistol-380-auto", "status": "active" } ],
-    "40sw": [ { "path": "/collections/pistol-40-sw", "status": "active" } ],
-    "38spl": [ { "path": "/collections/pistol-38-special", "status": "active" } ],
-    "357mag": [ { "path": "/collections/pistol-357-magnum", "status": "active" } ],
-    "22lr": [ { "path": "/collections/rimfire-22-long-rifle", "status": "active" } ],
+    "9mm": [
+      {
+        "path": "/collections/pistol-9mm",
+        "status": "active"
+      }
+    ],
+    "380acp": [
+      {
+        "path": "/collections/pistol-380-auto",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/collections/pistol-40-sw",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/collections/pistol-38-special",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/collections/pistol-357-magnum",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/collections/rimfire-22-long-rifle",
+        "status": "active"
+      }
+    ],
     "223-556": [
-      { "path": "/collections/rifle-223-remington", "status": "active" },
-      { "path": "/collections/rifle-556-nato", "status": "active" }
+      {
+        "path": "/collections/rifle-223-remington",
+        "status": "active"
+      },
+      {
+        "path": "/collections/rifle-556-nato",
+        "status": "active"
+      }
     ],
     "308win": [
-      { "path": "/collections/rifle-308-winchester", "status": "active" },
-      { "path": "/collections/rifle-762x51-nato", "status": "active" }
+      {
+        "path": "/collections/rifle-308-winchester",
+        "status": "active"
+      },
+      {
+        "path": "/collections/rifle-762x51-nato",
+        "status": "active"
+      }
     ],
-    "762x39": [ { "path": "/collections/rifle-762x39", "status": "active" } ],
-    "300blk": [ { "path": "/collections/rifle-300-aac-blackout", "status": "active" } ]
+    "762x39": [
+      {
+        "path": "/collections/rifle-762x39",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/collections/rifle-300-aac-blackout",
+        "status": "active"
+      }
+    ]
   }
 }

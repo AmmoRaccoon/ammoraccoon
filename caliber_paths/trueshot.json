@@ -3,20 +3,73 @@
   "platform": "shopify",
   "base": "https://www.trueshotammo.com",
   "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list of Shopify collection paths). Migrated from scraper_trueshot.py inline COLLECTION_HANDLES on 2026-06-14. The inline literal stored BARE collection handles (e.g. 'ammunition-pistol-ammo-9mm'); per the blackbasin precedent (Jon's call, 2026-06-14) the config stores the full '/collections/<handle>' path instead, and the scraper appends '/products.json?...' at runtime — keeping the schema's leading-slash path invariant and one consistent Shopify convention across blackbasin/trueshot/freedommunitions. Parity-proven byte-identical (fetched URL) before flip via _probe_caliber_paths_parity.py with the /collections/ inline prefix. REQUESTS-BASED scraper (Shopify per-collection /products.json feed via urllib — no browser), so it does NOT use the shared Playwright redirect / report_empty_first_pages guards; it keeps its own inline EMPTY_FAIL_THRESHOLD storefront-drift guard. The scraper keys off RETAILER_ID=15 (no slug lookup). .223 and 5.56 live in two separate collections, both bucket to 223-556; seen_ids dedups overlap. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/collections/ammunition-pistol-ammo-9mm", "status": "active" } ],
-    "380acp": [ { "path": "/collections/ammunition-pistol-ammo-380-auto", "status": "active" } ],
-    "40sw": [ { "path": "/collections/ammunition-pistol-ammo-40-sw", "status": "active" } ],
-    "38spl": [ { "path": "/collections/ammunition-pistol-ammo-38-special", "status": "active" } ],
-    "357mag": [ { "path": "/collections/ammunition-pistol-ammo-357-magnum", "status": "active" } ],
-    "22lr": [ { "path": "/collections/ammunition-rimfire-ammo-22-long-rifle", "status": "active" } ],
-    "223-556": [
-      { "path": "/collections/ammunition-rifle-ammo-223-rem", "status": "active" },
-      { "path": "/collections/ammunition-rifle-ammo-5-56x45mm", "status": "active" }
+    "9mm": [
+      {
+        "path": "/collections/ammunition-pistol-ammo-9mm",
+        "status": "active"
+      }
     ],
-    "308win": [ { "path": "/collections/ammunition-rifle-ammo-308-win", "status": "active" } ],
-    "762x39": [ { "path": "/collections/ammunition-rifle-ammo-7-62x39", "status": "active" } ],
-    "300blk": [ { "path": "/collections/ammunition-rifle-ammo-300-blackout", "status": "active" } ]
+    "380acp": [
+      {
+        "path": "/collections/ammunition-pistol-ammo-380-auto",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/collections/ammunition-pistol-ammo-40-sw",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/collections/ammunition-pistol-ammo-38-special",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/collections/ammunition-pistol-ammo-357-magnum",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/collections/ammunition-rimfire-ammo-22-long-rifle",
+        "status": "active"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/collections/ammunition-rifle-ammo-223-rem",
+        "status": "active"
+      },
+      {
+        "path": "/collections/ammunition-rifle-ammo-5-56x45mm",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/collections/ammunition-rifle-ammo-308-win",
+        "status": "active"
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/collections/ammunition-rifle-ammo-7-62x39",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/collections/ammunition-rifle-ammo-300-blackout",
+        "status": "active"
+      }
+    ]
   }
 }

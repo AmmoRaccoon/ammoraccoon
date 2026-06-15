@@ -4,12 +4,39 @@
   "platform": "shopify",
   "base": "https://fenixammunition.com",
   "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list of Shopify collection paths). Migrated from scraper_fenix.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical (fetched URL). The inline literal stored the FULL '/collections/<handle>/products.json' path; per the blackbasin precedent (Jon's call, 2026-06-14) the config stores the HTML category path '/collections/<handle>' WITHOUT the suffix and the scraper appends '/products.json' at runtime — uniform with blackbasin/trueshot/freedommunitions and validatable as a real category page by the Step-3 harness. Parity-proven via _probe_caliber_paths_parity.py with the '/products.json' inline-suffix arg (the symmetric twin of the batch-4 inline-prefix). REQUESTS-BASED (Shopify /products.json via urllib — no browser), so loader-only + NO shared Playwright guards. Fenix had NO drift guard at all before this migration; a NEW blackbasin-style loud-failure guard was added (fetch returns (products, ok); successful_calibers==0 -> sys.exit(1)). Scraper keys off RETAILER_SLUG='fenix'. Fenix is a Michigan competition/defensive manufacturer that does not produce rimfire (.22 LR), revolver (.38 Spl/.357 Mag), .308 Win, or 7.62x39, so those calibers are absent by design (would 404). Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/collections/9mm", "status": "active" } ],
-    "380acp": [ { "path": "/collections/380-acp", "status": "active" } ],
-    "40sw": [ { "path": "/collections/40-s-w", "status": "active" } ],
-    "223-556": [ { "path": "/collections/223-5-56", "status": "active" } ],
-    "300blk": [ { "path": "/collections/300blk", "status": "active" } ]
+    "9mm": [
+      {
+        "path": "/collections/9mm",
+        "status": "active"
+      }
+    ],
+    "380acp": [
+      {
+        "path": "/collections/380-acp",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/collections/40-s-w",
+        "status": "active"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/collections/223-5-56",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/collections/300blk",
+        "status": "active"
+      }
+    ]
   }
 }

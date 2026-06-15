@@ -4,17 +4,69 @@
   "platform": "custom",
   "base": "https://www.sgammo.com",
   "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list[str]). Transcribed verbatim from scraper_sgammo.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. SGAmmo runs a bespoke storefront (table.sgammo-product-list__table); platform family not positively classified, labelled 'custom' (honest-by-default, not load-bearing). No caliber splits across collections today, so every list is single-entry, but the per-handle loop relies on the list shape. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/catalog/pistol-ammo-sale/9mm-luger-ammo/", "status": "active" } ],
-    "380acp": [ { "path": "/catalog/pistol-ammo-sale/380-auto-ammo/", "status": "active" } ],
-    "40sw": [ { "path": "/catalog/pistol-ammo-sale/40-cal-ammo/", "status": "active" } ],
-    "38spl": [ { "path": "/catalog/pistol-ammo-sale/38-special-ammo/", "status": "active" } ],
-    "357mag": [ { "path": "/catalog/pistol-ammo-sale/357-magnum-ammo/", "status": "active" } ],
-    "22lr": [ { "path": "/catalog/rimfire-ammo-sale/22-lr-ammo/", "status": "active" } ],
-    "223-556": [ { "path": "/catalog/rifle-ammo-sale/223-556mm-ammo/", "status": "active" } ],
-    "308win": [ { "path": "/catalog/rifle-ammo-sale/308-win-762x51-ammo/", "status": "active" } ],
-    "762x39": [ { "path": "/catalog/rifle-ammo-sale/762x39-ammo/", "status": "active" } ],
-    "300blk": [ { "path": "/catalog/rifle-ammo-sale/300-aac-blackout-ammo/", "status": "active" } ]
+    "9mm": [
+      {
+        "path": "/catalog/pistol-ammo-sale/9mm-luger-ammo/",
+        "status": "active"
+      }
+    ],
+    "380acp": [
+      {
+        "path": "/catalog/pistol-ammo-sale/380-auto-ammo/",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/catalog/pistol-ammo-sale/40-cal-ammo/",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/catalog/pistol-ammo-sale/38-special-ammo/",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/catalog/pistol-ammo-sale/357-magnum-ammo/",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/catalog/rimfire-ammo-sale/22-lr-ammo/",
+        "status": "active"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/catalog/rifle-ammo-sale/223-556mm-ammo/",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/catalog/rifle-ammo-sale/308-win-762x51-ammo/",
+        "status": "active"
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/catalog/rifle-ammo-sale/762x39-ammo/",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/catalog/rifle-ammo-sale/300-aac-blackout-ammo/",
+        "status": "active"
+      }
+    ]
   }
 }

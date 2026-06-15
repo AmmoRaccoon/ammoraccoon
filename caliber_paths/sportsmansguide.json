@@ -4,10 +4,27 @@
   "platform": "custom",
   "base": "https://www.sportsmansguide.com",
   "comment": "Expansion #4 Step-2 fan-out, shape E (list-of-parents with type tags + query strings). Transcribed verbatim from scraper_sportsmansguide.py inline PARENT_PATHS (list of (path, type) tuples) on 2026-06-14, parity-proven byte-identical before flip. SG is a custom storefront (BigRiver/Algolia product IDs) behind a Cloudflare-style anti-bot wall, crawled with playwright_stealth; per-caliber sub-slugs trip the wall, so it crawls three usage-type parent productlist pages and normalize_caliber() buckets each product by title (same approach as firearmsdepot/underwood). The (path, type) tuples become parent_paths entries carrying their `type` tag (handgun/rifle/rimfire), used only as a log label. The d=/c= category facet lives in `query`, stored apart from `path` so the redirect guard ignores it. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "parent_paths": [
-    { "path": "/productlist/ammo/handgun-pistol-ammo", "query": "d=121&c=95", "type": "handgun", "status": "active" },
-    { "path": "/productlist/ammo/rifle-ammo", "query": "d=121&c=96", "type": "rifle", "status": "active" },
-    { "path": "/productlist/ammo/rimfire-ammo", "query": "d=121&c=417", "type": "rimfire", "status": "active" }
+    {
+      "path": "/productlist/ammo/handgun-pistol-ammo",
+      "query": "d=121&c=95",
+      "status": "active",
+      "type": "handgun"
+    },
+    {
+      "path": "/productlist/ammo/rifle-ammo",
+      "query": "d=121&c=96",
+      "status": "active",
+      "type": "rifle"
+    },
+    {
+      "path": "/productlist/ammo/rimfire-ammo",
+      "query": "d=121&c=417",
+      "status": "active",
+      "type": "rimfire"
+    }
   ]
 }

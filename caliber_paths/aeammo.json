@@ -3,16 +3,67 @@
   "platform": "bigcommerce",
   "base": "https://aeammo.com",
   "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list[str]). Transcribed verbatim from scraper_aeammo.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. ASYNC-Playwright (async_api); BigCommerce stencil. Scraper keys off RETAILER_ID=11 (no slug lookup). 22lr points at the /Ammo/Rimfire-Ammo PARENT category (which lists 22 WMR/Short/CB alongside 22 LR); the card loop drops the off-caliber SKUs via normalize_caliber() at runtime — that bucketing is RUNTIME LOGIC, not a per-URL title_filter. The 2 status=parked entries (308win, 762x39) are genuine catalog absence, NOT URL drift: PARKED 2026-06-12 (first catches of the per-caliber zero-coverage alert; probe scripts/_probe_aeammo_ga_triage.py) — both category pages are alive (200, correct title) but render zero product cards and the rifle caliber facet lists neither cartridge; recovery slugs preserved here for re-activation when the facet reappears. Migration wiring: loader + report_empty_first_pages (swap of the inline EMPTY_FAIL_THRESHOLD block) + category_redirected at page 1 + had_success. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/Ammo/Handgun-Ammo/9mm-Ammo", "status": "active" } ],
-    "380acp": [ { "path": "/Ammo/Handgun-Ammo/380-Acp-Ammo", "status": "active" } ],
-    "38spl": [ { "path": "/Ammo/Handgun-Ammo/38-Special-Ammo", "status": "active" } ],
-    "357mag": [ { "path": "/Ammo/Handgun-Ammo/357-Magnum-Ammo", "status": "active" } ],
-    "22lr": [ { "path": "/Ammo/Rimfire-Ammo", "status": "active", "source": "manual: parent rimfire category, bucketed to 22lr by normalize_caliber at runtime" } ],
-    "223-556": [ { "path": "/Ammo/Rifle-Ammo/556-Nato-Ammo", "status": "active", "source": "manual: 5.56 leg only; .223 Rem has no category page (filter-only, 403 to bots)" } ],
-    "300blk": [ { "path": "/Ammo/Rifle-Ammo/300-Blackout", "status": "active" } ],
-    "308win": [ { "path": "/Ammo/Rifle-Ammo/308-Win-Ammo", "status": "parked", "source": "PARKED 2026-06-12: genuine catalog absence (page 200 but zero products; facet lists neither). Re-activate when AE re-stocks." } ],
-    "762x39": [ { "path": "/Ammo/Rifle-Ammo/7.62x39-Ammo", "status": "parked", "source": "PARKED 2026-06-12: genuine catalog absence (page 200 but zero products; facet lists neither). Re-activate when AE re-stocks." } ]
+    "9mm": [
+      {
+        "path": "/Ammo/Handgun-Ammo/9mm-Ammo",
+        "status": "active"
+      }
+    ],
+    "380acp": [
+      {
+        "path": "/Ammo/Handgun-Ammo/380-Acp-Ammo",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/Ammo/Handgun-Ammo/38-Special-Ammo",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/Ammo/Handgun-Ammo/357-Magnum-Ammo",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/Ammo/Rimfire-Ammo",
+        "status": "active",
+        "source": "manual: parent rimfire category, bucketed to 22lr by normalize_caliber at runtime"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/Ammo/Rifle-Ammo/556-Nato-Ammo",
+        "status": "active",
+        "source": "manual: 5.56 leg only; .223 Rem has no category page (filter-only, 403 to bots)"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/Ammo/Rifle-Ammo/300-Blackout",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/Ammo/Rifle-Ammo/308-Win-Ammo",
+        "status": "parked",
+        "source": "PARKED 2026-06-12: genuine catalog absence (page 200 but zero products; facet lists neither). Re-activate when AE re-stocks."
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/Ammo/Rifle-Ammo/7.62x39-Ammo",
+        "status": "parked",
+        "source": "PARKED 2026-06-12: genuine catalog absence (page 200 but zero products; facet lists neither). Re-activate when AE re-stocks."
+      }
+    ]
   }
 }

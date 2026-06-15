@@ -4,17 +4,69 @@
   "platform": "magento",
   "base": "https://www.classicfirearms.com",
   "comment": "Expansion #4 Step-2 fan-out, shape A (dict->str). Transcribed verbatim from scraper_classicfirearms.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. Magento store, pure SSR; per-caliber pages are paginated by the scraper with ?p=N. .38 Special (/38-special/) and .357 (/357/) are SEPARATE dedicated single-caliber pages — NOT a gritr-style mixed page — so there is no per-URL title_filter here. The scraper's runtime _title_names_caliber() dual-caliber honesty guard (CF cross-lists .38 ammo on the .357 page and vice-versa) is unrelated scraping LOGIC and stays in the scraper untouched. 7.62x39 uses the hyphenated slug; the unhyphenated variant 404s. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out (option a), 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/ammo/handgun-ammo/9mm/", "status": "active" } ],
-    "380acp": [ { "path": "/ammo/handgun-ammo/380-acp/", "status": "active" } ],
-    "40sw": [ { "path": "/ammo/handgun-ammo/40sw/", "status": "active" } ],
-    "38spl": [ { "path": "/ammo/handgun-ammo/38-special/", "status": "active" } ],
-    "357mag": [ { "path": "/ammo/handgun-ammo/357/", "status": "active" } ],
-    "22lr": [ { "path": "/ammo/rimfire-ammo/22lr/", "status": "active" } ],
-    "223-556": [ { "path": "/ammo/rifle-ammo/223rem/", "status": "active" } ],
-    "308win": [ { "path": "/ammo/rifle-ammo/308/", "status": "active" } ],
-    "762x39": [ { "path": "/ammo/rifle-ammo/7-62x39/", "status": "active" } ],
-    "300blk": [ { "path": "/ammo/rifle-ammo/300-blackout/", "status": "active" } ]
+    "9mm": [
+      {
+        "path": "/ammo/handgun-ammo/9mm/",
+        "status": "active"
+      }
+    ],
+    "380acp": [
+      {
+        "path": "/ammo/handgun-ammo/380-acp/",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/ammo/handgun-ammo/40sw/",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/ammo/handgun-ammo/38-special/",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/ammo/handgun-ammo/357/",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/ammo/rimfire-ammo/22lr/",
+        "status": "active"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/ammo/rifle-ammo/223rem/",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/ammo/rifle-ammo/308/",
+        "status": "active"
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/ammo/rifle-ammo/7-62x39/",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/ammo/rifle-ammo/300-blackout/",
+        "status": "active"
+      }
+    ]
   }
 }

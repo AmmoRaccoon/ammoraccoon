@@ -4,17 +4,69 @@
   "platform": "woocommerce",
   "base": "https://www.shadowsmith.net",
   "comment": "Expansion #4 Step-2 fan-out, shape A (dict->str). Transcribed verbatim from scraper_shadowsmith.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. WooCommerce store; the canonical host is www.shadowsmith.net (shadowsmithammo.com 301s to it), so base is already the landed host. URL prefix is /product-category/ammunition/filters/caliber-gauge/. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/product-category/ammunition/filters/caliber-gauge/9mm/", "status": "active" } ],
-    "380acp": [ { "path": "/product-category/ammunition/filters/caliber-gauge/380-acp/", "status": "active" } ],
-    "40sw": [ { "path": "/product-category/ammunition/filters/caliber-gauge/40-sw/", "status": "active" } ],
-    "38spl": [ { "path": "/product-category/ammunition/filters/caliber-gauge/38-special/", "status": "active" } ],
-    "357mag": [ { "path": "/product-category/ammunition/filters/caliber-gauge/357-magnum/", "status": "active" } ],
-    "22lr": [ { "path": "/product-category/ammunition/filters/caliber-gauge/22-lr/", "status": "active" } ],
-    "223-556": [ { "path": "/product-category/ammunition/filters/caliber-gauge/223-rem-5-56-nato/", "status": "active" } ],
-    "308win": [ { "path": "/product-category/ammunition/filters/caliber-gauge/308-7-62-nato/", "status": "active" } ],
-    "762x39": [ { "path": "/product-category/ammunition/filters/caliber-gauge/7-62-x-39mm/", "status": "active" } ],
-    "300blk": [ { "path": "/product-category/ammunition/filters/caliber-gauge/300-aac-blackout/", "status": "active" } ]
+    "9mm": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/9mm/",
+        "status": "active"
+      }
+    ],
+    "380acp": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/380-acp/",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/40-sw/",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/38-special/",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/357-magnum/",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/22-lr/",
+        "status": "active"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/223-rem-5-56-nato/",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/308-7-62-nato/",
+        "status": "active"
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/7-62-x-39mm/",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/product-category/ammunition/filters/caliber-gauge/300-aac-blackout/",
+        "status": "active"
+      }
+    ]
   }
 }

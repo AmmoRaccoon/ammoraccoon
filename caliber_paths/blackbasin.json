@@ -4,20 +4,73 @@
   "platform": "shopify",
   "base": "https://blackbasin.com",
   "comment": "Expansion #4 Step-2 fan-out, shape B (dict->list[str]). Transcribed verbatim from scraper_blackbasin.py inline CALIBER_PATHS on 2026-06-14, parity-proven byte-identical before flip. REQUESTS-BASED scraper (Shopify per-collection /products.json feed via urllib — no browser, no page navigation), so it does NOT use the shared Playwright redirect guard or report_empty_first_pages; it keeps its own correct requests-appropriate drift guard (successful_calibers==0 -> fatal return 1). .223 and 5.56 live in two separate Shopify collections; both bucket to 223-556 and seen_ids (variant SKU) dedups cross-listed SKUs. Paths here carry NO /products.json suffix — the scraper appends it. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 fan-out, 2026-06-14.",
-  "discovery": { "method": "manual" },
+  "discovery": {
+    "method": "manual"
+  },
   "calibers": {
-    "9mm": [ { "path": "/collections/9mm-ammo", "status": "active" } ],
-    "380acp": [ { "path": "/collections/380-auto-ammo", "status": "active" } ],
-    "40sw": [ { "path": "/collections/40-sw-ammo", "status": "active" } ],
-    "38spl": [ { "path": "/collections/38-special-ammo", "status": "active" } ],
-    "357mag": [ { "path": "/collections/357-mag-ammo", "status": "active" } ],
-    "22lr": [ { "path": "/collections/22-lr-ammo", "status": "active" } ],
-    "223-556": [
-      { "path": "/collections/223-remington-ammo", "status": "active" },
-      { "path": "/collections/556x45-nato-ammo", "status": "active" }
+    "9mm": [
+      {
+        "path": "/collections/9mm-ammo",
+        "status": "active"
+      }
     ],
-    "308win": [ { "path": "/collections/308-ammo", "status": "active" } ],
-    "762x39": [ { "path": "/collections/762x39mm-ammo", "status": "active" } ],
-    "300blk": [ { "path": "/collections/300-aac-blackout-ammo", "status": "active" } ]
+    "380acp": [
+      {
+        "path": "/collections/380-auto-ammo",
+        "status": "active"
+      }
+    ],
+    "40sw": [
+      {
+        "path": "/collections/40-sw-ammo",
+        "status": "active"
+      }
+    ],
+    "38spl": [
+      {
+        "path": "/collections/38-special-ammo",
+        "status": "active"
+      }
+    ],
+    "357mag": [
+      {
+        "path": "/collections/357-mag-ammo",
+        "status": "active"
+      }
+    ],
+    "22lr": [
+      {
+        "path": "/collections/22-lr-ammo",
+        "status": "active"
+      }
+    ],
+    "223-556": [
+      {
+        "path": "/collections/223-remington-ammo",
+        "status": "active"
+      },
+      {
+        "path": "/collections/556x45-nato-ammo",
+        "status": "active"
+      }
+    ],
+    "308win": [
+      {
+        "path": "/collections/308-ammo",
+        "status": "active"
+      }
+    ],
+    "762x39": [
+      {
+        "path": "/collections/762x39mm-ammo",
+        "status": "active"
+      }
+    ],
+    "300blk": [
+      {
+        "path": "/collections/300-aac-blackout-ammo",
+        "status": "active"
+      }
+    ]
   }
 }
