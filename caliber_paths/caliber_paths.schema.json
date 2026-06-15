@@ -85,7 +85,8 @@
       "description": "Result/provenance of the last validation. Booleans/status reflect known-true facts; measured numerics are null until the Step-3 harness records them (honest-by-default — never invented).",
       "properties": {
         "method": { "type": "string", "description": "manual-dryrun | harness | ..." },
-        "validated_at": { "type": "string", "description": "Date of the validation (YYYY-MM-DD)." },
+        "validated_at": { "type": "string", "description": "When this verdict was established (YYYY-MM-DD or ISO timestamp). Updated only on a CHANGE-of-record (first validation or a verdict change), never on every run — so it stays a sign-off signal, not 2-hourly churn." },
+        "verdict": { "enum": ["PASS", "FAIL", "NEEDS_REVIEW"], "description": "The harness's 5-gate verdict (caliber_validate.evaluate). A RECORDED MEASUREMENT, NOT an actuator: it never flips the entry's `status` (active/candidate/parked). A status change is a SEPARATE human-reviewed diff (propose-never-auto-apply)." },
         "status": { "type": ["integer", "null"], "description": "HTTP status observed (200)." },
         "redirect": { "type": ["boolean", "null"], "description": "Whether the request redirected away from `path`." },
         "title_match": { "type": ["boolean", "null"], "description": "Whether the page <title> names the caliber." },

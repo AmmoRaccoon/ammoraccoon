@@ -5,3 +5,7 @@ __pycache__/
 .next/
 node_modules/
 .playwright/
+# Validation-harness telemetry (#4 Step-4): continuous per-run measurements,
+# uploaded as a GHA artifact — NOT a tracked record (the config validation:{}
+# block is the sign-off snapshot of record; this is the high-frequency stream).
+_validation_telemetry/

@@ -37,7 +37,7 @@ _FETCH_ORDER = ['mode', 'stealth', 'fresh_context_per_request', 'user_agent']
 _SELECTORS_ORDER = ['product_card', 'product_title']
 _ENTRY_ORDER = ['path', 'query', 'status', 'expect_landed', 'title_filter',
                 'type', 'source', 'validation', 'approved_by', 'approved_at']
-_VALIDATION_ORDER = ['method', 'validated_at', 'status', 'redirect',
+_VALIDATION_ORDER = ['method', 'validated_at', 'verdict', 'status', 'redirect',
                      'title_match', 'gate_pass_pct', 'n_products', 'note']
 
 
