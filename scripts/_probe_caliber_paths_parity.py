@@ -24,13 +24,22 @@ precedent) stores the full '/collections/<handle>' path. Pass the optional
 so the comparison is the FETCHED URL, not the raw literal. Default '' is a
 no-op for every other retailer.
 
+Symmetrically, fenix stores the FULL '/collections/<handle>/products.json'
+inline but the config (same precedent) stores '/collections/<handle>' and
+the scraper appends '/products.json' at runtime. Pass the optional 5th arg
+INLINE_SUFFIX='/products.json' to STRIP it from each inline value so the
+comparison recovers the stored config path. Default '' is a no-op. Prefix
+and suffix can be combined; both transform the inline literal back into the
+stored config path.
+
 Usage:
-    py scripts/_probe_caliber_paths_parity.py <retailer> <scraper_file> [literal_name] [inline_prefix]
+    py scripts/_probe_caliber_paths_parity.py <retailer> <scraper_file> [literal_name] [inline_prefix] [inline_suffix]
 Examples:
     py scripts/_probe_caliber_paths_parity.py outdoorlimited scraper_outdoorlimited.py
     py scripts/_probe_caliber_paths_parity.py buds scraper_buds.py CALIBER_FILTER_URLS
     py scripts/_probe_caliber_paths_parity.py firearmsdepot scraper_firearmsdepot.py PARENT_PATHS
     py scripts/_probe_caliber_paths_parity.py trueshot scraper_trueshot.py COLLECTION_HANDLES /collections/
+    py scripts/_probe_caliber_paths_parity.py fenix scraper_fenix.py CALIBER_PATHS "" /products.json
 
 Exit 0 = identical url set. Exit 1 = any divergence (prints the first one).
 """
@@ -114,6 +123,10 @@ def main():
     # Optional prefix prepended to each inline value before comparison —
     # for bare-handle Shopify scrapers whose runtime URL adds '/collections/'.
     inline_prefix = sys.argv[4] if len(sys.argv) > 4 else ''
+    # Optional suffix stripped from each inline value before comparison —
+    # for scrapers (fenix) whose inline literal embeds a runtime-appended
+    # suffix like '/products.json' that the stored config path omits.
+    inline_suffix = sys.argv[5] if len(sys.argv) > 5 else ''
 
     tree = ast.parse((ROOT / scraper).read_text(encoding='utf-8'))
     ns = _build_string_ns(tree)
@@ -123,10 +136,18 @@ def main():
                      .read_text(encoding='utf-8'))
     base = cfg.get('base', '')
 
+    def _xform_inline(u):
+        """Transform an inline literal value back into the stored config
+        path: prepend inline_prefix and strip a trailing inline_suffix so
+        the comparison is path-for-path with the loader output."""
+        v = inline_prefix + _rel(u, base)
+        if inline_suffix and v.endswith(inline_suffix):
+            v = v[:-len(inline_suffix)]
+        return v
+
     fails = []
     if isinstance(node, ast.Dict):
-        inline = {_resolve_str(k, ns): [inline_prefix + _rel(u, base)
-                                        for u in _value_urls(v, ns)]
+        inline = {_resolve_str(k, ns): [_xform_inline(u) for u in _value_urls(v, ns)]
                   for k, v in zip(node.keys, node.values)}
         loaded = {cal: [e['url'] for e in entries]
                   for cal, entries in load_caliber_paths(retailer).items()}
