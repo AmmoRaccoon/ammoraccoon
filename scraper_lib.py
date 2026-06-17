@@ -1624,16 +1624,33 @@ def category_redirected(requested_url, landed_url):
     gate silently saved zero for 9 of 10 calibers). Skip the page loudly when
     this returns True so the next renumbering fails visibly.
 
-    Query strings (sort/paging) AND a trailing slash are ignored, and the
-    compare is case-insensitive. The trailing-slash tolerance matters because
-    most of the migrated scrapers use '/cat/' style URLs and many storefronts
-    301 '/cat/' -> '/cat' (or vice-versa) as a same-page canonicalization that
-    is NOT the wrong-caliber redirect we guard against; without it the guard
-    would false-fire on every caliber. Equivalent to the TSUSA inline guard for
-    .aspx URLs (which carry no trailing slash)."""
-    def norm(u):
-        return u.split('?')[0].rstrip('/').lower()
-    return norm(requested_url) != norm(landed_url)
+    Tolerated (NOT drift — same page in a canonical URL form):
+      - query strings (sort/paging)
+      - a trailing slash
+      - case
+      - http <-> https scheme
+      - a leading 'www.' on the host (www <-> non-www canonicalization)
+    Trailing-slash/query tolerance matters because most migrated scrapers use
+    '/cat/' URLs that 301 '/cat/' -> '/cat'. The www/scheme tolerance was added
+    2026-06-16 after the wave-2 validation run proved 4 www-based scrapers
+    (gritr/outdoorlimited/sgammo/recoilgunworks) went DARK on 2026-06-14: their
+    sites 301 www->non-www on the SAME path, and this guard treated that
+    canonicalization as a wrong-caliber redirect and skipped every page
+    (had_success=false, last_scraped_at frozen). A 301 to the SAME PATH on the
+    same registrable host differing only by 'www'/scheme is canonicalization,
+    not drift.
+
+    STILL flagged (the real drift this guard exists to catch): ANY path change
+    (the TSUSA .aspx renumber; ventura's
+    /categories/rifle/...-ammo-for-sale.html -> /7-62x39/) and ANY redirect to a
+    DIFFERENT host (a non-'www' subdomain change or another domain)."""
+    def parts(u):
+        p = urlparse(u)
+        host = p.netloc.lower()
+        if host.startswith('www.'):
+            host = host[4:]
+        return host, p.path.rstrip('/').lower()   # query/scheme excluded; slash+case normalized
+    return parts(requested_url) != parts(landed_url)
 
 
 EMPTY_FAIL_THRESHOLD = 3

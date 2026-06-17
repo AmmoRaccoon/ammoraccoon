@@ -19,7 +19,7 @@ from caliber_validate import (  # noqa: E402
     Page, evaluate, title_mentions,
     PASS, FAIL, NEEDS_REVIEW, PER_CALIBER, PARENT,
 )
-from scraper_lib import normalize_caliber  # noqa: E402 (clean_title-mirror contrast)
+from scraper_lib import normalize_caliber, category_redirected  # noqa: E402
 
 # --- Fixtures (all card titles confirmed against live normalize_caliber) ---
 NINE = [
@@ -219,6 +219,54 @@ class TestTypographicGlyph(unittest.TestCase):
         self.assertEqual(r['verdict'], PASS)
         self.assertEqual(r['gate_pass_pct'], 100.0)
         self.assertEqual(r['n_products'], 6)
+
+
+class TestCategoryRedirected(unittest.TestCase):
+    """Locks the 2026-06-16 host/scheme tolerance fix (the wave-2 www-redirect
+    regression that took gritr/outdoorlimited/sgammo/recoilgunworks dark) — WITHOUT
+    over-loosening: a real path change or a different host must STILL flag."""
+
+    # --- now TOLERATED (canonicalization, same path) ---
+    def test_www_to_nonwww_same_path_tolerated(self):
+        self.assertFalse(category_redirected(
+            'https://www.gritrsports.com/shooting/ammunition/handgun-ammo/9mm-luger-ammo/',
+            'https://gritrsports.com/shooting/ammunition/handgun-ammo/9mm-luger-ammo/'))
+
+    def test_nonwww_to_www_same_path_tolerated(self):
+        self.assertFalse(category_redirected(
+            'https://recoilgunworks.com/ammo/handgun-ammo/380-auto-ammo/',
+            'https://www.recoilgunworks.com/ammo/handgun-ammo/380-auto-ammo/'))
+
+    def test_http_to_https_same_path_tolerated(self):
+        self.assertFalse(category_redirected(
+            'http://sgammo.com/catalog/pistol-ammo-sale/9mm-luger-ammo',
+            'https://sgammo.com/catalog/pistol-ammo-sale/9mm-luger-ammo'))
+
+    def test_trailing_slash_and_query_still_tolerated(self):
+        self.assertFalse(category_redirected(
+            'https://x.com/cat/?sort=price&p=2', 'https://x.com/cat'))
+
+    # --- must STILL flag (real drift) ---
+    def test_real_path_change_still_flags_ventura(self):
+        # The genuine ventura 762x39 stale-URL redirect MUST still FAIL.
+        self.assertTrue(category_redirected(
+            'https://www.venturamunitions.com/categories/rifle/7-62-x-39-ammo-for-sale.html',
+            'https://www.venturamunitions.com/7-62x39/'))
+
+    def test_path_prefix_drop_still_flags(self):
+        # dancessportinggoods /ammo/ drop is a real path change (config-canon).
+        self.assertTrue(category_redirected(
+            'https://www.dancessportinggoods.com/ammo/handgun-centerfire/',
+            'https://www.dancessportinggoods.com/handgun-centerfire/'))
+
+    def test_different_host_still_flags(self):
+        self.assertTrue(category_redirected(
+            'https://gritrsports.com/9mm/', 'https://other-domain.com/9mm/'))
+
+    def test_nonwww_subdomain_change_still_flags(self):
+        # A non-'www' subdomain change is NOT www-canonicalization -> still drift.
+        self.assertTrue(category_redirected(
+            'https://shop.site.com/9mm/', 'https://site.com/9mm/'))
 
 
 class TestResultShape(unittest.TestCase):
