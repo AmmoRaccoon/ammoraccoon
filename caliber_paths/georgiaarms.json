@@ -18,49 +18,137 @@
     "9mm": [
       {
         "path": "/9mm-luger-1/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 3,
+          "note": "gate5: only 3 product(s)"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/380-acp-1/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 2,
+          "note": "gate5: only 2 product(s)"
+        }
       }
     ],
     "40sw": [
       {
         "path": "/40-s-w-1/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 75.0,
+          "n_products": 4,
+          "note": "gate5: only 4 product(s)"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/38-special-1/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 3,
+          "note": "gate5: only 3 product(s)"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/357-mag-1/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 4,
+          "note": "gate5: only 4 product(s)"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/223-rem-1/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 4,
+          "note": "gate5: only 4 product(s)"
+        }
       }
     ],
     "308win": [
       {
         "path": "/308-win-1/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 2,
+          "note": "gate5: only 2 product(s)"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/300-blackout/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 2,
+          "note": "gate5: only 2 product(s)"
+        }
       }
     ]
   }

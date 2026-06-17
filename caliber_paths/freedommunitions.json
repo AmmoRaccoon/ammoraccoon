@@ -13,69 +13,201 @@
     "9mm": [
       {
         "path": "/collections/pistol-9mm",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/collections/pistol-380-auto",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 13,
+          "note": "all gates pass"
+        }
       }
     ],
     "40sw": [
       {
         "path": "/collections/pistol-40-sw",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/collections/pistol-38-special",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 13,
+          "note": "all gates pass"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/collections/pistol-357-magnum",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 93.3,
+          "n_products": 15,
+          "note": "all gates pass"
+        }
       }
     ],
     "22lr": [
       {
         "path": "/collections/rimfire-22-long-rifle",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 7,
+          "note": "all gates pass"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/collections/rifle-223-remington",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       },
       {
         "path": "/collections/rifle-556-nato",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 88.9,
+          "n_products": 18,
+          "note": "all gates pass"
+        }
       }
     ],
     "308win": [
       {
         "path": "/collections/rifle-308-winchester",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 19,
+          "note": "all gates pass"
+        }
       },
       {
         "path": "/collections/rifle-762x51-nato",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 1,
+          "note": "gate5: only 1 product(s)"
+        }
       }
     ],
     "762x39": [
       {
         "path": "/collections/rifle-762x39",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 4,
+          "note": "gate5: only 4 product(s)"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/collections/rifle-300-aac-blackout",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 16,
+          "note": "all gates pass"
+        }
       }
     ]
   }

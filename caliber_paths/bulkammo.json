@@ -17,65 +17,186 @@
     "9mm": [
       {
         "path": "/handgun/bulk-9mm-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/handgun/bulk-.380-acp-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ],
     "40sw": [
       {
         "path": "/handgun/bulk-.40-s-w-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/handgun/bulk-.38-spl-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/handgun/bulk-.357-mag-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ],
     "22lr": [
       {
         "path": "/rimfire/bulk-.22-lr-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/rifle/bulk-.223-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       },
       {
         "path": "/rifle/bulk-5.56x45-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ],
     "308win": [
       {
         "path": "/rifle/bulk-.308-win-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ],
     "762x39": [
       {
         "path": "/rifle/bulk-7.62x39mm-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 24,
+          "note": "all gates pass"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/rifle/bulk-.300-aac-blackout-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 32,
+          "note": "all gates pass"
+        }
       }
     ]
   }

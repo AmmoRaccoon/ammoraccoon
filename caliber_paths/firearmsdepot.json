@@ -17,15 +17,48 @@
   "parent_paths": [
     {
       "path": "/ammunition/centerfire-handgun-rounds/",
-      "status": "active"
+      "status": "active",
+      "validation": {
+        "method": "harness",
+        "validated_at": "2026-06-16",
+        "verdict": "PASS",
+        "status": 200,
+        "redirect": false,
+        "title_match": null,
+        "gate_pass_pct": 83.3,
+        "n_products": 24,
+        "note": "all gates pass"
+      }
     },
     {
       "path": "/ammunition/centerfire-rifle-rounds/",
-      "status": "active"
+      "status": "active",
+      "validation": {
+        "method": "harness",
+        "validated_at": "2026-06-16",
+        "verdict": "PASS",
+        "status": 200,
+        "redirect": false,
+        "title_match": null,
+        "gate_pass_pct": 62.5,
+        "n_products": 24,
+        "note": "all gates pass"
+      }
     },
     {
       "path": "/ammunition/rimfire-rounds/",
-      "status": "active"
+      "status": "active",
+      "validation": {
+        "method": "harness",
+        "validated_at": "2026-06-16",
+        "verdict": "PASS",
+        "status": 200,
+        "redirect": false,
+        "title_match": null,
+        "gate_pass_pct": 33.3,
+        "n_products": 24,
+        "note": "all gates pass"
+      }
     }
   ]
 }

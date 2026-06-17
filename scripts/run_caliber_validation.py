@@ -23,6 +23,7 @@ sportsmansguide) only validates authoritatively on GHA.
 """
 import argparse
 import datetime
+import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -59,17 +60,23 @@ def main():
     ap.add_argument('retailers', nargs='*', help='retailer keys (default: wave-1 four)')
     ap.add_argument('--write', action='store_true',
                     help='write telemetry + change-of-record validation{} (default: dry)')
+    ap.add_argument('--json', action='store_true',
+                    help='emit ONE JSON array of result rows to stdout (machine-readable; '
+                         'suppresses the human table). For the parallel wide-run workers.')
     args = ap.parse_args()
     retailers = args.retailers or WAVE1
+    human = not args.json
 
     now = datetime.datetime.now()
     validated_at = now.strftime('%Y-%m-%d')
     ts = now.isoformat(timespec='seconds')
 
-    print(f"{'MODE':5} {'retailer':13} {'cal':8} {'verdict':12} {'st':>4} "
-          f"{'n':>4} {'gate%':>6} title wrote  note")
+    if human:
+        print(f"{'MODE':5} {'retailer':13} {'cal':8} {'verdict':12} {'st':>4} "
+              f"{'n':>4} {'gate%':>6} title wrote  note")
     verdicts = Counter()
     rows = []
+    json_rows = []
     for r in retailers:
         path = ROOT / 'caliber_paths' / f'{r}.json'
         cfg = caliber_paths_io.load_config(str(path))
@@ -87,21 +94,33 @@ def main():
                     str(path), cal, pq, rec, validated_at=validated_at)
             verdicts[rec['verdict']] += 1
             rows.append((r, cal, pq, rec, page))
-            wmark = ('W' if wrote else '.') if args.write else '-'
-            print(f"{mode[:5]:5} {r:13} {str(cal):8} {rec['verdict']:12} "
-                  f"{str(rec['status']):>4} {str(rec['n_products']):>4} "
-                  f"{str(rec['gate_pass_pct']):>6} {str(rec['title_match'])[:5]:5} "
-                  f"{wmark:5} {rec['note'][:64]}")
+            json_rows.append({
+                'retailer': r, 'mode': mode, 'caliber': cal, 'url': pq,
+                'verdict': rec['verdict'], 'status': rec['status'],
+                'redirect': rec['redirect'], 'title_match': rec['title_match'],
+                'gate_pass_pct': rec['gate_pass_pct'], 'n_products': rec['n_products'],
+                'note': rec['note'], 'page_title': page.title,
+                'landed_url': page.landed_url, 'n_cards': len(page.card_titles),
+                'sample_cards': [t.strip()[:70] for t in page.card_titles[:3]],
+                'wrote': wrote,
+            })
+            if human:
+                wmark = ('W' if wrote else '.') if args.write else '-'
+                print(f"{mode[:5]:5} {r:13} {str(cal):8} {rec['verdict']:12} "
+                      f"{str(rec['status']):>4} {str(rec['n_products']):>4} "
+                      f"{str(rec['gate_pass_pct']):>6} {str(rec['title_match'])[:5]:5} "
+                      f"{wmark:5} {rec['note'][:64]}")
 
-    # Plausibility detail: page <title> + a couple sample card titles per entry.
-    print("\n--- plausibility detail (page <title> + sample card titles) ---")
-    for r, cal, pq, rec, page in rows:
-        samples = ' | '.join(t.strip()[:48] for t in page.card_titles[:2])
-        print(f"  {r}/{cal} {pq}")
-        print(f"      title={page.title[:80]!r}")
-        print(f"      cards[{len(page.card_titles)}]: {samples}")
-
-    print(f"\nverdicts: {dict(verdicts)}  ({sum(verdicts.values())} entries)")
+    if human:
+        print("\n--- plausibility detail (page <title> + sample card titles) ---")
+        for r, cal, pq, rec, page in rows:
+            samples = ' | '.join(t.strip()[:48] for t in page.card_titles[:2])
+            print(f"  {r}/{cal} {pq}")
+            print(f"      title={page.title[:80]!r}")
+            print(f"      cards[{len(page.card_titles)}]: {samples}")
+        print(f"\nverdicts: {dict(verdicts)}  ({sum(verdicts.values())} entries)")
+    else:
+        print(json.dumps(json_rows, ensure_ascii=False))
     return 0
 
 

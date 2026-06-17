@@ -26,14 +26,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null,
-          "note": "Re-harvested + dry-run-verified in the 2026-06-12 TSUSA category-renumber fix (commit e9d7c98). Per-URL gate% / n_products were not recorded then; the Step-3 harness populates measured values on first validation run."
+          "gate_pass_pct": 97.5,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -48,13 +49,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 100.0,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -69,13 +72,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 97.5,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -90,13 +95,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 97.5,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -111,13 +118,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 95.0,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -132,13 +141,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 100.0,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -153,14 +164,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null,
-          "note": "Upstream split: .223 Rem and 5.56 NATO are separate TSUSA category pages; both bucket to 223-556 via normalize_caliber, and the run-global seen_ids set dedups any SKU cross-listed on both."
+          "gate_pass_pct": 100.0,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -173,13 +185,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 100.0,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -194,14 +208,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null,
-          "note": "Upstream split: .308 Win and 7.62x51 NATO are separate TSUSA category pages; both bucket to 308win via normalize_caliber; seen_ids dedups cross-listed SKUs."
+          "gate_pass_pct": 100.0,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -214,13 +229,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 100.0,
+          "n_products": 36,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -235,13 +252,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 100.0,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"
@@ -256,13 +275,15 @@
         "title_filter": null,
         "source": "sitemap:product-categories-sitemap.xml",
         "validation": {
-          "method": "manual-dryrun",
-          "validated_at": "2026-06-12",
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
           "status": 200,
           "redirect": false,
           "title_match": true,
-          "gate_pass_pct": null,
-          "n_products": null
+          "gate_pass_pct": 95.0,
+          "n_products": 40,
+          "note": "all gates pass"
         },
         "approved_by": "jon",
         "approved_at": "2026-06-12"

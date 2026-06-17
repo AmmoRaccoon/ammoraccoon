@@ -13,65 +13,186 @@
     "9mm": [
       {
         "path": "/collections/ammunition-pistol-ammo-9mm",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/collections/ammunition-pistol-ammo-380-auto",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "40sw": [
       {
         "path": "/collections/ammunition-pistol-ammo-40-sw",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/collections/ammunition-pistol-ammo-38-special",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 96.7,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/collections/ammunition-pistol-ammo-357-magnum",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 96.7,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "22lr": [
       {
         "path": "/collections/ammunition-rimfire-ammo-22-long-rifle",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/collections/ammunition-rifle-ammo-223-rem",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 73.3,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       },
       {
         "path": "/collections/ammunition-rifle-ammo-5-56x45mm",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 83.3,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "308win": [
       {
         "path": "/collections/ammunition-rifle-ammo-308-win",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "762x39": [
       {
         "path": "/collections/ammunition-rifle-ammo-7-62x39",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 90.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/collections/ammunition-rifle-ammo-300-blackout",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ]
   }

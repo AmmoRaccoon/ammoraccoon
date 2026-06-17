@@ -18,61 +18,171 @@
     "9mm": [
       {
         "path": "/9mm/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/380-auto/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 8,
+          "note": "all gates pass"
+        }
       }
     ],
     "40sw": [
       {
         "path": "/40-s-w/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/38-special/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/357-magnum/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 7,
+          "note": "all gates pass"
+        }
       }
     ],
     "22lr": [
       {
         "path": "/22-lr/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/223-remington/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 91.7,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "308win": [
       {
         "path": "/308-winchester/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "762x39": [
       {
         "path": "/7-62x39mm/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": false,
+          "gate_pass_pct": 100.0,
+          "n_products": 3,
+          "note": "gate5: only 3 product(s); title does not name the caliber (generic)"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/300-aac-blackout/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 5,
+          "note": "all gates pass"
+        }
       }
     ]
   }

@@ -17,45 +17,122 @@
     "9mm": [
       {
         "path": "/Ammo/Handgun-Ammo/9mm-Ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 49,
+          "note": "all gates pass"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/Ammo/Handgun-Ammo/380-Acp-Ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 11,
+          "note": "all gates pass"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/Ammo/Handgun-Ammo/38-Special-Ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 4,
+          "note": "gate5: only 4 product(s)"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/Ammo/Handgun-Ammo/357-Magnum-Ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 4,
+          "note": "gate5: only 4 product(s)"
+        }
       }
     ],
     "22lr": [
       {
         "path": "/Ammo/Rimfire-Ammo",
         "status": "active",
-        "source": "manual: parent rimfire category, bucketed to 22lr by normalize_caliber at runtime"
+        "source": "manual: parent rimfire category, bucketed to 22lr by normalize_caliber at runtime",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": false,
+          "gate_pass_pct": 67.7,
+          "n_products": 31,
+          "note": "gate4: only 67.7% of 31 cards match 22lr; title does not name the caliber (generic)"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/Ammo/Rifle-Ammo/556-Nato-Ammo",
         "status": "active",
-        "source": "manual: 5.56 leg only; .223 Rem has no category page (filter-only, 403 to bots)"
+        "source": "manual: 5.56 leg only; .223 Rem has no category page (filter-only, 403 to bots)",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 10,
+          "note": "all gates pass"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/Ammo/Rifle-Ammo/300-Blackout",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 7,
+          "note": "all gates pass"
+        }
       }
     ],
     "308win": [

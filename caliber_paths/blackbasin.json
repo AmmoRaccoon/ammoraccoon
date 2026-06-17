@@ -14,65 +14,186 @@
     "9mm": [
       {
         "path": "/collections/9mm-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 96.7,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/collections/380-auto-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "40sw": [
       {
         "path": "/collections/40-sw-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/collections/38-special-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/collections/357-mag-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "22lr": [
       {
         "path": "/collections/22-lr-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 27,
+          "note": "all gates pass"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/collections/223-remington-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       },
       {
         "path": "/collections/556x45-nato-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "308win": [
       {
         "path": "/collections/308-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ],
     "762x39": [
       {
         "path": "/collections/762x39mm-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 29,
+          "note": "all gates pass"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/collections/300-aac-blackout-ammo",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
       }
     ]
   }
