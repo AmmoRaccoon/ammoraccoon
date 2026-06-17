@@ -7,6 +7,13 @@
   "discovery": {
     "method": "manual"
   },
+  "fetch": {
+    "mode": "playwright-sync"
+  },
+  "selectors": {
+    "product_card": "article.card",
+    "product_title": "h4.card-title a"
+  },
   "parent_paths": [
     {
       "path": "/ammo/handgun-centerfire/",

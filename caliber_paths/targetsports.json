@@ -9,6 +9,13 @@
     "sitemap": "product-categories-sitemap.xml (declared in robots.txt)",
     "category_url_pattern": "-c-\\d+\\.aspx"
   },
+  "fetch": {
+    "mode": "playwright-sync"
+  },
+  "selectors": {
+    "product_card": "li a[href*=\"-p-\"]",
+    "product_title": "h2"
+  },
   "calibers": {
     "9mm": [
       {

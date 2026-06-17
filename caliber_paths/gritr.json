@@ -7,6 +7,13 @@
   "discovery": {
     "method": "manual"
   },
+  "fetch": {
+    "mode": "playwright-sync"
+  },
+  "selectors": {
+    "product_card": "li.snize-product",
+    "product_title": ".snize-title"
+  },
   "calibers": {
     "9mm": [
       {

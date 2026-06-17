@@ -6,6 +6,13 @@
   "discovery": {
     "method": "manual"
   },
+  "fetch": {
+    "mode": "playwright-async"
+  },
+  "selectors": {
+    "product_card": "li.b-product-list-item",
+    "product_title": "h2.b-product-list-item__product-name"
+  },
   "calibers": {
     "9mm": [
       {

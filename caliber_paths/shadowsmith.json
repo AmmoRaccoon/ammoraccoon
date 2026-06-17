@@ -7,6 +7,13 @@
   "discovery": {
     "method": "manual"
   },
+  "fetch": {
+    "mode": "playwright-sync"
+  },
+  "selectors": {
+    "product_card": "ul.products li.product, li.product",
+    "product_title": "h2.woocommerce-loop-product__title, .woocommerce-loop-product__title"
+  },
   "calibers": {
     "9mm": [
       {

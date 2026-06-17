@@ -7,6 +7,14 @@
   "discovery": {
     "method": "manual"
   },
+  "fetch": {
+    "mode": "playwright-sync",
+    "fresh_context_per_request": true
+  },
+  "selectors": {
+    "product_card": ".products.list.items.product-items > li",
+    "product_title": ".product-item-link"
+  },
   "calibers": {
     "9mm": [
       {

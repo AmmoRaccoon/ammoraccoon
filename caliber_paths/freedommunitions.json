@@ -6,6 +6,9 @@
   "discovery": {
     "method": "manual"
   },
+  "fetch": {
+    "mode": "requests"
+  },
   "calibers": {
     "9mm": [
       {

@@ -7,6 +7,15 @@
   "discovery": {
     "method": "manual"
   },
+  "fetch": {
+    "mode": "playwright-sync",
+    "stealth": true,
+    "fresh_context_per_request": true
+  },
+  "selectors": {
+    "product_card": ".product-tile",
+    "product_title": ".product-name span, .product-name"
+  },
   "parent_paths": [
     {
       "path": "/productlist/ammo/handgun-pistol-ammo",
