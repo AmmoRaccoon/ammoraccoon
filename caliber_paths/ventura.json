@@ -18,61 +18,171 @@
     "9mm": [
       {
         "path": "/categories/handgun/9mm-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/categories/handgun/380-acp-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "40sw": [
       {
         "path": "/categories/handgun/40-s-w-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/categories/handgun/38-special-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 5,
+          "note": "all gates pass"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/categories/handgun/357-magnum-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 5,
+          "note": "all gates pass"
+        }
       }
     ],
     "22lr": [
       {
         "path": "/22lr-long-rifle/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/categories/rifle/223-rem-1-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "308win": [
       {
         "path": "/categories/rifle/308-win-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 12,
+          "note": "all gates pass"
+        }
       }
     ],
     "762x39": [
       {
         "path": "/categories/rifle/7-62-x-39-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "FAIL",
+          "status": 200,
+          "redirect": true,
+          "title_match": null,
+          "gate_pass_pct": null,
+          "n_products": null,
+          "note": "redirected to https://www.venturamunitions.com/7-62x39/"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/categories/300-aac-blackout-ammo-for-sale.html",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 9,
+          "note": "all gates pass"
+        }
       }
     ]
   }

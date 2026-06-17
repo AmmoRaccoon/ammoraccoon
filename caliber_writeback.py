@@ -5,11 +5,13 @@ TWO deliberately-split outputs (approved design, flag 5):
 1. CONFIG write-back -- the sign-off SNAPSHOT OF RECORD. write_validation()
    stores the evaluator's measured record into the matching entry's
    `validation:{}` block, serialized by the step-1 canonical writer so the diff
-   is clean. It writes ONLY on a CHANGE-OF-RECORD (first validation, or a
-   verdict CHANGE like PASS->FAIL) -- never on an unchanged verdict, so a
-   2-hourly re-run produces NO diff and the sign-off signal isn't buried in
-   timestamp churn. Reads the RAW json (never the loader's runtime shape, which
-   carries compiled regex / built urls that must never round-trip to disk).
+   is clean. It writes ONLY on a CHANGE-OF-RECORDED-FACT (first validation, or
+   any change to a recorded field -- verdict OR a sub-field like title_match /
+   gate_pass_pct / note) -- never when every recorded fact is identical, so a
+   2-hourly re-run with unchanged measurements produces NO diff and the sign-off
+   signal isn't buried in timestamp churn (method/validated_at are not recorded
+   facts). Reads the RAW json (never the loader's runtime shape, which carries
+   compiled regex / built urls that must never round-trip to disk).
 
 2. TELEMETRY -- the CONTINUOUS stream. log_telemetry() appends one JSONL line
    per (retailer, caliber, url, verdict, numbers, timestamp) to a gitignored
@@ -64,8 +66,17 @@ def _find_entry(cfg, caliber, path_query):
 def write_validation(config_path, caliber, path_query, record, *,
                      validated_at, method='harness'):
     """Write the measured record into the matching entry's validation:{} block,
-    ONLY when it is a change-of-record (first validation, or a verdict change).
-    Returns True if it wrote, False if the verdict was unchanged (no diff).
+    ONLY on a change-of-recorded-FACT: first validation, OR any difference in a
+    recorded field (verdict OR a sub-field -- status/redirect/title_match/
+    gate_pass_pct/n_products/note). Returns True if it wrote, False when every
+    recorded fact is identical (no diff).
+
+    This is NOT every-run churn: `method`/`validated_at` are NOT recorded facts,
+    so a re-run whose measurements are identical bumps nothing and writes
+    nothing (byte-identical, idempotent). A sub-field only moves when a harness
+    fix corrects it (rare) or the page itself really changed -- and then the
+    snapshot SHOULD update (else it carries a stale title_match/note, the
+    fenix-40sw case). Telemetry still logs every run regardless.
 
     NEVER touches entry['status'] -- measurements only, never an actuator."""
     cfg = caliber_paths_io.load_config(config_path)
@@ -78,12 +89,15 @@ def write_validation(config_path, caliber, path_query, record, *,
     new_block.update({k: record.get(k) for k in _MEASURED})
 
     old = entry.get('validation')
-    old_verdict = old.get('verdict') if isinstance(old, dict) else None
-    if old_verdict == new_block['verdict']:
-        # No change-of-record -> no write -> byte-identical file (idempotent).
+    old_measured = ({k: old.get(k) for k in _MEASURED}
+                    if isinstance(old, dict) else None)
+    new_measured = {k: new_block[k] for k in _MEASURED}
+    if old_measured == new_measured:
+        # No change-of-recorded-fact -> no write -> byte-identical file.
         return False
 
-    # Change of record. Update ONLY the validation block; status is untouched.
+    # A recorded fact changed (verdict or a sub-field). Update ONLY the
+    # validation block; status is untouched (the honesty boundary).
     entry['validation'] = new_block
     with open(config_path, 'w', encoding='utf-8', newline='\n') as f:
         f.write(caliber_paths_io.dump_config(cfg))

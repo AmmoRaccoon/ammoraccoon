@@ -17,73 +17,216 @@
     "9mm": [
       {
         "path": "/product-category/handgun/9mm/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 97.7,
+          "n_products": 44,
+          "note": "all gates pass"
+        }
       }
     ],
     "380acp": [
       {
         "path": "/product-category/handgun/380/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 7,
+          "note": "all gates pass"
+        }
       },
       {
         "path": "/product-category/handgun/380-auto/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 66.7,
+          "n_products": 3,
+          "note": "gate4: only 66.7% of 3 cards match 380acp; gate5: only 3 product(s)"
+        }
       }
     ],
     "40sw": [
       {
         "path": "/product-category/handgun/40-sw/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 16,
+          "note": "all gates pass"
+        }
       }
     ],
     "38spl": [
       {
         "path": "/product-category/handgun/38-special/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 93.3,
+          "n_products": 15,
+          "note": "all gates pass"
+        }
       }
     ],
     "357mag": [
       {
         "path": "/product-category/handgun/357-mag/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 90.9,
+          "n_products": 11,
+          "note": "all gates pass"
+        }
       }
     ],
     "22lr": [
       {
         "path": "/product-category/rimfire/22lr/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 20,
+          "note": "all gates pass"
+        }
       }
     ],
     "223-556": [
       {
         "path": "/product-category/rifle/223/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 20,
+          "note": "all gates pass"
+        }
       },
       {
         "path": "/product-category/rifle/5-56x45mm-nato/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 50.0,
+          "n_products": 14,
+          "note": "gate4: only 50.0% of 14 cards match 223-556"
+        }
       }
     ],
     "308win": [
       {
         "path": "/product-category/rifle/308-win/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 33,
+          "note": "all gates pass"
+        }
       },
       {
         "path": "/product-category/rifle/308-7-62x51mm/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 1,
+          "note": "gate5: only 1 product(s)"
+        }
       }
     ],
     "762x39": [
       {
         "path": "/product-category/rifle/7-62x39mm/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 4,
+          "note": "gate5: only 4 product(s)"
+        }
       }
     ],
     "300blk": [
       {
         "path": "/product-category/rifle/300-blackout/",
-        "status": "active"
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-16",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 10,
+          "note": "all gates pass"
+        }
       }
     ]
   }

@@ -32,6 +32,14 @@ PASS_REC = {'verdict': 'PASS', 'status': 200, 'redirect': False,
 FAIL_REC = {'verdict': 'FAIL', 'status': 404, 'redirect': None,
             'title_match': None, 'gate_pass_pct': None, 'n_products': None,
             'note': 'HTTP 404'}
+# The fenix-40sw pair: same verdict (NEEDS_REVIEW), but a harness fix flips
+# title_match false->true and refreshes the note.
+NR_TITLE_FALSE = {'verdict': 'NEEDS_REVIEW', 'status': 200, 'redirect': False,
+                  'title_match': False, 'gate_pass_pct': 75.0, 'n_products': 4,
+                  'note': 'gate5: only 4 product(s); title does not name the caliber (generic)'}
+NR_TITLE_TRUE = {'verdict': 'NEEDS_REVIEW', 'status': 200, 'redirect': False,
+                 'title_match': True, 'gate_pass_pct': 75.0, 'n_products': 4,
+                 'note': 'gate5: only 4 product(s)'}
 
 
 class WritebackBase(unittest.TestCase):
@@ -78,6 +86,34 @@ class TestWriteValidation(WritebackBase):
                                  FAIL_REC, validated_at='2026-06-15')
         self.assertTrue(wrote)          # PASS -> FAIL is a change-of-record
         self.assertEqual(self._entry()['validation']['verdict'], 'FAIL')
+
+    def test_subfield_change_same_verdict_rewrites(self):
+        # The fenix-40sw case: verdict stays NEEDS_REVIEW but title_match flips
+        # false->true (and the note refreshes). MUST rewrite so the snapshot
+        # doesn't carry a stale sub-field.
+        write_validation(self.cfg_path, '9mm', '/collections/9mm',
+                         NR_TITLE_FALSE, validated_at='2026-06-15')
+        self.assertFalse(self._entry()['validation']['title_match'])
+        wrote = write_validation(self.cfg_path, '9mm', '/collections/9mm',
+                                 NR_TITLE_TRUE, validated_at='2026-06-16')
+        self.assertTrue(wrote)          # sub-field change-of-record -> rewrite
+        v = self._entry()['validation']
+        self.assertTrue(v['title_match'])
+        self.assertEqual(v['verdict'], 'NEEDS_REVIEW')      # verdict still stable
+        self.assertNotIn('title does not name', v['note'])  # note refreshed
+        self.assertEqual(v['validated_at'], '2026-06-16')
+        self.assertEqual(self._entry()['status'], 'candidate')  # status untouched
+
+    def test_identical_facts_newer_timestamp_no_write(self):
+        # NOT every-run churn: method/validated_at are not recorded facts, so
+        # identical measurements with a newer timestamp must NOT rewrite.
+        write_validation(self.cfg_path, '9mm', '/collections/9mm', PASS_REC,
+                         validated_at='2026-06-14')
+        b1 = Path(self.cfg_path).read_bytes()
+        wrote = write_validation(self.cfg_path, '9mm', '/collections/9mm',
+                                 PASS_REC, validated_at='2026-06-30')
+        self.assertFalse(wrote)
+        self.assertEqual(b1, Path(self.cfg_path).read_bytes())  # byte-identical
 
     def test_never_touches_status(self):
         # The honesty boundary: writing a verdict must NOT flip status.

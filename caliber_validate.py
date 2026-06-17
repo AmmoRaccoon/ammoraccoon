@@ -39,7 +39,7 @@ ENTRY-KIND AWARE (critical — a flat gate false-FAILs every parent_paths retail
 """
 import re
 
-from scraper_lib import normalize_caliber, category_redirected
+from scraper_lib import normalize_caliber, category_redirected, clean_title
 from caliber_registry_gen import CALIBER_URL_ALIASES
 
 # Verdicts
@@ -160,10 +160,17 @@ def evaluate(page, caliber, entry_kind, title_filter=None):
         titles = [t for t in titles if rx.search(t)]
     n_products = len(titles)
 
+    # Mirror the scrapers EXACTLY: every scraper runs clean_title (typographic
+    # ×->x, en-dash->-, entity/glyph cleanup) BEFORE normalize_caliber, so the
+    # gate must too — else a × glyph ('7.62×39', U+00D7) false-FAILs a page the
+    # scraper matches fine (proven: normalize_caliber('7.62×39')->None,
+    # normalize_caliber(clean_title('7.62×39'))->'762x39').
     if is_parent:
-        n_match = sum(1 for t in titles if normalize_caliber(t)[1] in TRACKED_CALIBERS)
+        n_match = sum(1 for t in titles
+                      if normalize_caliber(clean_title(t))[1] in TRACKED_CALIBERS)
     else:
-        n_match = sum(1 for t in titles if normalize_caliber(t)[1] == caliber)
+        n_match = sum(1 for t in titles
+                      if normalize_caliber(clean_title(t))[1] == caliber)
     gate_pass_pct = round(100.0 * n_match / n_products, 1) if n_products else 0.0
 
     # Gate 5 special case: empty but otherwise healthy. NEVER FAIL — propose PARK

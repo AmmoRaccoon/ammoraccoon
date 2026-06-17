@@ -19,6 +19,7 @@ from caliber_validate import (  # noqa: E402
     Page, evaluate, title_mentions,
     PASS, FAIL, NEEDS_REVIEW, PER_CALIBER, PARENT,
 )
+from scraper_lib import normalize_caliber  # noqa: E402 (clean_title-mirror contrast)
 
 # --- Fixtures (all card titles confirmed against live normalize_caliber) ---
 NINE = [
@@ -189,6 +190,35 @@ class TestTitleMentions(unittest.TestCase):
     def test_whole_token_no_substring_false_positive(self):
         # '556' must not match inside '5560'.
         self.assertFalse(title_mentions('Brand 5560 Widget', '223-556'))
+
+
+SEVEN62X39_GLYPH = [  # '×' = U+00D7 — normalize_caliber needs clean_title first
+    'Wolf 7.62×39 123gr FMJ 20rd',
+    'Tula 7.62×39 122gr FMJ 20rd',
+    'Fiocchi 7.62×39 123gr FMJ 20rd',
+    'Norma 7.62×39 124gr FMJ 20rd',
+    'PPU 7.62×39 123gr FMJ 20rd',
+    'Red Army 7.62×39 122gr FMJ 20rd',
+]
+
+
+class TestTypographicGlyph(unittest.TestCase):
+    """Locks fix #1: gate-4 clean_titles each card before normalize_caliber,
+    so the typographic '×' (U+00D7) in '7.62×39' no longer false-FAILs a page
+    the scraper matches fine (the rivertown 762x39 wave-1 false FAIL)."""
+
+    def test_raw_x_glyph_does_not_normalize(self):
+        # The rationale: raw '7.62×39' normalizes to None (this is WHY the gate
+        # must clean_title first). If this ever changes, revisit the fix.
+        self.assertIsNone(normalize_caliber('Wolf 7.62×39 123gr FMJ')[1])
+
+    def test_x_glyph_cards_gate_pass(self):
+        p = Page(200, '/rifle/7-62x39mm/', '/rifle/7-62x39mm/',
+                 '7.62x39 Ammo for Sale', SEVEN62X39_GLYPH)
+        r = evaluate(p, '762x39', PER_CALIBER)
+        self.assertEqual(r['verdict'], PASS)
+        self.assertEqual(r['gate_pass_pct'], 100.0)
+        self.assertEqual(r['n_products'], 6)
 
 
 class TestResultShape(unittest.TestCase):

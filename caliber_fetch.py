@@ -54,6 +54,7 @@ specific scraper — called out, not guessed):
     first run shows the wall still bites.
 """
 import asyncio
+import html
 import json
 import re
 import urllib.error
@@ -79,9 +80,13 @@ def _abs(base, path_query):
     return base.rstrip('/') + '/' + path_query.lstrip('/')
 
 
-def _extract_title(html):
-    m = re.search(r'<title[^>]*>(.*?)</title>', html, re.IGNORECASE | re.DOTALL)
-    return re.sub(r'\s+', ' ', m.group(1)).strip() if m else ''
+def _extract_title(markup):
+    # html.unescape so entities don't corrupt the title gate — the requests
+    # path reads RAW HTML, so '.40 S&amp;W' would otherwise inject an "amp"
+    # token that breaks the 40sw alias match. (Playwright's page.title()
+    # already decodes, so this only matters on the requests path.)
+    m = re.search(r'<title[^>]*>(.*?)</title>', markup, re.IGNORECASE | re.DOTALL)
+    return re.sub(r'\s+', ' ', html.unescape(m.group(1))).strip() if m else ''
 
 
 def _selectors(config, override):
