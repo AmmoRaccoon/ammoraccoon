@@ -17,7 +17,7 @@
   "calibers": {
     "9mm": [
       {
-        "path": "/ammo/handgun-ammo/9mm/",
+        "path": "/ammo/handgun-ammo/9mm-ammo/",
         "status": "active"
       }
     ],
@@ -47,13 +47,13 @@
     ],
     "22lr": [
       {
-        "path": "/ammo/rimfire-ammo/22lr/",
+        "path": "/ammo/rimfire-ammo/22lr-ammo/",
         "status": "active"
       }
     ],
     "223-556": [
       {
-        "path": "/ammo/rifle-ammo/223-5-56/",
+        "path": "/ammo/rifle-ammo/223-5-56-ammo/",
         "status": "active"
       }
     ],
