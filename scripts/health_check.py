@@ -86,6 +86,24 @@ PAGE_SIZE = 1000
 # 6h = ~3 missed refreshes, well before the web's 24h slow-RPC fallback.
 CACHE_MAX_AGE_HOURS = 6
 
+# Stale success-stamp alarm (follow-up #7, 2026-06-17). Fires when a retailer's
+# last SUCCESSFUL category scrape (retailers.last_scraped_at, bumped only by
+# mark_retailer_scraped on had_success) is too old. Reads last_scraped_at AGE
+# ONLY — never listings.last_updated / price_history — so the daily
+# scraper_recheck job (which refreshes existing rows) cannot mask a dark
+# category scrape. This is the gap that hid gritr/outdoorlimited/sgammo/
+# recoilgunworks for ~2 days on 2026-06-14.
+STALE_HOURS = 8           # normal active store (~4 missed 2h light-tier ticks)
+WALLED_STALE_HOURS = 72   # bot-walled store (legitimately misses many ticks)
+# Bot-walled-but-ACTIVE stores use had_success=(saved>0) and do NOT bump
+# last_scraped_at on a fully-walled day, so a routine wall would false-alarm at
+# 8h; 72h still catches a permanently-dead wall (3+ days dark). The inactive
+# walled stores in scraper_recheck.py EXCLUDE_SLUGS (ammodeport/wideners/
+# midwayusa/academy/bereli/bulkmunitions) are is_active=false and already
+# dropped by fetch_retailers. shadowsmith is deliberately NOT here yet —
+# follow-up #3 (its production 403) is unresolved.
+WALLED_SLUGS = {'gunbuyer', 'sportsmansguide'}
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LIGHT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scrape_light.yml"
@@ -311,6 +329,48 @@ def check_cache_age(sb):
                  f"cache age check itself failed ({type(e).__name__}: {e})")]
 
 
+def check_stale_scrapes(retailers):
+    """Stale success-stamp alarm (follow-up #7): CRITICAL when a retailer's
+    last SUCCESSFUL category scrape is older than its threshold.
+
+    Reads retailers.last_scraped_at AGE ONLY — deliberately independent of
+    listings.last_updated and price_history (the signals evaluate() uses and
+    that the daily scraper_recheck job keeps warm). That independence is the
+    whole point: a dark category scrape leaves last_scraped_at frozen
+    (mark_retailer_scraped bumps it only on had_success), and recheck refreshing
+    existing rows cannot move it. Closes the gap that hid gritr/outdoorlimited/
+    sgammo/recoilgunworks for ~2 days on 2026-06-14.
+
+    Unlike evaluate_coverage(), this does NOT skip a frozen/old stamp — firing
+    BECAUSE the stamp is stale is exactly the intent. NULL last_scraped_at
+    (never-scraped active store) is skipped-but-logged, never alarmed.
+    """
+    alerts = []
+    now = datetime.now(timezone.utc)
+    for r in retailers.values():
+        last = r.get("last_scraped_at")
+        if not last:
+            print(f"stale-check: {r['name']} has no last_scraped_at - "
+                  f"skipped (no baseline, not alarmed).")
+            continue
+        try:
+            last_dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
+        except ValueError:
+            print(f"stale-check: {r['name']} last_scraped_at unparseable "
+                  f"({last!r}) - skipped.")
+            continue
+        threshold = WALLED_STALE_HOURS if r.get("slug") in WALLED_SLUGS else STALE_HOURS
+        age_h = (now - last_dt).total_seconds() / 3600
+        if age_h > threshold:
+            alerts.append((
+                "CRITICAL",
+                r["name"],
+                f"no successful scrape in {age_h:.1f}h (threshold {threshold}h); "
+                f"last_scraped_at={last}",
+            ))
+    return alerts
+
+
 def post_discord(message):
     if not DISCORD_WEBHOOK_URL:
         print("DISCORD_WEBHOOK_URL not set - skipping Discord post.")
@@ -401,6 +461,7 @@ def main():
     alerts = evaluate(retailers, current, previous)
     alerts += evaluate_coverage(retailers, declared_coverage(), current,
                                 current_by_caliber, cur_start)
+    alerts += check_stale_scrapes(retailers)
     alerts += check_cache_age(sb)
     if not alerts:
         print("\nAll scrapers healthy -no alert sent.")
