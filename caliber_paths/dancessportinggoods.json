@@ -16,15 +16,15 @@
   },
   "parent_paths": [
     {
-      "path": "/ammo/handgun-centerfire/",
+      "path": "/handgun-centerfire/",
       "status": "active"
     },
     {
-      "path": "/ammo/rifle-centerfire/",
+      "path": "/rifle-centerfire/",
       "status": "active"
     },
     {
-      "path": "/ammo/rimfire/",
+      "path": "/rimfire/",
       "status": "active"
     }
   ]
