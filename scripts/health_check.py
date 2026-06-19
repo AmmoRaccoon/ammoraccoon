@@ -11,22 +11,27 @@ Alerting rules:
             DROP_THRESHOLD fraction this run
   CRITICAL  zero-coverage: a retailer that finished a run this window and saved
             listings for SOME calibers saved zero for other calibers its own
-            CALIBER_PATHS config says it covers (one alert line per retailer)
+            caliber_paths config says it covers (one alert line per retailer)
 
 Retailers with no previous baseline (e.g. never-scraped, or intentionally disabled
 like Bereli) self-mute -they produce no alerts because we have nothing to compare
 against.
 
-The zero-coverage check (2026-06-12) closes the silent-failure class the
-caliber-scoping audit caught: Target Sports USA's renumbered category IDs
-left 9 of 10 calibers dark for weeks with NO alert, because 9mm kept saving
-and the retailer-level total never hit zero. Coverage truth comes from the
-scrapers themselves — CALIBER_PATHS keys are AST-parsed out of every scraper
-wired into scrape_light.yml — so parking a caliber in a scraper (PSA's five
-Cloudflare-walled ones) automatically removes it from the expectation; no
-second source of truth to drift. Deliberate boundaries: only light-tier
-scrapers (this check runs at the end of scrape_light; medium/heavy runs can
-straddle the window mid-run and would false-alarm), only retailers whose
+The zero-coverage check (2026-06-12; repointed at the caliber_paths configs
+2026-06-18 after the config migration retired the inline CALIBER_PATHS dict —
+declared_coverage() had silently returned [] for the whole light tier in the
+interim) closes the silent-failure class the caliber-scoping audit caught:
+Target Sports USA's renumbered category IDs left 9 of 10 calibers dark for
+weeks with NO alert, because 9mm kept saving and the retailer-level total
+never hit zero. Coverage truth comes from each light-tier scraper's
+caliber_paths/<name>.json config — the active per-caliber keys are read
+straight from the config (the scraper's load_caliber_paths('<name>') argument
+names the config) — so parking a caliber in the config automatically removes
+it from the expectation; no second source of truth to drift. Deliberate
+boundaries: only light-tier scrapers (this check runs at the end of
+scrape_light; medium/heavy runs can straddle the window mid-run and would
+false-alarm), walled stores in COVERAGE_EXEMPT are skipped (partial caliber
+loss is a normal day for a bot-walled store), only retailers whose
 last_scraped_at landed inside the current window (i.e. the run FINISHED),
 and only retailers that saved at least one listing — a fully-dark retailer
 is the existing CRITICAL rule's job at onset, and persistently-dark
@@ -104,9 +109,20 @@ WALLED_STALE_HOURS = 72   # bot-walled store (legitimately misses many ticks)
 # follow-up #3 (its production 403) is unresolved.
 WALLED_SLUGS = {'gunbuyer', 'sportsmansguide'}
 
+# Zero-coverage exemption: walled stores where partial caliber loss is a normal
+# day (a Cloudflare/bot wall lets some category pages through and blocks others),
+# so a missing caliber is NOT a reliable broken-scraper signal there. Skipped
+# entirely by declared_coverage(). Neither is in the light tier today, but the
+# set is wired in from the start so adding a walled store to scrape_light.yml
+# can't silently start false-alarming. shadowsmith is a CANDIDATE to add here
+# pending follow-up #3 (its production 403); until then it stays checked — and
+# when fully dark it's caught by the stale alarm + the total==0 skip, not here.
+COVERAGE_EXEMPT = {'gunbuyer', 'sportsmansguide'}
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LIGHT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "scrape_light.yml"
+CALIBER_PATHS_DIR = REPO_ROOT / "caliber_paths"
 
 
 def fetch_retailers(sb):
@@ -147,19 +163,54 @@ def count_current(sb, cutoff_iso):
     return counts, by_caliber
 
 
+def _loader_config_name(tree):
+    """Inspect a parsed scraper for its caliber_paths loader call and return
+    (kind, config_name):
+
+      ('caliber', 'X')  module-level `<NAME> = load_caliber_paths('X')` — a
+                        per-caliber store; 'X' names its caliber_paths config.
+      ('parent', None)  uses load_parent_paths(...) — a list-of-parents store
+                        with no per-caliber map (correctly out of this check).
+      (None, None)      no loader call found — NOT config-driven (un-migrated
+                        or odd); the caller prints a loud skip so it's visible.
+
+    Migration-aware: keys off the load_*_paths CALL (not the retired inline
+    CALIBER_PATHS dict), and ignores the assignment target name so the
+    COLLECTION_HANDLES alias (freedommunitions/trueshot) is caught too.
+    """
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Call):
+            continue
+        func = node.value.func
+        fn = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+        if fn == "load_parent_paths":
+            return "parent", None
+        if fn == "load_caliber_paths" and node.value.args:
+            arg0 = node.value.args[0]
+            if isinstance(arg0, ast.Constant) and isinstance(arg0.value, str):
+                return "caliber", arg0.value
+    return None, None
+
+
 def declared_coverage():
-    """Coverage expectations straight from the scraper configs.
+    """Coverage expectations straight from the caliber_paths configs (the
+    post-migration source of truth; the inline CALIBER_PATHS dict is gone).
 
-    Reads scrape_light.yml for the scraper files actually wired into the
-    light tier, then AST-parses each one (no imports — module level in a
-    scraper builds a Supabase client) for its module-level RETAILER_SLUG /
-    RETAILER_ID and the keys of CALIBER_PATHS. Values may be strings or
-    lists (targetsports holds lists since the 2026-06 category split);
-    only the keys matter here. Scrapers without both names self-exclude.
+    Reads scrape_light.yml for the scraper files wired into the light tier,
+    then for each AST-reads the string argument of its load_caliber_paths('X')
+    call (via _loader_config_name) to find its config — migration-aware. A
+    scraper that calls load_parent_paths(...) is a list-of-parents store with
+    no per-caliber map and is excluded. Walled stores in COVERAGE_EXEMPT are
+    excluded. Expected calibers = the config's keys with >=1 status:active
+    entry (identical to load_caliber_paths(name).keys()), so parking a caliber
+    in the config auto-drops it. DB join uses config['retailer_slug'] when
+    present, else the config filename stem (== DB slug for the id-based stores;
+    the field covers the hyphen cases lucky-gunner / target-sports).
 
-    Returns a list of (slug_or_None, retailer_id_or_None, frozenset(calibers),
-    filename). Never raises — a parse failure just drops that scraper from
-    the check (and prints, so the gap is visible in the Actions log).
+    Returns a list of (slug, None, frozenset(calibers), '<name>.json'). Never
+    raises — a missing/unreadable config or empty active set prints a LOUD skip
+    (so the gap shows in the Actions log) and drops that scraper, rather than
+    silently contributing nothing the way the dead dict-parse did.
     """
     entries = []
     try:
@@ -174,24 +225,35 @@ def declared_coverage():
         except (OSError, SyntaxError) as e:
             print(f"coverage: cannot parse {fname} ({e}) - excluded.")
             continue
-        slug = rid = calibers = None
-        for node in tree.body:
-            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
-                continue
-            target = node.targets[0]
-            if not isinstance(target, ast.Name):
-                continue
-            if target.id == "RETAILER_SLUG" and isinstance(node.value, ast.Constant):
-                slug = node.value.value
-            elif target.id == "RETAILER_ID" and isinstance(node.value, ast.Constant):
-                rid = node.value.value
-            elif target.id == "CALIBER_PATHS" and isinstance(node.value, ast.Dict):
-                calibers = frozenset(
-                    k.value for k in node.value.keys
-                    if isinstance(k, ast.Constant) and isinstance(k.value, str)
-                )
-        if calibers and (slug or rid):
-            entries.append((slug, rid, calibers, fname))
+        kind, cfg_name = _loader_config_name(tree)
+        if kind == "parent":
+            continue  # list-of-parents store: no per-caliber map, correctly out
+        if kind is None:
+            print(f"coverage: {fname} has no load_caliber_paths/load_parent_paths "
+                  f"call - EXCLUDED (not config-driven? verify it migrated).")
+            continue
+        if cfg_name in COVERAGE_EXEMPT:
+            print(f"coverage: {fname} -> '{cfg_name}' is COVERAGE_EXEMPT (walled) "
+                  f"- skipped.")
+            continue
+        cfg_path = CALIBER_PATHS_DIR / f"{cfg_name}.json"
+        try:
+            cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            print(f"coverage: {fname} -> {cfg_name}.json unreadable ({e}) "
+                  f"- EXCLUDED (coverage gap; fix the config).")
+            continue
+        cals = cfg.get("calibers") or {}
+        active = frozenset(
+            c for c, ents in cals.items()
+            if any(e.get("status") == "active" for e in ents)
+        )
+        if not active:
+            print(f"coverage: {fname} -> {cfg_name}.json has no active per-caliber "
+                  f"entries - EXCLUDED (parent-only/empty; verify intended).")
+            continue
+        slug = cfg.get("retailer_slug") or cfg_name
+        entries.append((slug, None, active, f"{cfg_name}.json"))
     return entries
 
 
