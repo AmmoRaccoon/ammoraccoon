@@ -47,7 +47,9 @@ import requests
 from dotenv import load_dotenv
 from supabase import create_client
 
-from scraper_lib import recheck_product_stock, RECHECK_USER_AGENT, now_iso
+from scraper_lib import (
+    recheck_product_stock, RECHECK_USER_AGENT, now_iso, sanity_check_ppr,
+)
 
 load_dotenv()
 
@@ -77,7 +79,8 @@ def fetch_stale_listings(supabase, cutoff_iso):
     while True:
         resp = (supabase.table('listings')
                 .select('id, retailer_id, product_url, in_stock, last_updated, '
-                        'base_price, price_per_round, total_rounds')
+                        'base_price, price_per_round, total_rounds, '
+                        'caliber_normalized')
                 .eq('in_stock', True)
                 .lt('last_updated', cutoff_iso)
                 .order('retailer_id')
@@ -115,6 +118,8 @@ def _classify(slug, lst, res):
         'base_price': lst.get('base_price'),
         'price_per_round': lst.get('price_per_round'),
         'total_rounds': lst.get('total_rounds'),
+        # carried for the commit-path re-validation (per-caliber floor/ceiling)
+        'caliber_normalized': lst.get('caliber_normalized'),
         'status': res['status'], 'reason': res['reason'],
         'price': res['price'], 'determinable': res['determinable'],
         'new_in_stock': res['in_stock'],
@@ -145,6 +150,22 @@ def commit_change(supabase, rec, now):
       the OOS transition at a sane price.
     CONFIRM in-stock: refresh last_seen_in_stock + last_updated, and refresh the
       price when the page gave us a fresh one.
+
+    Returns 'written' | 'flag_only' | 'skipped_reval' so the caller can report.
+
+    PRICE RE-VALIDATION (price-honesty audit, 2026-06-19): the price we are about
+    to vouch for is re-checked through the SAME guard the 39 scrapers use
+    (sanity_check_ppr — arithmetic-consistency + per-caliber floor/ceiling).
+    Recheck previously bumped last_updated and reused the stored price WITHOUT
+    re-validating, keeping out-of-band / self-contradictory rows perpetually
+    "fresh" (the second masking bug). Honest-blank on failure — we never guess
+    which field is wrong:
+      * CONFIRM in-stock fails -> skip the bump entirely (don't touch
+        last_updated, don't write price_history). The 6h freshness gate ages the
+        row out of every customer surface honestly.
+      * FLIP -> OOS fails -> the OOS flip is still honest (the item is gone), so
+        flip the stock flag but skip the price_history insert (don't record a
+        bad price).
     """
     new_in = rec['new_in_stock']
     update = {
@@ -163,6 +184,30 @@ def commit_change(supabase, rec, now):
             ph_ppr = round(rec['price'] / rec['total_rounds'], 4)
             update['base_price'] = ph_price
             update['price_per_round'] = ph_ppr
+
+    # Re-validate the price we're about to vouch for. caliber_normalized is
+    # carried from the stale-listings query so the per-caliber floor/ceiling
+    # applies (without it the .38spl / .357 floor cases slip past DEFAULT_FLOOR).
+    price_ok = sanity_check_ppr(
+        ph_ppr, ph_price, rec.get('total_rounds'),
+        context=f"recheck {rec.get('slug', '')}",
+        caliber=rec.get('caliber_normalized'),
+    )
+    if not price_ok:
+        if new_in:
+            # Untrustworthy price on a confirm-in-stock: do NOT refresh. Skip the
+            # bump so the row stales out via the 6h freshness gate.
+            print(f"    [reval-skip] #{rec['listing_id']} [{rec.get('slug','')}] "
+                  f"confirm-in-stock FAILED re-validation "
+                  f"(ppr={ph_ppr}, price={ph_price}, rounds={rec.get('total_rounds')}, "
+                  f"cal={rec.get('caliber_normalized')}) -> skip bump, let it stale")
+            return 'skipped_reval'
+        # Flip -> OOS with a bad price: flag-only, no price_history row.
+        print(f"    [reval-flag-only] #{rec['listing_id']} [{rec.get('slug','')}] "
+              f"flip->OOS with untrustworthy price -> flip stock flag, skip price_history")
+        supabase.table('listings').update(update).eq('id', rec['listing_id']).execute()
+        return 'flag_only'
+
     supabase.table('listings').update(update).eq('id', rec['listing_id']).execute()
     # Record the observation. Skip only if we have no price at all (avoids a
     # null-price history row); the listing flag update above still lands.
@@ -174,6 +219,7 @@ def commit_change(supabase, rec, now):
             'in_stock': new_in,
             'recorded_at': now,
         }, returning='minimal').execute()
+    return 'written'
 
 
 def main():
@@ -294,14 +340,23 @@ def main():
     # LIVE path (only with --commit).
     now = now_iso()
     written = 0
+    flag_only = 0
+    skipped_reval = 0
     for r in records:
         if r['category'] in ('flip_oos', 'confirm_instock'):
             try:
-                commit_change(supabase, r, now)
-                written += 1
+                outcome = commit_change(supabase, r, now)
+                if outcome == 'skipped_reval':
+                    skipped_reval += 1
+                elif outcome == 'flag_only':
+                    flag_only += 1
+                else:
+                    written += 1
             except Exception as e:
                 print(f'    [DB-ERR] #{r["listing_id"]}: {e}')
     print(f'\n  wrote {written} listing updates (+ price_history rows).')
+    print(f'  flag-only (OOS flip, bad price withheld): {flag_only}')
+    print(f'  skipped re-validation (confirm-in-stock left to stale): {skipped_reval}')
     return 0
 
 

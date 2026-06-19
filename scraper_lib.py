@@ -685,6 +685,17 @@ PPR_CEILING = 5.00         # $5/rd is premium-defensive territory; above it is a
                            # ceiling OR scope it per caliber_normalized — a blanket
                            # $5 ceiling will silently drop legitimate listings.
 
+# Arithmetic-consistency thresholds (price-honesty audit, 2026-06-19). A row is
+# rejected only when its stored price_per_round disagrees with base_price /
+# total_rounds by BOTH a large relative AND a meaningful absolute margin. These
+# reuse the data-proven Track-1 frontend gate (lib/listingHelpers.js): the full
+# ~19.5K-listing sweep showed a clean EMPTY gap from 10-50% off — real parse
+# bugs sat >=60% off while ~108 legit "penny-rounded per-round" listings topped
+# out at ~10% off. A tighter 2% gate would hide those 108 correct rows; the
+# absolute gate immunises cheap calibers (.22 LR) against a 1c rounding.
+PPR_INCONSISTENCY_REL = 0.25   # 25% relative gap — sits inside the empty 10-50% gap
+PPR_INCONSISTENCY_ABS = 0.10   # AND at least 10c/rd off in absolute terms
+
 # Per-caliber lower bounds. The blanket $0.01 floor was too loose — a
 # misparsed 9mm at 3.2¢/rd was clearly impossible (street floor for
 # brass-case range 9mm hasn't been below ~22¢ in years) but still slipped
@@ -782,6 +793,39 @@ def sanity_check_ppr(ppr, price, rounds, context='', caliber=None):
             f"(price=${price}, rounds={rounds}) {context}"
         )
         return False
+
+    # Arithmetic-consistency check (price-honesty audit, 2026-06-19). Everything
+    # above validates only the per-round NUMBER's plausibility; none of it
+    # verifies that price_per_round actually agrees with base_price /
+    # total_rounds. A row can be perfectly in-band yet self-contradictory when a
+    # parse bug put the price or the round count in the wrong field (e.g. a
+    # .300BLK row storing $0.88/rd while $110 / 50rd = $2.20/rd). Reject those.
+    #
+    # HONEST-BLANK on violation: we reject the WHOLE row and never guess which of
+    # the three fields is corrupt — at write-time that is unknowable.
+    #
+    # SAFETY NO-OP when base_price / total_rounds are missing or <= 0: never
+    # reject what we cannot compute (mirrors the frontend gate's "need all three
+    # positive" rule). p is already a validated float (the ppr None/ABS_FLOOR
+    # checks above guarantee p > 0 by this point).
+    try:
+        base = float(price)
+        rnd = float(rounds)
+    except (TypeError, ValueError):
+        return True
+    if base > 0 and rnd > 0:
+        expected = base / rnd
+        abs_diff = abs(p - expected)
+        rel_diff = abs_diff / expected
+        if rel_diff > PPR_INCONSISTENCY_REL and abs_diff > PPR_INCONSISTENCY_ABS:
+            # Distinct prefix so inconsistency rejections grep cleanly, mirroring
+            # the [floor]/[ceiling] cases.
+            print(
+                f"  [inconsistent] {caliber or 'default'}: ppr ${p:.4f} vs "
+                f"base/rounds ${expected:.4f} ({rel_diff * 100:.0f}% / ${abs_diff:.2f} off) "
+                f"(price=${price}, rounds={rounds}) {context}"
+            )
+            return False
     return True
 
 
