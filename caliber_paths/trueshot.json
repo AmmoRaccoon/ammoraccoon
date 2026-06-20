@@ -194,6 +194,23 @@
           "note": "all gates pass"
         }
       }
+    ],
+    "45acp": [
+      {
+        "path": "/collections/ammunition-pistol-ammo-45-acp",
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-20",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 96.7,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
+      }
     ]
   }
 }

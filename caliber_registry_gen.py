@@ -1,7 +1,7 @@
 """GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 
 Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
-Registry sha256: f6ccd12855523429f7e91aed45af8cd8ba539865db0a9b8fad3008179d1c255a
+Registry sha256: 19b9224e18b6db768089b42cd889bb15645f854ce46cd460b258c9ad82e4e322
 
 Phase A (2026-06-12): NOTHING imports this module yet. Every table below
 is the registry-derived twin of a hand-maintained table in scraper_lib /
@@ -11,7 +11,7 @@ Parity proof: scripts/check_caliber_registry.py.
 """
 import re as _re
 
-REGISTRY_SHA256 = 'f6ccd12855523429f7e91aed45af8cd8ba539865db0a9b8fad3008179d1c255a'
+REGISTRY_SHA256 = '19b9224e18b6db768089b42cd889bb15645f854ce46cd460b258c9ad82e4e322'
 
 # Twin of scraper_lib.CALIBERS
 CALIBERS = {
@@ -25,10 +25,11 @@ CALIBERS = {
     '300blk': '.300 AAC Blackout',
     '38spl': '.38 Special',
     '357mag': '.357 Magnum',
+    '45acp': '.45 ACP',
 }
 
 # Twin of scraper_lib.normalize_caliber — branch order + specs verbatim.
-NORMALIZE_PRIORITY = ['223-556', '22lr', '380acp', '40sw', '308win', '762x39', '300blk', '38spl', '357mag', '9mm']
+NORMALIZE_PRIORITY = ['223-556', '22lr', '380acp', '40sw', '308win', '762x39', '300blk', '38spl', '357mag', '9mm', '45acp']
 NORMALIZE_SPECS = {
     '223-556': [('sub', '5.56'), ('sub', '5.56x45'), ('sub', '5.56nato'), ('sub', '5.56 nato'), ('re', r'\b\.?223\b'), ('sub', '223 rem'), ('sub', '.223 rem')],
     '22lr': [('re', r'\b22\s*lr\b'), ('sub', '22 long rifle'), ('sub', '.22lr'), ('re', r'\b\.22\s*lr\b')],
@@ -40,6 +41,7 @@ NORMALIZE_SPECS = {
     '38spl': [('sub', '38 special'), ('sub', '.38 special'), ('sub', '38 spl'), ('sub', '.38 spl'), ('sub', '38special')],
     '357mag': [('sub', '357 mag'), ('sub', '.357 mag'), ('sub', '357 magnum'), ('sub', '.357 magnum'), ('sub', '357mag')],
     '9mm': [('re', r'\b9mm\b'), ('sub', '9 mm'), ('sub', '9x19'), ('sub', '9 x 19'), ('sub', '9 luger')],
+    '45acp': [('sub', '45 acp'), ('sub', '.45 acp'), ('re', r'\b\.?45\s*auto\b(?!\s*rim)'), ('re', r'\b\.?45\s*acp\b')],
 }
 _NORMALIZE_COMPILED = {
     cal: [(kind, _re.compile(val) if kind == 're' else val) for kind, val in specs]
@@ -95,6 +97,7 @@ CALIBER_TO_FLOOR_KEY = {
     '300blk': '300blk',
     '38spl': '38spl',
     '357mag': '357mag',
+    '45acp': '45acp',
 }
 
 # Twin of scraper_lib.CALIBER_PRICE_CEILINGS.
@@ -110,6 +113,7 @@ CALIBER_PRICE_CEILINGS = {
     '300blk': 4.00,
     '38spl': 2.50,
     '357mag': 3.00,
+    '45acp': 2.50,
 }
 DEFAULT_CEILING = 3.00
 
@@ -125,6 +129,7 @@ AUDIT_EXPECTED_RANGES = {
     '300blk': (0.50, 2.50),
     '38spl': (0.25, 1.50),
     '357mag': (0.30, 1.50),
+    '45acp': (0.25, 1.20),
 }
 AUDIT_DEFAULT_RANGE = (0.10, 5.00)
 
@@ -206,6 +211,6 @@ CALIBER_URL_ALIASES = {
 }
 
 # Twins of scripts/match_manufacturer_rebates_to_listings.py caliber sets.
-REBATE_HANDGUN_CALIBERS = ('9mm', '380acp', '40sw', '38spl', '357mag')
+REBATE_HANDGUN_CALIBERS = ('9mm', '380acp', '40sw', '38spl', '357mag', '45acp')
 REBATE_RIFLE_CALIBERS   = ('223-556', '308win', '762x39', '300blk')
 REBATE_RIMFIRE_CALIBERS = ('22lr',)

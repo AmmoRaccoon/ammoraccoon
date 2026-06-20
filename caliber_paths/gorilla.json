@@ -44,6 +44,23 @@
         "path": "/product-category/view-ammo-by-caliber/300-blackout-view-ammo-by-caliber/",
         "status": "active"
       }
+    ],
+    "45acp": [
+      {
+        "path": "/product-category/view-ammo-by-caliber/45-acp-view-ammo-by-caliber/",
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-20",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": false,
+          "gate_pass_pct": 100.0,
+          "n_products": 5,
+          "note": "title does not name the caliber (generic)"
+        }
+      }
     ]
   }
 }

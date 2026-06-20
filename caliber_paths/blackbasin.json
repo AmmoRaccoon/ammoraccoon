@@ -195,6 +195,23 @@
           "note": "all gates pass"
         }
       }
+    ],
+    "45acp": [
+      {
+        "path": "/collections/45-acp-ammo",
+        "status": "active",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-20",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        }
+      }
     ]
   }
 }

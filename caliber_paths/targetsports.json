@@ -288,6 +288,29 @@
         "approved_by": "jon",
         "approved_at": "2026-06-12"
       }
+    ],
+    "45acp": [
+      {
+        "path": "/45-acp-auto-ammo-c-70.aspx",
+        "query": "pp=240&SortOrder=PriceAscending",
+        "status": "active",
+        "expect_landed": "/45-acp-auto-ammo-c-70.aspx",
+        "title_filter": null,
+        "source": "sitemap:product-categories-sitemap.xml",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-20",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 40,
+          "note": "all gates pass"
+        },
+        "approved_by": "jon",
+        "approved_at": "2026-06-20"
+      }
     ]
   }
 }
