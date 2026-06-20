@@ -1,7 +1,7 @@
 """GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 
 Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
-Registry sha256: 7df48e4ae6c0fe36ea73486135a25326614a9864d405b32b982169afae4a8c60
+Registry sha256: f6ccd12855523429f7e91aed45af8cd8ba539865db0a9b8fad3008179d1c255a
 
 Phase A (2026-06-12): NOTHING imports this module yet. Every table below
 is the registry-derived twin of a hand-maintained table in scraper_lib /
@@ -11,7 +11,7 @@ Parity proof: scripts/check_caliber_registry.py.
 """
 import re as _re
 
-REGISTRY_SHA256 = '7df48e4ae6c0fe36ea73486135a25326614a9864d405b32b982169afae4a8c60'
+REGISTRY_SHA256 = 'f6ccd12855523429f7e91aed45af8cd8ba539865db0a9b8fad3008179d1c255a'
 
 # Twin of scraper_lib.CALIBERS
 CALIBERS = {
@@ -202,6 +202,7 @@ CALIBER_URL_ALIASES = {
     '300blk': ['300-blackout', '300-aac-blackout', '300-aac', '300blk'],
     '38spl': ['38-special', '38-specials', '38-spl'],
     '357mag': ['357-magnum', '357-mag', '357'],
+    '45acp': ['45-acp', '45-auto', '45acp', '45-acp-auto'],
 }
 
 # Twins of scripts/match_manufacturer_rebates_to_listings.py caliber sets.

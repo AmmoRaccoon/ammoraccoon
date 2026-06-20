@@ -400,6 +400,7 @@
       ],
       "detect_js": ["45\\s*acp", "\\.45\\s*(?:acp|auto)", "45\\s*auto"],
       "ballistics_aliases": ["45 auto", ".45 auto", "45 acp"],
+      "url_aliases": ["45-acp", "45-auto", "45acp", "45-acp-auto"],
       "floor_key": "45acp",
       "scrape_floor": 0.25,
       "scrape_ceiling": null,
