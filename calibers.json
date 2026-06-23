@@ -3,7 +3,7 @@
   "comment": "Single source of truth for supported calibers (expansion #3, Phase A 2026-06-12). Hand-edit THIS file only; run `node ../ammoraccoon-web/scripts/gen-calibers/index.mjs --write` to regenerate derived tables. Values are VERBATIM transcriptions of the hand-maintained tables as of Phase A — including known quirks kept deliberately for byte parity: the duplicate '40sw' input alias (ReloadingCalculator.js), loose floor keys + the '556' twin row (scraper_lib CALIBER_PRICE_FLOORS), and per-surface display variants (display.overrides; D4). JSON has no comments, so transcription provenance lives in calibers.schema.json descriptions and the Phase A design doc.",
   "detect_priority_py": ["223-556", "22lr", "380acp", "40sw", "308win", "762x39", "300blk", "38spl", "357mag", "9mm", "45acp"],
   "detect_priority_js": ["762x39", "300blk", "308win", "223-556", "22lr", "380acp", "40sw", "38spl", "357mag", "9mm", "45acp"],
-  "market_bounds_order": ["9mm", "22lr", "380acp", "38spl", "357mag", "40sw", "45acp", "223-556", "300blk", "308win", "6.5cm", "762x39", "762x54r", "12ga"],
+  "market_bounds_order": ["9mm", "22lr", "380acp", "38spl", "357mag", "40sw", "45acp", "223-556", "300blk", "308win", "6.5cm", "762x39", "762x54r", "12ga", "10mm"],
   "defaults": {
     "scrape_floor": 0.15,
     "scrape_ceiling": 3.0,
@@ -448,6 +448,38 @@
       "display": { "full": "12 Gauge", "short": "12ga" },
       "market_floor": 0.15,
       "market_ceiling": 2.5
+    },
+    "10mm": {
+      "status": "staged",
+      "group": "pistol",
+      "admin_category": "pistol",
+      "rebate_firearm_type": "handgun",
+      "display": { "full": "10mm Auto", "short": "10mm" },
+      "order": { "popularity": 12, "home": 7, "history": 12 },
+      "color": "#6366f1",
+      "surfaces": { "home_picker": false, "history": false, "ammo_index": false, "reloading": false },
+      "detect_py": [
+        { "kind": "sub", "value": "10mm auto" },
+        { "kind": "sub", "value": "10 mm auto" },
+        { "kind": "re", "value": "\\b10\\s*mm\\b" }
+      ],
+      "detect_js": ["\\b10\\s*mm\\b", "10\\s*mm\\s*auto"],
+      "input_aliases": ["10mm", "10mmauto"],
+      "ballistics_aliases": ["10mm auto", "10mm", "10 mm auto"],
+      "url_aliases": ["10mm", "10mm-auto", "10mm-ammo", "10mm-auto-ammo", "10-mm", "10mm-ammunition"],
+      "floor_key": "10mm",
+      "scrape_floor": 0.2,
+      "scrape_ceiling": 3.5,
+      "market_floor": 0.2,
+      "market_ceiling": 2.5,
+      "audit_range": [0.3, 2.5],
+      "grain_buckets": [
+        { "value": "155", "label": "155gr", "op": "eq", "n": 155 },
+        { "value": "165", "label": "165gr", "op": "eq", "n": 165 },
+        { "value": "180", "label": "180gr", "op": "eq", "n": 180 },
+        { "value": "200", "label": "200gr", "op": "eq", "n": 200 },
+        { "value": "220", "label": "220gr", "op": "eq", "n": 220 }
+      ]
     }
   }
 }

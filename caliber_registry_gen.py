@@ -1,7 +1,7 @@
 """GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 
 Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
-Registry sha256: 19b9224e18b6db768089b42cd889bb15645f854ce46cd460b258c9ad82e4e322
+Registry sha256: 28a0e6e4d2e1da13ce3fa14bc5256a59b9cb67c745b1a0e8a2755df2e19cd332
 
 Phase A (2026-06-12): NOTHING imports this module yet. Every table below
 is the registry-derived twin of a hand-maintained table in scraper_lib /
@@ -11,7 +11,7 @@ Parity proof: scripts/check_caliber_registry.py.
 """
 import re as _re
 
-REGISTRY_SHA256 = '19b9224e18b6db768089b42cd889bb15645f854ce46cd460b258c9ad82e4e322'
+REGISTRY_SHA256 = '28a0e6e4d2e1da13ce3fa14bc5256a59b9cb67c745b1a0e8a2755df2e19cd332'
 
 # Twin of scraper_lib.CALIBERS
 CALIBERS = {
@@ -82,6 +82,7 @@ CALIBER_PRICE_FLOORS = {
     '38spl': 0.20,
     '357mag': 0.25,
     '45acp': 0.25,
+    '10mm': 0.20,
 }
 DEFAULT_FLOOR = 0.15
 
@@ -114,6 +115,7 @@ CALIBER_PRICE_CEILINGS = {
     '38spl': 2.50,
     '357mag': 3.00,
     '45acp': 2.50,
+    '10mm': 3.50,
 }
 DEFAULT_CEILING = 3.00
 
@@ -192,6 +194,9 @@ BALLISTICS_CALIBER_NORMALIZE = {
     '44 magnum': '44mag',
     '.44 magnum': '44mag',
     '44 mag': '44mag',
+    '10mm auto': '10mm',
+    '10mm': '10mm',
+    '10 mm auto': '10mm',
 }
 
 # Discovery url-slug aliases (expansion #4). Used by the discovery
@@ -208,6 +213,7 @@ CALIBER_URL_ALIASES = {
     '38spl': ['38-special', '38-specials', '38-spl'],
     '357mag': ['357-magnum', '357-mag', '357'],
     '45acp': ['45-acp', '45-auto', '45acp', '45-acp-auto'],
+    '10mm': ['10mm', '10mm-auto', '10mm-ammo', '10mm-auto-ammo', '10-mm', '10mm-ammunition'],
 }
 
 # Twins of scripts/match_manufacturer_rebates_to_listings.py caliber sets.
