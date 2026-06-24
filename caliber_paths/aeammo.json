@@ -148,6 +148,13 @@
         "status": "parked",
         "source": "PARKED 2026-06-12: genuine catalog absence (page 200 but zero products; facet lists neither). Re-activate when AE re-stocks."
       }
+    ],
+    "10mm": [
+      {
+        "path": "/Ammo/Handgun-Ammo/10mm-Ammo",
+        "status": "active",
+        "source": "scout 2026-06-22"
+      }
     ]
   }
 }

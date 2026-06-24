@@ -210,6 +210,14 @@
           "note": "all gates pass"
         }
       }
+    ],
+    "10mm": [
+      {
+        "path": "/handgun/10mm-ammo",
+        "query": "show=100",
+        "status": "active",
+        "source": "scout 2026-06-22"
+      }
     ]
   }
 }

@@ -311,6 +311,15 @@
         "approved_by": "jon",
         "approved_at": "2026-06-20"
       }
+    ],
+    "10mm": [
+      {
+        "path": "/10mm-auto-ammo-c-60.aspx",
+        "query": "pp=240&SortOrder=PriceAscending",
+        "title_filter": null,
+        "status": "active",
+        "source": "scout 2026-06-22"
+      }
     ]
   }
 }

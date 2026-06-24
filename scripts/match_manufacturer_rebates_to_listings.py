@@ -52,7 +52,7 @@ PAGE = 1000
 # Caliber sets per firearm_type. Listings without a caliber_normalized
 # value won't match any non-NULL gate — defensible: if we can't classify
 # the listing, we don't claim a rebate covers it.
-HANDGUN_CALIBERS = ('9mm', '380acp', '40sw', '38spl', '357mag', '45acp')
+HANDGUN_CALIBERS = ('9mm', '380acp', '40sw', '38spl', '357mag', '45acp', '10mm')
 RIFLE_CALIBERS   = ('223-556', '308win', '762x39', '300blk')
 RIMFIRE_CALIBERS = ('22lr',)
 SHOTSHELL_BULLET_TYPES = ('Slug', 'Buckshot', 'Birdshot')

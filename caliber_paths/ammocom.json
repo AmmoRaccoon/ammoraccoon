@@ -77,6 +77,13 @@
         "path": "/rifle/300-blackout-ammo",
         "status": "active"
       }
+    ],
+    "10mm": [
+      {
+        "path": "/handgun/10mm-ammo",
+        "status": "active",
+        "source": "scout 2026-06-22"
+      }
     ]
   }
 }

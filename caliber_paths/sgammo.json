@@ -74,6 +74,13 @@
         "path": "/catalog/rifle-ammo-sale/300-aac-blackout-ammo/",
         "status": "active"
       }
+    ],
+    "10mm": [
+      {
+        "path": "/catalog/pistol-ammo-sale/10mm-auto-ammo/",
+        "status": "active",
+        "source": "scout 2026-06-22"
+      }
     ]
   }
 }

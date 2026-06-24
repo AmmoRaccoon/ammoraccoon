@@ -184,6 +184,13 @@
           "note": "all gates pass"
         }
       }
+    ],
+    "10mm": [
+      {
+        "path": "/10mm/",
+        "status": "active",
+        "source": "scout 2026-06-22"
+      }
     ]
   }
 }

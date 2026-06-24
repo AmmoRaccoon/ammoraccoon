@@ -226,6 +226,13 @@
           "note": "all gates pass"
         }
       }
+    ],
+    "10mm": [
+      {
+        "path": "/collections/pistol-10mm",
+        "status": "active",
+        "source": "scout 2026-06-22"
+      }
     ]
   }
 }

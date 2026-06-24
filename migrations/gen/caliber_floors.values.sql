@@ -1,6 +1,6 @@
 -- GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 -- Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
--- Registry sha256: 28a0e6e4d2e1da13ce3fa14bc5256a59b9cb67c745b1a0e8a2755df2e19cd332
+-- Registry sha256: 7fb1dd11ce6fb6a169c596b85fd19e6fb51ff1bd6f287c04c9ef9e13a5e72601
 --
 -- The caliber_floors CTE block below is the registry-derived twin of the
 -- one inside migrations/033_homepage_segment_aggregates_percaliber_floor.sql

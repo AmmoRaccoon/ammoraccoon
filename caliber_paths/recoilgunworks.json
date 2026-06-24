@@ -62,6 +62,13 @@
         "path": "/ammo/rifle-ammo/7-62x39mm-ammo/",
         "status": "active"
       }
+    ],
+    "10mm": [
+      {
+        "path": "/ammo/handgun-ammo/10mm-auto-ammo/",
+        "status": "active",
+        "source": "scout 2026-06-22"
+      }
     ]
   }
 }
