@@ -184,6 +184,26 @@
           "note": "all gates pass"
         }
       }
+    ],
+    "30-06": [
+      {
+        "path": "/categories/rifle/30-06-springfield-ammo-for-sale.html",
+        "status": "active",
+        "source": "manual: STEP-2 harness validation 2026-06-26 (.30-06 caliber #13)",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-26",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 8,
+          "note": "all gates pass"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
+      }
     ]
   }
 }

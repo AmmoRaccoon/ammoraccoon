@@ -66,6 +66,26 @@
         "approved_by": "Jon",
         "approved_at": "2026-06-26"
       }
+    ],
+    "30-06": [
+      {
+        "path": "/search.php/type/ammo/q/30-06",
+        "status": "active",
+        "source": "manual: STEP-2 harness validation 2026-06-26 (.30-06 caliber #13)",
+        "validation": {
+          "method": "harness (buds-parser cards)",
+          "validated_at": "2026-06-26",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 88.9,
+          "n_products": 36,
+          "note": "q-scoped keyword category (no /caliber facet); page-1 cards parsed via the buds itemprop parser (generic-requests adapter is card-blind for buds)"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
+      }
     ]
   }
 }

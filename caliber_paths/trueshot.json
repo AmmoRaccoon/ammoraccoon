@@ -218,6 +218,26 @@
         "status": "active",
         "source": "scout 2026-06-22"
       }
+    ],
+    "30-06": [
+      {
+        "path": "/collections/ammunition-rifle-ammo-30-06",
+        "status": "active",
+        "source": "manual: STEP-2 harness validation 2026-06-26 (.30-06 caliber #13)",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-26",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 96.7,
+          "n_products": 30,
+          "note": "all gates pass"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
+      }
     ]
   }
 }

@@ -61,6 +61,26 @@
           "note": "title does not name the caliber (generic)"
         }
       }
+    ],
+    "30-06": [
+      {
+        "path": "/product-category/view-ammo-by-caliber/30-06-sprg/",
+        "status": "active",
+        "source": "manual: STEP-2 harness validation 2026-06-26 (.30-06 caliber #13)",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-26",
+          "verdict": "NEEDS_REVIEW",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 2,
+          "note": "honest-small: title matches + 100% gate-4 but only 2 SKUs (gate-5 small-count); wired on Jon nod"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
+      }
     ]
   }
 }
