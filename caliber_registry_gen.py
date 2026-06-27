@@ -1,7 +1,7 @@
 """GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 
 Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
-Registry sha256: 7fb1dd11ce6fb6a169c596b85fd19e6fb51ff1bd6f287c04c9ef9e13a5e72601
+Registry sha256: 4f9e5a40bfd7bf6b682d586daceacf742505964c17bf6b10a452866a9f97a8fc
 
 Phase A (2026-06-12): NOTHING imports this module yet. Every table below
 is the registry-derived twin of a hand-maintained table in scraper_lib /
@@ -11,7 +11,7 @@ Parity proof: scripts/check_caliber_registry.py.
 """
 import re as _re
 
-REGISTRY_SHA256 = '7fb1dd11ce6fb6a169c596b85fd19e6fb51ff1bd6f287c04c9ef9e13a5e72601'
+REGISTRY_SHA256 = '4f9e5a40bfd7bf6b682d586daceacf742505964c17bf6b10a452866a9f97a8fc'
 
 # Twin of scraper_lib.CALIBERS
 CALIBERS = {
@@ -27,10 +27,11 @@ CALIBERS = {
     '357mag': '.357 Magnum',
     '45acp': '.45 ACP',
     '10mm': '10mm Auto',
+    '30-06': '.30-06 Springfield',
 }
 
 # Twin of scraper_lib.normalize_caliber — branch order + specs verbatim.
-NORMALIZE_PRIORITY = ['223-556', '22lr', '380acp', '40sw', '308win', '762x39', '300blk', '38spl', '357mag', '9mm', '45acp', '10mm']
+NORMALIZE_PRIORITY = ['223-556', '22lr', '380acp', '40sw', '308win', '762x39', '300blk', '38spl', '357mag', '9mm', '45acp', '10mm', '30-06']
 NORMALIZE_SPECS = {
     '223-556': [('sub', '5.56'), ('sub', '5.56x45'), ('sub', '5.56nato'), ('sub', '5.56 nato'), ('re', r'\b\.?223\b'), ('sub', '223 rem'), ('sub', '.223 rem')],
     '22lr': [('re', r'\b22\s*lr\b'), ('sub', '22 long rifle'), ('sub', '.22lr'), ('re', r'\b\.22\s*lr\b')],
@@ -44,6 +45,7 @@ NORMALIZE_SPECS = {
     '9mm': [('re', r'\b9mm\b'), ('sub', '9 mm'), ('sub', '9x19'), ('sub', '9 x 19'), ('sub', '9 luger')],
     '45acp': [('sub', '45 acp'), ('sub', '.45 acp'), ('re', r'\b\.?45\s*auto\b(?!\s*rim)'), ('re', r'\b\.?45\s*acp\b')],
     '10mm': [('sub', '10mm auto'), ('sub', '10 mm auto'), ('re', r'\b10\s*mm\b')],
+    '30-06': [('sub', '30-06 springfield'), ('sub', '30-06 sprg'), ('re', r'\b\.?30[\s-]?06\b')],
 }
 _NORMALIZE_COMPILED = {
     cal: [(kind, _re.compile(val) if kind == 're' else val) for kind, val in specs]
@@ -85,6 +87,7 @@ CALIBER_PRICE_FLOORS = {
     '357mag': 0.25,
     '45acp': 0.25,
     '10mm': 0.20,
+    '30-06': 0.40,
 }
 DEFAULT_FLOOR = 0.15
 
@@ -102,6 +105,7 @@ CALIBER_TO_FLOOR_KEY = {
     '357mag': '357mag',
     '45acp': '45acp',
     '10mm': '10mm',
+    '30-06': '30-06',
 }
 
 # Twin of scraper_lib.CALIBER_PRICE_CEILINGS.
@@ -119,6 +123,7 @@ CALIBER_PRICE_CEILINGS = {
     '357mag': 3.00,
     '45acp': 2.50,
     '10mm': 3.50,
+    '30-06': 4.00,
 }
 DEFAULT_CEILING = 3.00
 
@@ -136,6 +141,7 @@ AUDIT_EXPECTED_RANGES = {
     '357mag': (0.30, 1.50),
     '45acp': (0.25, 1.20),
     '10mm': (0.30, 2.50),
+    '30-06': (0.50, 3.00),
 }
 AUDIT_DEFAULT_RANGE = (0.10, 5.00)
 
@@ -201,6 +207,10 @@ BALLISTICS_CALIBER_NORMALIZE = {
     '10mm auto': '10mm',
     '10mm': '10mm',
     '10 mm auto': '10mm',
+    '30-06': '30-06',
+    '30-06 springfield': '30-06',
+    '.30-06 springfield': '30-06',
+    '30-06 sprg': '30-06',
 }
 
 # Discovery url-slug aliases (expansion #4). Used by the discovery
@@ -218,9 +228,10 @@ CALIBER_URL_ALIASES = {
     '357mag': ['357-magnum', '357-mag', '357'],
     '45acp': ['45-acp', '45-auto', '45acp', '45-acp-auto'],
     '10mm': ['10mm', '10mm-auto', '10mm-ammo', '10mm-auto-ammo', '10-mm', '10mm-ammunition'],
+    '30-06': ['30-06', '30-06-springfield', '30-06-sprg', '3006', '30-06-ammo', '30-06-springfield-ammo', '30-06-sprg-ammo', '3006-springfield', '30-06-spring', '30-06-ammunition'],
 }
 
 # Twins of scripts/match_manufacturer_rebates_to_listings.py caliber sets.
 REBATE_HANDGUN_CALIBERS = ('9mm', '380acp', '40sw', '38spl', '357mag', '45acp', '10mm')
-REBATE_RIFLE_CALIBERS   = ('223-556', '308win', '762x39', '300blk')
+REBATE_RIFLE_CALIBERS   = ('223-556', '308win', '762x39', '300blk', '30-06')
 REBATE_RIMFIRE_CALIBERS = ('22lr',)

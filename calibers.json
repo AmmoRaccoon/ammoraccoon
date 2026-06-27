@@ -1,9 +1,9 @@
 {
   "version": 1,
   "comment": "Single source of truth for supported calibers (expansion #3, Phase A 2026-06-12). Hand-edit THIS file only; run `node ../ammoraccoon-web/scripts/gen-calibers/index.mjs --write` to regenerate derived tables. Values are VERBATIM transcriptions of the hand-maintained tables as of Phase A — including known quirks kept deliberately for byte parity: the duplicate '40sw' input alias (ReloadingCalculator.js), loose floor keys + the '556' twin row (scraper_lib CALIBER_PRICE_FLOORS), and per-surface display variants (display.overrides; D4). JSON has no comments, so transcription provenance lives in calibers.schema.json descriptions and the Phase A design doc.",
-  "detect_priority_py": ["223-556", "22lr", "380acp", "40sw", "308win", "762x39", "300blk", "38spl", "357mag", "9mm", "45acp", "10mm"],
-  "detect_priority_js": ["762x39", "300blk", "308win", "223-556", "22lr", "380acp", "40sw", "38spl", "357mag", "9mm", "45acp", "10mm"],
-  "market_bounds_order": ["9mm", "22lr", "380acp", "38spl", "357mag", "40sw", "45acp", "223-556", "300blk", "308win", "6.5cm", "762x39", "762x54r", "12ga", "10mm"],
+  "detect_priority_py": ["223-556", "22lr", "380acp", "40sw", "308win", "762x39", "300blk", "38spl", "357mag", "9mm", "45acp", "10mm", "30-06"],
+  "detect_priority_js": ["762x39", "300blk", "308win", "223-556", "22lr", "380acp", "40sw", "38spl", "357mag", "9mm", "45acp", "10mm", "30-06"],
+  "market_bounds_order": ["9mm", "22lr", "380acp", "38spl", "357mag", "40sw", "45acp", "223-556", "300blk", "308win", "6.5cm", "762x39", "762x54r", "12ga", "10mm", "30-06"],
   "defaults": {
     "scrape_floor": 0.15,
     "scrape_ceiling": 3.0,
@@ -478,6 +478,38 @@
         { "value": "165", "label": "165gr", "op": "eq", "n": 165 },
         { "value": "180", "label": "180gr", "op": "eq", "n": 180 },
         { "value": "200", "label": "200gr", "op": "eq", "n": 200 },
+        { "value": "220", "label": "220gr", "op": "eq", "n": 220 }
+      ]
+    },
+    "30-06": {
+      "status": "active",
+      "group": "rifle",
+      "admin_category": "rifle-prec",
+      "rebate_firearm_type": "rifle",
+      "display": { "full": ".30-06 Springfield", "short": ".30-06" },
+      "order": { "popularity": 13, "home": 5, "history": 13 },
+      "color": "#0ea5e9",
+      "surfaces": { "home_picker": false, "history": false, "ammo_index": false, "reloading": false },
+      "detect_py": [
+        { "kind": "sub", "value": "30-06 springfield" },
+        { "kind": "sub", "value": "30-06 sprg" },
+        { "kind": "re", "value": "\\b\\.?30[\\s-]?06\\b" }
+      ],
+      "detect_js": ["\\b\\.?30[\\s-]?06\\b"],
+      "input_aliases": ["3006", "30-06", "30-06-springfield", "30-06-sprg", "30-06-spring", "30 06", ".30-06"],
+      "ballistics_aliases": ["30-06", "30-06 springfield", ".30-06 springfield", "30-06 sprg"],
+      "url_aliases": ["30-06", "30-06-springfield", "30-06-sprg", "3006", "30-06-ammo", "30-06-springfield-ammo", "30-06-sprg-ammo", "3006-springfield", "30-06-spring", "30-06-ammunition"],
+      "floor_key": "30-06",
+      "scrape_floor": 0.4,
+      "scrape_ceiling": 4.0,
+      "market_floor": 0.2,
+      "market_ceiling": 3.0,
+      "audit_range": [0.5, 3.0],
+      "grain_buckets": [
+        { "value": "150", "label": "150gr", "op": "eq", "n": 150 },
+        { "value": "165", "label": "165gr", "op": "eq", "n": 165 },
+        { "value": "168", "label": "168gr", "op": "eq", "n": 168 },
+        { "value": "180", "label": "180gr", "op": "eq", "n": 180 },
         { "value": "220", "label": "220gr", "op": "eq", "n": 220 }
       ]
     }
