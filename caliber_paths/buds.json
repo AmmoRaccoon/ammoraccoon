@@ -3,7 +3,7 @@
   "retailer_slug": "buds",
   "platform": "generic-sitemap",
   "base": "https://www.budsgunshop.com",
-  "comment": "Expansion #4 Step-2 pilot, shape D (dict->f-string url). Transcribed VERBATIM from scraper_buds.py inline CALIBER_FILTER_URLS on 2026-06-14 — the f-strings resolve to absolute URLs; stored here as paths relative to base, parity-proven byte-identical (after relativizing the resolved f-strings against base) before flip. URL-encoding preserved exactly (+ = space, %26 = &, %28/%29 = parens, numeric prefix = Bud's category id); changing it 404s. Only the 6 calibers Bud's exposes a filter URL for are here; the other 4 (380acp, 357mag, 762x39, 300blk) are picked up by the all-ammo crawl backstop, which stays inline (it is NOT a per-caliber URL). Bud's is requests-based (not Playwright); see the scraper for why the Playwright redirect guard does not apply. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 pilot, 2026-06-14.",
+  "comment": "Expansion #4 Step-2 pilot, shape D (dict->f-string url). Transcribed VERBATIM from scraper_buds.py inline CALIBER_FILTER_URLS on 2026-06-14 — the f-strings resolve to absolute URLs; stored here as paths relative to base, parity-proven byte-identical (after relativizing the resolved f-strings against base) before flip. URL-encoding preserved exactly (+ = space, %26 = &, %28/%29 = parens, numeric prefix = Bud's category id); changing it 404s. Only the 6 calibers Bud's exposes a filter URL for are here; the other 4 (380acp, 357mag, 762x39, 300blk) are picked up by the all-ammo crawl backstop, which stays inline (it is NOT a per-caliber URL). Bud's is requests-based (not Playwright); see the scraper for why the Playwright redirect guard does not apply. Not yet harness-validated; validation null until Step-3. Approved by Jon, Step-2 pilot, 2026-06-14. 2026-06-26: added 10mm as a keyword-search q-scoped path (/search.php/type/ammo/q/10mm) — Bud's exposes no 10mm caliber facet and the all-ammo backstop's 1000-cap misses 10mm; harness PASS (200 / no-redirect / title-match / 100% of 36 page-1 cards / 6 pages). Each card is re-tagged by normalize_caliber(title), so the q-scope cannot mistag non-10mm rows. Approved by Jon.",
   "discovery": {
     "method": "manual"
   },
@@ -45,6 +45,26 @@
       {
         "path": "/search.php/type/ammo/caliber/10000566-38+special",
         "status": "active"
+      }
+    ],
+    "10mm": [
+      {
+        "path": "/search.php/type/ammo/q/10mm",
+        "status": "active",
+        "source": "manual: keyword-search q-scope (Bud's exposes no 10mm caliber facet; the all-ammo backstop's 1000-cap misses 10mm)",
+        "validation": {
+          "method": "harness (buds-parser cards)",
+          "validated_at": "2026-06-26",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 36,
+          "note": "q-scoped keyword category, not a /caliber/<id> facet (none exists for 10mm); page-1 cards parsed via the buds itemprop parser because the generic-requests fetch adapter is card-blind for buds; 36/36 = 100% normalize to 10mm; page <title> '\"10mm\" in Ammo'; /page/N pagination confirmed through page 6"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
       }
     ]
   }
