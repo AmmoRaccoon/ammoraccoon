@@ -1,7 +1,7 @@
 """GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 
 Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
-Registry sha256: 4f9e5a40bfd7bf6b682d586daceacf742505964c17bf6b10a452866a9f97a8fc
+Registry sha256: dbfbb1acd6fe2680052d48cc9d9234de2ffa08d863a2b1a7e93b055339d04be8
 
 Phase A (2026-06-12): NOTHING imports this module yet. Every table below
 is the registry-derived twin of a hand-maintained table in scraper_lib /
@@ -11,7 +11,7 @@ Parity proof: scripts/check_caliber_registry.py.
 """
 import re as _re
 
-REGISTRY_SHA256 = '4f9e5a40bfd7bf6b682d586daceacf742505964c17bf6b10a452866a9f97a8fc'
+REGISTRY_SHA256 = 'dbfbb1acd6fe2680052d48cc9d9234de2ffa08d863a2b1a7e93b055339d04be8'
 
 # Twin of scraper_lib.CALIBERS
 CALIBERS = {
@@ -28,10 +28,11 @@ CALIBERS = {
     '45acp': '.45 ACP',
     '10mm': '10mm Auto',
     '30-06': '.30-06 Springfield',
+    '270win': '.270 Winchester',
 }
 
 # Twin of scraper_lib.normalize_caliber — branch order + specs verbatim.
-NORMALIZE_PRIORITY = ['223-556', '22lr', '380acp', '40sw', '308win', '762x39', '300blk', '38spl', '357mag', '9mm', '45acp', '10mm', '30-06']
+NORMALIZE_PRIORITY = ['223-556', '22lr', '380acp', '40sw', '308win', '762x39', '300blk', '38spl', '357mag', '9mm', '45acp', '10mm', '30-06', '270win']
 NORMALIZE_SPECS = {
     '223-556': [('sub', '5.56'), ('sub', '5.56x45'), ('sub', '5.56nato'), ('sub', '5.56 nato'), ('re', r'\b\.?223\b'), ('sub', '223 rem'), ('sub', '.223 rem')],
     '22lr': [('re', r'\b22\s*lr\b'), ('sub', '22 long rifle'), ('sub', '.22lr'), ('re', r'\b\.22\s*lr\b')],
@@ -46,6 +47,7 @@ NORMALIZE_SPECS = {
     '45acp': [('sub', '45 acp'), ('sub', '.45 acp'), ('re', r'\b\.?45\s*auto\b(?!\s*rim)'), ('re', r'\b\.?45\s*acp\b')],
     '10mm': [('sub', '10mm auto'), ('sub', '10 mm auto'), ('re', r'\b10\s*mm\b')],
     '30-06': [('sub', '30-06 springfield'), ('sub', '30-06 sprg'), ('re', r'\b\.?30[\s-]?06\b')],
+    '270win': [('re', r'(?:\b270\s*win(?:chester)?\b(?!\s*short))|(?:\b\.270\b(?!\s*(?:wsm|win(?:chester)?\s+short)))')],
 }
 _NORMALIZE_COMPILED = {
     cal: [(kind, _re.compile(val) if kind == 're' else val) for kind, val in specs]
@@ -88,6 +90,7 @@ CALIBER_PRICE_FLOORS = {
     '45acp': 0.25,
     '10mm': 0.20,
     '30-06': 0.40,
+    '270win': 0.40,
 }
 DEFAULT_FLOOR = 0.15
 
@@ -106,6 +109,7 @@ CALIBER_TO_FLOOR_KEY = {
     '45acp': '45acp',
     '10mm': '10mm',
     '30-06': '30-06',
+    '270win': '270win',
 }
 
 # Twin of scraper_lib.CALIBER_PRICE_CEILINGS.
@@ -124,6 +128,7 @@ CALIBER_PRICE_CEILINGS = {
     '45acp': 2.50,
     '10mm': 3.50,
     '30-06': 4.00,
+    '270win': 4.00,
 }
 DEFAULT_CEILING = 3.00
 
@@ -142,6 +147,7 @@ AUDIT_EXPECTED_RANGES = {
     '45acp': (0.25, 1.20),
     '10mm': (0.30, 2.50),
     '30-06': (0.50, 3.00),
+    '270win': (0.50, 3.00),
 }
 AUDIT_DEFAULT_RANGE = (0.10, 5.00)
 
@@ -211,6 +217,10 @@ BALLISTICS_CALIBER_NORMALIZE = {
     '30-06 springfield': '30-06',
     '.30-06 springfield': '30-06',
     '30-06 sprg': '30-06',
+    '270 win': '270win',
+    '270 winchester': '270win',
+    '.270 winchester': '270win',
+    '.270 win': '270win',
 }
 
 # Discovery url-slug aliases (expansion #4). Used by the discovery
@@ -229,9 +239,10 @@ CALIBER_URL_ALIASES = {
     '45acp': ['45-acp', '45-auto', '45acp', '45-acp-auto'],
     '10mm': ['10mm', '10mm-auto', '10mm-ammo', '10mm-auto-ammo', '10-mm', '10mm-ammunition'],
     '30-06': ['30-06', '30-06-springfield', '30-06-sprg', '3006', '30-06-ammo', '30-06-springfield-ammo', '30-06-sprg-ammo', '3006-springfield', '30-06-spring', '30-06-ammunition'],
+    '270win': ['270-win', '270-winchester', '270-win-ammo', '270-winchester-ammo', '270', '270-ammo', '270win'],
 }
 
 # Twins of scripts/match_manufacturer_rebates_to_listings.py caliber sets.
 REBATE_HANDGUN_CALIBERS = ('9mm', '380acp', '40sw', '38spl', '357mag', '45acp', '10mm')
-REBATE_RIFLE_CALIBERS   = ('223-556', '308win', '762x39', '300blk', '30-06')
+REBATE_RIFLE_CALIBERS   = ('223-556', '308win', '762x39', '300blk', '30-06', '270win')
 REBATE_RIMFIRE_CALIBERS = ('22lr',)
