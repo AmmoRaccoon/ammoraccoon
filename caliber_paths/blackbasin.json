@@ -219,6 +219,46 @@
         "status": "active",
         "source": "scout 2026-06-22"
       }
+    ],
+    "270win": [
+      {
+        "path": "/collections/270-winchester-ammo",
+        "status": "active",
+        "source": "manual: ultracode discovery sweep 2026-06-26",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-26",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "all gates pass"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
+      }
+    ],
+    "30-06": [
+      {
+        "path": "/collections/30-06-springfield-ammo",
+        "status": "active",
+        "source": "manual: ultracode discovery sweep 2026-06-26",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-26",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 30,
+          "note": "recovered via /collections.json handle discovery; all gates pass"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
+      }
     ]
   }
 }

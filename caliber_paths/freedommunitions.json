@@ -253,6 +253,26 @@
         "approved_by": "Jon",
         "approved_at": "2026-06-26"
       }
+    ],
+    "270win": [
+      {
+        "path": "/collections/rifle-270-winchester",
+        "status": "active",
+        "source": "manual: ultracode discovery sweep 2026-06-26",
+        "validation": {
+          "method": "harness",
+          "validated_at": "2026-06-26",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 100.0,
+          "n_products": 7,
+          "note": "all gates pass"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
+      }
     ]
   }
 }

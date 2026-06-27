@@ -86,6 +86,26 @@
         "approved_by": "Jon",
         "approved_at": "2026-06-26"
       }
+    ],
+    "270win": [
+      {
+        "path": "/search.php/type/ammo/q/270+win",
+        "status": "active",
+        "source": "manual: ultracode discovery sweep 2026-06-26",
+        "validation": {
+          "method": "harness (buds-parser cards)",
+          "validated_at": "2026-06-26",
+          "verdict": "PASS",
+          "status": 200,
+          "redirect": false,
+          "title_match": true,
+          "gate_pass_pct": 91.7,
+          "n_products": 36,
+          "note": "q-scoped keyword search \"270 win\"; 91.7% .270 Win purity (bare 270 mixes WSM/WBY)"
+        },
+        "approved_by": "Jon",
+        "approved_at": "2026-06-26"
+      }
     ]
   }
 }
