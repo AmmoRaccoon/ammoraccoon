@@ -10,7 +10,7 @@ from scraper_lib import (
     insert_price_history,
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, parse_bullet_type,
-    mark_retailer_scraped,
+    mark_retailer_scraped, normalize_caliber, clean_title,
     load_caliber_paths, category_redirected, report_empty_first_pages,
 )
 
@@ -133,6 +133,17 @@ def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id
             # Buckinghorse jams into every product title — keeps the saved
             # display name clean and avoids confusing future regex passes.
             name = re.sub(r'\s*-?\s*FREE SHIPPING.*$', '', raw_name, flags=re.IGNORECASE).strip()
+
+            # Re-tag by TITLE, never trust the category. A category page can
+            # cross-list a lookalike (e.g. .270 WSM in a .270 Win page);
+            # normalize_caliber excludes WSM/.277/.280/7mm and every off-list
+            # cartridge. A title that doesn't map to a tracked caliber is dropped
+            # (honest blank), never force-tagged by category.
+            cal_disp, cal_norm = normalize_caliber(clean_title(name))
+            if not cal_norm:
+                skipped += 1
+                continue
+
             href = link_el.get_attribute('href') or ''
             if not href:
                 skipped += 1
@@ -180,7 +191,7 @@ def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id
 
             price_per_round = round(base_price / total_rounds, 4)
             if not sanity_check_ppr(price_per_round, base_price, total_rounds,
-                                    context=f'{RETAILER_SLUG} {caliber_norm}', caliber=caliber_norm):
+                                    context=f'{RETAILER_SLUG} {cal_norm}', caliber=cal_norm):
                 skipped += 1
                 continue
 
@@ -204,8 +215,8 @@ def scrape_category_page(page, entry, caliber_norm, caliber_display, retailer_id
                 'retailer_id': retailer_id,
                 'retailer_product_id': product_id,
                 'product_url': product_url,
-                'caliber': caliber_display,
-                'caliber_normalized': caliber_norm,
+                'caliber': cal_disp,
+                'caliber_normalized': cal_norm,
                 'grain': grain,
                 'bullet_type': bullet_type,
                 'case_material': case_material,
