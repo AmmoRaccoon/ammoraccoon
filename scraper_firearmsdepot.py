@@ -81,6 +81,50 @@ def is_non_ammo_product(name, product_url):
     return False
 
 
+# ---------------------------------------------------------------------------
+# Source-mislabel guard: title caliber vs URL-slug caliber.
+#
+# firearmsdepot occasionally publishes a product whose TITLE names one caliber
+# while the URL slug reveals a different, look-alike caliber — the canonical
+# case being a ".270 Win" title on a .270 WSM product whose slug says
+# "270wsm". normalize_caliber faithfully reads the (wrong) title and tags it
+# 270win, so the defect is in the SOURCE's title, not our detection; a
+# title-only re-tag cannot catch it (DECISIONS 2026-06-27). When the slug
+# carries a conflicting caliber token that the title hides, we trust the slug
+# and DROP the row (honest blank) rather than mis-tag it.
+#
+# Table-driven so new look-alike pairs are a one-line add. Keyed by the
+# caliber the TITLE normalizes to; each value is a tuple of regexes that, when
+# found in the slug but ABSENT from the title, mark a genuine caliber
+# conflict. ONLY real caliber tokens belong here — never bullet diameters or
+# SKU digits, which would over-drop legitimate rows.
+TITLE_SLUG_CALIBER_CONFLICTS = {
+    # .270 Win (tracked) vs .270 WSM (untracked, confusable). FD strips the
+    # "WSM"/"Short Mag" from the title but leaves it in the slug. Both
+    # spellings covered. Verified live: catches the X270SDSLF Deer Season WSM
+    # row, drops nothing legitimate (2026-06-28 dry-run).
+    '270win': (r'270[\s\-]*wsm', r'\bwsm\b', r'short[\s\-]*mag'),
+}
+
+
+def slug_contradicts_title_caliber(title_caliber_norm, title, product_url):
+    """Return True when the URL slug reveals a caliber that conflicts with the
+    title's normalized caliber — a source mislabel we drop rather than trust.
+
+    Conservative by construction: fires only on the curated look-alike tokens
+    in TITLE_SLUG_CALIBER_CONFLICTS, and only when a token appears in the slug
+    but NOT in the title (so a correctly-titled product is never dropped)."""
+    patterns = TITLE_SLUG_CALIBER_CONFLICTS.get(title_caliber_norm)
+    if not patterns:
+        return False
+    slug = (product_url or '').lower()
+    title_l = (title or '').lower()
+    for pat in patterns:
+        if re.search(pat, slug) and not re.search(pat, title_l):
+            return True
+    return False
+
+
 def get_retailer_id():
     result = supabase.table("retailers").select("id").eq("slug", RETAILER_SLUG).execute()
     if not result.data:
@@ -232,6 +276,16 @@ def scrape_parent(page, parent_path, retailer_id, seen_ids, counts):
                 caliber_display, caliber_norm = normalize_caliber(name)
                 if not caliber_norm:
                     skipped += 1
+                    continue
+
+                # Source-mislabel guard: when the URL slug reveals a caliber
+                # that conflicts with the title (e.g. a ".270 Win" title on a
+                # product whose slug says "270wsm"), trust the slug and drop
+                # rather than mis-tag. See DECISIONS 2026-06-27.
+                if slug_contradicts_title_caliber(caliber_norm, name, product_url):
+                    skipped += 1
+                    print(f"  Dropped (title/slug caliber conflict): "
+                          f"{name[:55]} | {product_url}")
                     continue
 
                 # Stock detection. FD renders an "Out of Stock" badge in
