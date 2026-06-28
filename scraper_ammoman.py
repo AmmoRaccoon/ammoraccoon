@@ -370,6 +370,11 @@ def main() -> int:
             'condition_type': 'New',
             'country_of_origin': country,
             'manufacturer': manufacturer,
+            # Manufacturer part number from the Magento Product JSON-LD `mpn`
+            # field (Bucket B). Empty -> NULL (honest blank). Shared across
+            # pack-count variants of the same SKU line; the slug remains the
+            # unique retailer_product_id.
+            'manufacturer_sku': row['mpn'] or None,
             'rounds_per_box': row['total_rounds'],
             'boxes_per_case': 1,
             'total_rounds': row['total_rounds'],
