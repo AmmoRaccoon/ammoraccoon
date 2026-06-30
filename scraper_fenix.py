@@ -11,6 +11,7 @@ from scraper_lib import (
     insert_price_history,
     CALIBERS, now_iso, with_stock_fields, parse_purchase_limit,
     parse_brand, sanity_check_ppr, clean_title, parse_bullet_type,
+    normalize_caliber,
     mark_retailer_scraped,
     load_caliber_paths,
 )
@@ -136,6 +137,17 @@ def scrape_caliber(path, caliber_norm, caliber_display, retailer_id, seen_ids, c
                 skipped += 1
                 continue
 
+            # Re-tag by TITLE, never trust the category page. A category
+            # can cross-list a lookalike (an off-list cartridge or a
+            # different tracked caliber); normalize_caliber re-derives the
+            # real caliber and a title that maps to nothing tracked is
+            # dropped (honest blank), never force-tagged by the category.
+            # title is already clean_title'd above (blackbasin precedent).
+            cal_disp, cal_norm = normalize_caliber(title)
+            if not cal_norm:
+                skipped += 1
+                continue
+
             product_url = f"{SITE_BASE}/products/{handle}"
 
             # /brands/ guard kept for parity with the rest of the suite —
@@ -167,8 +179,8 @@ def scrape_caliber(path, caliber_norm, caliber_display, retailer_id, seen_ids, c
 
             price_per_round = round(base_price / total_rounds, 4)
             if not sanity_check_ppr(price_per_round, base_price, total_rounds,
-                                    context=f'{RETAILER_SLUG} {caliber_norm}',
-                                    caliber=caliber_norm):
+                                    context=f'{RETAILER_SLUG} {cal_norm}',
+                                    caliber=cal_norm):
                 skipped += 1
                 continue
 
@@ -197,8 +209,8 @@ def scrape_caliber(path, caliber_norm, caliber_display, retailer_id, seen_ids, c
                 'retailer_id': retailer_id,
                 'retailer_product_id': product_id,
                 'product_url': product_url,
-                'caliber': caliber_display,
-                'caliber_normalized': caliber_norm,
+                'caliber': cal_disp,
+                'caliber_normalized': cal_norm,
                 'grain': grain,
                 'bullet_type': bullet_type,
                 'case_material': case_material,

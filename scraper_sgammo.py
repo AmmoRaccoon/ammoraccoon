@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 from supabase import create_client
 
 from scraper_lib import (
-    CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, parse_brand,
+    CALIBERS, now_iso, clean_title, normalize_caliber, with_stock_fields, parse_purchase_limit, parse_brand,
     sanity_check_ppr, parse_bullet_type, mark_retailer_scraped, insert_price_history,
     load_caliber_paths, category_redirected, report_empty_first_pages,
 )
@@ -159,6 +159,16 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                     skipped += 1
                     continue
 
+                # Re-tag by TITLE, never trust the category page. A category
+                # can cross-list a lookalike (an off-list cartridge or a
+                # different tracked caliber); normalize_caliber re-derives the
+                # real caliber and a title that maps to nothing tracked is
+                # dropped (honest blank), never force-tagged by the category.
+                cal_disp, cal_norm = normalize_caliber(clean_title(name))
+                if not cal_norm:
+                    skipped += 1
+                    continue
+
                 # \s* between $ and the digits is permissive belt-and-
                 # suspenders — Playwright's inner_text() strips the
                 # &#36;-entity-then-space rendering down to "$0.28",
@@ -182,7 +192,7 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                     continue
 
                 if not sanity_check_ppr(price_per_round, base_price, total_rounds,
-                                        context=f'{RETAILER_SLUG} {caliber_norm}', caliber=caliber_norm):
+                                        context=f'{RETAILER_SLUG} {cal_norm}', caliber=cal_norm):
                     skipped += 1
                     continue
 
@@ -209,8 +219,8 @@ def scrape_caliber(page, caliber_norm, caliber_display, retailer_id, seen_ids):
                     'retailer_id': retailer_id,
                     'retailer_product_id': product_id,
                     'product_url': product_url,
-                    'caliber': caliber_display,
-                    'caliber_normalized': caliber_norm,
+                    'caliber': cal_disp,
+                    'caliber_normalized': cal_norm,
                     'grain': grain,
                     'bullet_type': bullet_type,
                     'case_material': case_material,

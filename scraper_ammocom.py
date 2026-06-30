@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 from supabase import create_client
 
-from scraper_lib import CALIBERS, now_iso, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history, load_caliber_paths, category_redirected, report_empty_first_pages
+from scraper_lib import CALIBERS, now_iso, clean_title, normalize_caliber, with_stock_fields, parse_purchase_limit, sanity_check_ppr, parse_bullet_type, parse_brand, mark_retailer_scraped, insert_price_history, load_caliber_paths, category_redirected, report_empty_first_pages
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -138,6 +138,16 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     if not title_el:
                         continue
                     title = (await title_el.inner_text()).strip()
+
+                    # Re-tag by TITLE, never trust the category page. A category
+                    # can cross-list a lookalike (an off-list cartridge or a
+                    # different tracked caliber); normalize_caliber re-derives the
+                    # real caliber and a title that maps to nothing tracked is
+                    # dropped (honest blank), never force-tagged by the category.
+                    cal_disp, cal_norm = normalize_caliber(clean_title(title))
+                    if not cal_norm:
+                        continue
+
                     product_slug = await title_el.get_attribute('id')
                     if not product_slug:
                         li_id = await card.get_attribute('id')
@@ -172,7 +182,7 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     brand = parse_brand(title) or "Unknown"
                     condition = parse_condition(title)
                     ppr = round(price / rounds, 4)
-                    if not sanity_check_ppr(ppr, price, rounds, context=title[:60], caliber=caliber_norm):
+                    if not sanity_check_ppr(ppr, price, rounds, context=title[:60], caliber=cal_norm):
                         continue
                     product_id = product_slug[:100]
                     if product_id in seen_ids:
@@ -182,8 +192,8 @@ async def scrape_caliber(page, caliber_norm, caliber_display, seen_ids):
                     product = {
                         'retailer_id': RETAILER_ID,
                         'retailer_product_id': product_id,
-                        'caliber': caliber_display,
-                        'caliber_normalized': caliber_norm,
+                        'caliber': cal_disp,
+                        'caliber_normalized': cal_norm,
                         'product_url': link,
                         'base_price': round(price, 2),
                         'price_per_round': ppr,
