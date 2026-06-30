@@ -83,7 +83,9 @@
         { "kind": "sub", "value": "5.56 nato" },
         { "kind": "re", "value": "\\b\\.?223\\b" },
         { "kind": "sub", "value": "223 rem" },
-        { "kind": "sub", "value": ".223 rem" }
+        { "kind": "sub", "value": ".223 rem" },
+        { "kind": "re", "value": "223\\s*rem" },
+        { "kind": "re", "value": "\\b556\\b" }
       ],
       "detect_js": ["5[.-]?56\\s*(?:nato|x45)?", "\\b\\.?223\\b", "223\\s*rem", "\\.223\\s*rem"],
       "input_aliases": ["223", "5.56", "556", "223rem", "223-556", "556nato", "5.56nato", "223remington"],
@@ -148,6 +150,7 @@
         { "kind": "sub", "value": ".380 acp" },
         { "kind": "sub", "value": "380auto" },
         { "kind": "sub", "value": "380 auto" },
+        { "kind": "re", "value": "\\b\\.?380\\s*acp\\b" },
         { "kind": "re", "value": "\\b\\.?380\\b" }
       ],
       "detect_js": ["380\\s*(?:acp|auto)", "\\.380\\b"],
@@ -213,6 +216,8 @@
         { "kind": "sub", "value": ".308 win" },
         { "kind": "sub", "value": "7.62x51" },
         { "kind": "sub", "value": "7.62 x 51" },
+        { "kind": "re", "value": "\\b\\.?308\\s*win\\b" },
+        { "kind": "re", "value": "\\b7\\.?62\\s*nato\\b" },
         { "kind": "re", "value": "\\b\\.?308\\b" }
       ],
       "detect_js": ["7[-.\\s]?62\\s*x\\s*51", "\\.308\\b", "308\\s*win"],
@@ -284,7 +289,9 @@
         { "kind": "sub", "value": "300 blk" },
         { "kind": "sub", "value": ".300 blk" },
         { "kind": "sub", "value": "300 aac" },
-        { "kind": "sub", "value": ".300 aac" }
+        { "kind": "sub", "value": ".300 aac" },
+        { "kind": "re", "value": "300\\s*(?:aac|blk|blackout)" },
+        { "kind": "re", "value": "\\.300\\s*(?:aac|blk|blackout)" }
       ],
       "detect_js": ["300\\s*(?:aac|blk|blackout)", "\\.300\\s*(?:aac|blk|blackout)"],
       "input_aliases": ["300", "300blk", "300blackout", "300aac", "300aacblackout"],
@@ -323,7 +330,8 @@
         { "kind": "sub", "value": ".38 special" },
         { "kind": "sub", "value": "38 spl" },
         { "kind": "sub", "value": ".38 spl" },
-        { "kind": "sub", "value": "38special" }
+        { "kind": "sub", "value": "38special" },
+        { "kind": "re", "value": "\\b\\.?38\\s*spl\\b" }
       ],
       "detect_js": ["38\\s*spl", "38\\s*special", "\\.38\\s*spl", "\\.38\\s*special"],
       "input_aliases": ["38", "38special", "38spl", "38spc"],
