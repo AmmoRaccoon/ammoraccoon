@@ -211,10 +211,16 @@ def scrape_caliber_url(page, base, caliber_norm, caliber_display, retailer_id, s
                     skipped += 1
                     continue
 
-                # CF caliber facets include component bullets (-bul- SKU)
-                # and unprimed brass — drop them before parsing.
+                # CF caliber facets include component bullets (-bul- and
+                # -bull- SKU forms) and unprimed brass — drop them before
+                # parsing. '-bull-' added 2026-07-02: six Speer/Sierra/
+                # Hornady projectile listings carried a '-bull-' slug the
+                # '-bul-' substring does NOT match, slipped through as
+                # "loaded .308", and dragged the /history daily floor to
+                # 41.83c on every CF-success day.
                 slug = product_url.rstrip('/').split('/')[-1].lower()
-                if '-bul-' in slug or 'unprimed' in slug or slug.startswith('starline-'):
+                if ('-bul-' in slug or '-bull-' in slug or 'unprimed' in slug
+                        or slug.startswith('starline-')):
                     skipped += 1
                     continue
 
@@ -226,6 +232,17 @@ def scrape_caliber_url(page, base, caliber_norm, caliber_display, retailer_id, s
                 name = clean_title(raw_name)
                 if not name:
                     skipped += 1
+                    continue
+
+                # Component guard, title leg (2026-07-02): CF titles these
+                # projectile products with a bare "Bull" token ("Speer
+                # WM308150GDB Bull 308 150 GoldDot 50"). \bbull\b cannot
+                # match loaded-ammo vocabulary (bullet/bullseye are single
+                # words with no boundary after 'bull') — proven against the
+                # full live .308 + 9mm categories in the 2026-07-02 dry-run.
+                if re.search(r'\bbull\b', name, re.IGNORECASE):
+                    skipped += 1
+                    print(f"  Skipped (component bullets): {name[:55]}")
                     continue
 
                 # Re-tag by TITLE, never trust the category page. CF's caliber
