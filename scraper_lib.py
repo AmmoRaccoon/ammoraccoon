@@ -841,10 +841,14 @@ TYPOGRAPHIC = str.maketrans({
 
 
 def clean_title(text):
-    """Translate typographic glyphs in a product title and strip whitespace."""
+    """Translate typographic glyphs in a product title and strip whitespace.
+
+    Exotic Unicode spaces (nbsp U+00A0, narrow-nbsp U+202F) are folded to a
+    regular space so caliber detection sees normal word spacing (e.g. a
+    "40<U+202F>S&W" title reads as "40 S&W")."""
     if not text:
         return ''
-    return text.translate(TYPOGRAPHIC).strip()
+    return text.translate(TYPOGRAPHIC).replace('\u00a0', ' ').replace('\u202f', ' ').strip()
 
 
 # Firearm-type classification for manufacturer_rebates rows. Mirrors

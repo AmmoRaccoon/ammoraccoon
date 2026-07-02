@@ -25,7 +25,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from caliber_registry_gen import normalize_caliber_gen as normalize_caliber
 
 DEFAULT_CORPUS = r"C:\Users\jonca\OneDrive\Desktop\ammoraccoon-web\scripts\gen-calibers\_corpus.json"
-ALLOWED_NEW = {"380acp", "300blk", "308win", "38spl", "223-556"}
+ALLOWED_NEW = {"380acp", "300blk", "308win", "38spl", "223-556",
+               "357mag", "30-06", "9mm", "10mm", "40sw"}
 
 
 def load_corpus(path):

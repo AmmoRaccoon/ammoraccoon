@@ -1,7 +1,7 @@
 """GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 
 Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
-Registry sha256: 40d48b76ee3edb6db3f283d7b1710fa6f00325d376cad9da96e9ac0f911518fd
+Registry sha256: 66a2b93d980800c1a4b20df6ae9284a1d15520e741b7656dc52857f3030da41c
 
 Phase A (2026-06-12): NOTHING imports this module yet. Every table below
 is the registry-derived twin of a hand-maintained table in scraper_lib /
@@ -11,7 +11,7 @@ Parity proof: scripts/check_caliber_registry.py.
 """
 import re as _re
 
-REGISTRY_SHA256 = '40d48b76ee3edb6db3f283d7b1710fa6f00325d376cad9da96e9ac0f911518fd'
+REGISTRY_SHA256 = '66a2b93d980800c1a4b20df6ae9284a1d15520e741b7656dc52857f3030da41c'
 
 # Twin of scraper_lib.CALIBERS
 CALIBERS = {
@@ -34,19 +34,19 @@ CALIBERS = {
 # Twin of scraper_lib.normalize_caliber — branch order + specs verbatim.
 NORMALIZE_PRIORITY = ['223-556', '22lr', '380acp', '40sw', '308win', '762x39', '300blk', '38spl', '357mag', '9mm', '45acp', '10mm', '30-06', '270win']
 NORMALIZE_SPECS = {
-    '223-556': [('sub', '5.56'), ('sub', '5.56x45'), ('sub', '5.56nato'), ('sub', '5.56 nato'), ('re', r'\b\.?223\b'), ('sub', '223 rem'), ('sub', '.223 rem'), ('re', r'223\s*rem'), ('re', r'\b556\b')],
+    '223-556': [('sub', '5.56'), ('sub', '5.56x45'), ('sub', '5.56nato'), ('sub', '5.56 nato'), ('re', r'\b\.?223\b'), ('sub', '223 rem'), ('sub', '.223 rem'), ('re', r'223\s*rem'), ('re', r'\b556\b'), ('re', r'\b556\s*nato')],
     '22lr': [('re', r'\b22\s*lr\b'), ('sub', '22 long rifle'), ('sub', '.22lr'), ('re', r'\b\.22\s*lr\b')],
     '380acp': [('sub', '380 acp'), ('sub', '.380 acp'), ('sub', '380auto'), ('sub', '380 auto'), ('re', r'\b\.?380\s*acp\b'), ('re', r'\b\.?380\b')],
-    '40sw': [('sub', '40 s&w'), ('sub', '40s&w'), ('sub', '.40 s&w'), ('sub', '.40sw'), ('sub', '40 smith'), ('re', r'\b\.?40\s*sw\b')],
-    '308win': [('sub', '308 win'), ('sub', '.308 win'), ('sub', '7.62x51'), ('sub', '7.62 x 51'), ('re', r'\b\.?308\s*win\b'), ('re', r'\b7\.?62\s*nato\b'), ('re', r'\b\.?308\b')],
+    '40sw': [('sub', '40 s&w'), ('sub', '40s&w'), ('sub', '.40 s&w'), ('sub', '.40sw'), ('sub', '40 smith'), ('re', r'\b\.?40\s*sw\b'), ('re', r'\b\.?40\s*s\s*&?\s*w\b')],
+    '308win': [('sub', '308 win'), ('sub', '.308 win'), ('sub', '7.62x51'), ('sub', '7.62 x 51'), ('re', r'\b\.?308\s*win\b'), ('re', r'\b7\.?62\s*nato\b'), ('re', r'\b\.?308\b'), ('sub', '762x51'), ('re', r'\b762\s*x?\s*51\b'), ('re', r'\b\.?308\s*win')],
     '762x39': [('sub', '7.62x39'), ('sub', '7.62 x 39'), ('sub', '762x39')],
     '300blk': [('sub', '300 blackout'), ('sub', '.300 blackout'), ('sub', '300 blk'), ('sub', '.300 blk'), ('sub', '300 aac'), ('sub', '.300 aac'), ('re', r'300\s*(?:aac|blk|blackout)'), ('re', r'\.300\s*(?:aac|blk|blackout)')],
-    '38spl': [('sub', '38 special'), ('sub', '.38 special'), ('sub', '38 spl'), ('sub', '.38 spl'), ('sub', '38special'), ('re', r'\b\.?38\s*spl\b')],
-    '357mag': [('sub', '357 mag'), ('sub', '.357 mag'), ('sub', '357 magnum'), ('sub', '.357 magnum'), ('sub', '357mag')],
-    '9mm': [('re', r'\b9mm\b'), ('sub', '9 mm'), ('sub', '9x19'), ('sub', '9 x 19'), ('sub', '9 luger')],
+    '38spl': [('sub', '38 special'), ('sub', '.38 special'), ('sub', '38 spl'), ('sub', '.38 spl'), ('sub', '38special'), ('re', r'\b\.?38\s*spl\b'), ('re', r'\b\.?38\s*sp(?:c|cl)?\b')],
+    '357mag': [('sub', '357 mag'), ('sub', '.357 mag'), ('sub', '357 magnum'), ('sub', '.357 magnum'), ('sub', '357mag'), ('re', r'\b\.?357\s*(?:rem(?:ington)?\.?\s*)?mag')],
+    '9mm': [('re', r'\b9mm\b'), ('sub', '9 mm'), ('sub', '9x19'), ('sub', '9 x 19'), ('sub', '9 luger'), ('re', r'\b9\s*mm\s*luger'), ('re', r'\b9\s*mm(?=\d)')],
     '45acp': [('sub', '45 acp'), ('sub', '.45 acp'), ('re', r'\b\.?45\s*auto\b(?!\s*rim)'), ('re', r'\b\.?45\s*acp\b')],
-    '10mm': [('sub', '10mm auto'), ('sub', '10 mm auto'), ('re', r'\b10\s*mm\b')],
-    '30-06': [('sub', '30-06 springfield'), ('sub', '30-06 sprg'), ('re', r'\b\.?30[\s-]?06\b')],
+    '10mm': [('sub', '10mm auto'), ('sub', '10 mm auto'), ('sub', '10mmauto'), ('re', r'\b10\s*mm\b')],
+    '30-06': [('sub', '30-06 springfield'), ('sub', '30-06 sprg'), ('re', r'\b\.?30[\s-]?06(?![0-9])')],
     '270win': [('re', r'(?:\b270\s*win(?:chester)?\b(?!\s*short))|(?:\b\.270\b(?!\s*(?:wsm|win(?:chester)?\s+short)))')],
 }
 _NORMALIZE_COMPILED = {

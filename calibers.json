@@ -39,7 +39,9 @@
         { "kind": "sub", "value": "9 mm" },
         { "kind": "sub", "value": "9x19" },
         { "kind": "sub", "value": "9 x 19" },
-        { "kind": "sub", "value": "9 luger" }
+        { "kind": "sub", "value": "9 luger" },
+        { "kind": "re", "value": "\\b9\\s*mm\\s*luger" },
+        { "kind": "re", "value": "\\b9\\s*mm(?=\\d)" }
       ],
       "detect_js": ["9\\s*mm", "9x19", "9\\s*luger"],
       "input_aliases": ["9mm", "9mmluger", "9x19", "9mmpara", "9para"],
@@ -85,7 +87,8 @@
         { "kind": "sub", "value": "223 rem" },
         { "kind": "sub", "value": ".223 rem" },
         { "kind": "re", "value": "223\\s*rem" },
-        { "kind": "re", "value": "\\b556\\b" }
+        { "kind": "re", "value": "\\b556\\b" },
+        { "kind": "re", "value": "\\b556\\s*nato" }
       ],
       "detect_js": ["5[.-]?56\\s*(?:nato|x45)?", "\\b\\.?223\\b", "223\\s*rem", "\\.223\\s*rem"],
       "input_aliases": ["223", "5.56", "556", "223rem", "223-556", "556nato", "5.56nato", "223remington"],
@@ -185,7 +188,8 @@
         { "kind": "sub", "value": ".40 s&w" },
         { "kind": "sub", "value": ".40sw" },
         { "kind": "sub", "value": "40 smith" },
-        { "kind": "re", "value": "\\b\\.?40\\s*sw\\b" }
+        { "kind": "re", "value": "\\b\\.?40\\s*sw\\b" },
+        { "kind": "re", "value": "\\b\\.?40\\s*s\\s*&?\\s*w\\b" }
       ],
       "detect_js": ["40\\s*s\\s*&?\\s*w", "\\.40\\s*sw", "40sw\\b"],
       "input_aliases": ["40", "40sw", "40sw", "40cal"],
@@ -218,7 +222,10 @@
         { "kind": "sub", "value": "7.62 x 51" },
         { "kind": "re", "value": "\\b\\.?308\\s*win\\b" },
         { "kind": "re", "value": "\\b7\\.?62\\s*nato\\b" },
-        { "kind": "re", "value": "\\b\\.?308\\b" }
+        { "kind": "re", "value": "\\b\\.?308\\b" },
+        { "kind": "sub", "value": "762x51" },
+        { "kind": "re", "value": "\\b762\\s*x?\\s*51\\b" },
+        { "kind": "re", "value": "\\b\\.?308\\s*win" }
       ],
       "detect_js": ["7[-.\\s]?62\\s*x\\s*51", "\\.308\\b", "308\\s*win"],
       "input_aliases": ["308", "308win", "308winchester", "7.62nato", "7.62x51", "762nato", "762x51"],
@@ -331,7 +338,8 @@
         { "kind": "sub", "value": "38 spl" },
         { "kind": "sub", "value": ".38 spl" },
         { "kind": "sub", "value": "38special" },
-        { "kind": "re", "value": "\\b\\.?38\\s*spl\\b" }
+        { "kind": "re", "value": "\\b\\.?38\\s*spl\\b" },
+        { "kind": "re", "value": "\\b\\.?38\\s*sp(?:c|cl)?\\b" }
       ],
       "detect_js": ["38\\s*spl", "38\\s*special", "\\.38\\s*spl", "\\.38\\s*special"],
       "input_aliases": ["38", "38special", "38spl", "38spc"],
@@ -370,7 +378,8 @@
         { "kind": "sub", "value": ".357 mag" },
         { "kind": "sub", "value": "357 magnum" },
         { "kind": "sub", "value": ".357 magnum" },
-        { "kind": "sub", "value": "357mag" }
+        { "kind": "sub", "value": "357mag" },
+        { "kind": "re", "value": "\\b\\.?357\\s*(?:rem(?:ington)?\\.?\\s*)?mag" }
       ],
       "detect_js": ["357\\s*mag", "\\.357\\s*mag", "357\\s*magnum"],
       "input_aliases": ["357", "357magnum", "357mag"],
@@ -469,6 +478,7 @@
       "detect_py": [
         { "kind": "sub", "value": "10mm auto" },
         { "kind": "sub", "value": "10 mm auto" },
+        { "kind": "sub", "value": "10mmauto" },
         { "kind": "re", "value": "\\b10\\s*mm\\b" }
       ],
       "detect_js": ["\\b10\\s*mm\\b", "10\\s*mm\\s*auto"],
@@ -501,7 +511,7 @@
       "detect_py": [
         { "kind": "sub", "value": "30-06 springfield" },
         { "kind": "sub", "value": "30-06 sprg" },
-        { "kind": "re", "value": "\\b\\.?30[\\s-]?06\\b" }
+        { "kind": "re", "value": "\\b\\.?30[\\s-]?06(?![0-9])" }
       ],
       "detect_js": ["\\b\\.?30[\\s-]?06\\b"],
       "input_aliases": ["3006", "30-06", "30-06-springfield", "30-06-sprg", "30-06-spring", "30 06", ".30-06"],
