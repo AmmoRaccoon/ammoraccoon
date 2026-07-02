@@ -228,6 +228,29 @@ def scrape_caliber_url(page, base, caliber_norm, caliber_display, retailer_id, s
                     skipped += 1
                     continue
 
+                # Re-tag by TITLE, never trust the category page. CF's caliber
+                # facets cross-list off-list cartridges (.357 SIG on /357/,
+                # .30-30 on /30-06/, .270 WSM, 20ga, etc.); normalize_caliber
+                # re-derives the real caliber and a title that maps to nothing
+                # tracked is dropped (honest blank), never force-tagged by the
+                # category. Replaces the old default-to-category behaviour that
+                # let .357 SIG / .30-30 rows persist under .357 Mag / .30-06.
+                title_disp, title_norm = normalize_caliber(name)
+                if not title_norm:
+                    skipped += 1
+                    print(f"  Skipped (off-list caliber): {name[:55]}")
+                    continue
+                eff_display, eff_norm = title_disp, title_norm
+                # Dual-caliber HONESTY GUARD (preserved): a genuinely dual .38
+                # Special/.357 Magnum item whose title names BOTH (e.g. a CCI
+                # Big-4 revolver shotshell) keeps its category tag rather than
+                # collapsing to the higher-priority 38spl — the one documented
+                # CF cross-listing.
+                if caliber_norm in ('357mag', '38spl') and eff_norm in ('357mag', '38spl'):
+                    if (_title_names_caliber(name, '38spl')
+                            and _title_names_caliber(name, '357mag')):
+                        eff_display, eff_norm = caliber_display, caliber_norm
+
                 # Stock detection has to come before the price read because
                 # CF hides the visible price block on OOS cards and stashes
                 # the last known price inside a hidden notify-me modal as
@@ -294,8 +317,8 @@ def scrape_caliber_url(page, base, caliber_norm, caliber_display, retailer_id, s
                 price_per_round = ppr if ppr and ppr > 0 else round(base_price / total_rounds, 4)
 
                 if not sanity_check_ppr(price_per_round, base_price, total_rounds,
-                                        context=f'{RETAILER_SLUG} {caliber_norm}',
-                                        caliber=caliber_norm):
+                                        context=f'{RETAILER_SLUG} {eff_norm}',
+                                        caliber=eff_norm):
                     skipped += 1
                     continue
 
@@ -316,25 +339,6 @@ def scrape_caliber_url(page, base, caliber_norm, caliber_display, retailer_id, s
                 if not product_id or product_id in seen_ids:
                     continue
                 seen_ids.add(product_id)
-
-                # Caliber comes from the category page being crawled, but CF
-                # cross-lists .38 Special on its /357/ page (.38 Spl chambers in
-                # .357 revolvers), so those rows get mis-tagged 357mag. Re-derive
-                # caliber from the title and prefer it — but SCOPED to the .38 /
-                # .357 pair only (the one documented cross-listing), so nothing
-                # on any other category page can ever be re-tagged (e.g. a .40
-                # row carrying a stale 9mm URL is untouched). normalize_caliber
-                # already ranks .38 Special above .357. HONESTY GUARD: never flip
-                # a genuinely dual-caliber item whose title names BOTH calibers
-                # (e.g. a CCI Big-4 revolver shotshell) — keep its category tag.
-                eff_display, eff_norm = caliber_display, caliber_norm
-                if caliber_norm in ('357mag', '38spl'):
-                    title_disp, title_norm = normalize_caliber(name)
-                    if title_norm in ('357mag', '38spl') and title_norm != caliber_norm:
-                        names_both = (_title_names_caliber(name, '38spl')
-                                      and _title_names_caliber(name, '357mag'))
-                        if not names_both:
-                            eff_display, eff_norm = title_disp, title_norm
 
                 listing = {
                     'retailer_id': retailer_id,
