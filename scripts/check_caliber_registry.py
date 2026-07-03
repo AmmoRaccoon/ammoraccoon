@@ -25,7 +25,9 @@ edge-case corpus (the full live-URL corpus replay is a separate script).
 Exit 0 = all parity checks pass. Any FAIL prints the difference and exits 1.
 """
 import ast
+import hashlib
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -84,6 +86,25 @@ def ast_import_aliases(path, module):
                 out[alias.asname or alias.name] = alias.name
     return out
 
+
+# --- registry FRESHNESS (gen artifacts vs calibers.json, the real source) ----
+# The value-parity checks below became gen-vs-gen self-comparisons after the
+# Phase B cutover (consumers import the gen module). THIS is the check that
+# catches a half-regeneration or a calibers.json edit without `npm run
+# gen:calibers`: the sha256 of the CRLF-normalized source must match the sha
+# stamped into every generated artifact (same normalization as the generator,
+# ammoraccoon-web/scripts/gen-calibers/index.mjs). Body-level hand-edits of a
+# gen file (sha header left intact) are caught by the generator's --check
+# byte-compare, which the web repo's CI runs.
+source_sha = hashlib.sha256(
+    (ROOT / 'calibers.json').read_text(encoding='utf-8').replace('\r\n', '\n').encode('utf-8')
+).hexdigest()
+check('FRESHNESS caliber_registry_gen.py sha == sha256(calibers.json)',
+      gen.REGISTRY_SHA256, source_sha)
+_sql_head = (ROOT / 'migrations' / 'gen' / 'caliber_floors.values.sql').read_text(encoding='utf-8')
+_sql_sha = re.search(r'Registry sha256: ([0-9a-f]{64})', _sql_head)
+check('FRESHNESS caliber_floors.values.sql sha == sha256(calibers.json)',
+      _sql_sha.group(1) if _sql_sha else None, source_sha)
 
 # --- scraper_lib tables ------------------------------------------------------
 check('CALIBERS', scraper_lib.CALIBERS, gen.CALIBERS)
@@ -174,6 +195,16 @@ else:
                         for a, s in union_from_literals.items())
         check(f'BALLISTICS remaining literals ({", ".join(literal_sources)}) subset of gen union',
               subset_ok, True)
+
+# --- normalize_caliber wiring ------------------------------------------------
+# Post-cutover, scraper_lib.normalize_caliber IS normalize_caliber_gen (the
+# alias at scraper_lib.py:50), so the replay below compares a function to
+# itself — kept only as an edge-corpus smoke of the gen detector. The real
+# assertion is the WIRING: scraper_lib must bind normalize_caliber to the gen
+# function (losing the alias would silently fork detection again).
+_sl_aliases = ast_import_aliases(ROOT / 'scraper_lib.py', 'caliber_registry_gen')
+check('scraper_lib cut over: normalize_caliber <- gen.normalize_caliber_gen',
+      _sl_aliases.get('normalize_caliber'), 'normalize_caliber_gen')
 
 # --- normalize_caliber edge-case replay (built-in corpus) --------------------
 corpus = set()

@@ -1,0 +1,29 @@
+name: Registry parity + freshness
+
+# Drift gate for the caliber registry (drift-audit finding b4). Runs the
+# Python parity suite on every push, including the sha-freshness check that
+# proves caliber_registry_gen.py and migrations/gen/caliber_floors.values.sql
+# were generated from the CURRENT calibers.json (catches a source edit
+# without `npm run gen:calibers`, or a half-regeneration). Byte-level
+# verification of gen-file bodies runs in the web repo's registry-check
+# workflow via the generator's --check mode. No pip installs: the suite and
+# scraper_lib import cleanly on stdlib alone.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  registry-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Python parity + freshness suite
+        run: python scripts/check_caliber_registry.py
