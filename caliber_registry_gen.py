@@ -1,7 +1,7 @@
 """GENERATED FROM ammoraccoon/calibers.json - DO NOT EDIT.
 
 Regenerate: node scripts/gen-calibers/index.mjs --write (run from ammoraccoon-web).
-Registry sha256: 66a2b93d980800c1a4b20df6ae9284a1d15520e741b7656dc52857f3030da41c
+Registry sha256: c32b5b2d6c7315f86897a9dc9e4ce1a281b0fdb82f0e0b931fcf8ca62ff064a7
 
 Phase A (2026-06-12): NOTHING imports this module yet. Every table below
 is the registry-derived twin of a hand-maintained table in scraper_lib /
@@ -11,7 +11,7 @@ Parity proof: scripts/check_caliber_registry.py.
 """
 import re as _re
 
-REGISTRY_SHA256 = '66a2b93d980800c1a4b20df6ae9284a1d15520e741b7656dc52857f3030da41c'
+REGISTRY_SHA256 = 'c32b5b2d6c7315f86897a9dc9e4ce1a281b0fdb82f0e0b931fcf8ca62ff064a7'
 
 # Twin of scraper_lib.CALIBERS
 CALIBERS = {
